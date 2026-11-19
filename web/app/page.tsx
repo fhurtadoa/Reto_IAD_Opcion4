@@ -21,7 +21,8 @@ import {
   Target,
   Maximize2,
   Upload,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import InteractiveCharts from "../components/InteractiveCharts";
@@ -241,6 +242,33 @@ export default function ColabStyleApp() {
   const [solveResult, setSolveResult] = useState<any>(null);
   const [showTheoryModal, setShowTheoryModal] = useState(false);
   const [decisionProfile, setDecisionProfile] = useState<"equitativo" | "compensatorio" | "moderado" | "personalizado">("equitativo");
+  const [autoBalance, setAutoBalance] = useState<boolean>(true);
+
+  // Validación estricta de suma de pesos (teoría de programación compromiso: sum(w) = 1.00)
+  const sumWeights = weights.reduce((a, b) => a + b, 0);
+  const isWeightSumValid = Math.abs(sumWeights - 1.0) <= 0.005;
+
+  const handleNormalizeWeights = () => {
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const n = weights.length;
+    if (sum <= 0.00001) {
+      const eq = Array(n).fill(parseFloat((1 / n).toFixed(3)));
+      const eqSum = eq.reduce((a, b) => a + b, 0);
+      const diff = parseFloat((1.0 - eqSum).toFixed(3));
+      if (diff !== 0 && eq.length > 0) eq[0] = parseFloat((eq[0] + diff).toFixed(3));
+      setWeights(eq);
+      executeSolve(currentModel, eq);
+      return;
+    }
+    const norm = weights.map(w => parseFloat((w / sum).toFixed(3)));
+    const newSum = norm.reduce((a, b) => a + b, 0);
+    const diff = parseFloat((1.0 - newSum).toFixed(3));
+    if (diff !== 0 && norm.length > 0) {
+      norm[0] = parseFloat((norm[0] + diff).toFixed(3));
+    }
+    setWeights(norm);
+    executeSolve(currentModel, norm);
+  };
 
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -305,18 +333,63 @@ export default function ColabStyleApp() {
     }
     const sum = newW.reduce((a, b) => a + b, 0);
     const normalized = newW.map(w => parseFloat((w / sum).toFixed(3)));
+    const finalSum = normalized.reduce((a, b) => a + b, 0);
+    const diff = parseFloat((1.0 - finalSum).toFixed(3));
+    if (diff !== 0 && normalized.length > 0) {
+      normalized[0] = parseFloat((normalized[0] + diff).toFixed(3));
+    }
     setWeights(normalized);
     executeSolve(currentModel, normalized);
   };
 
-  // Sliders reactivos en vivo
+  // Sliders reactivos en vivo con auto-balance proporcional o modo libre
   const handleWeightChange = (index: number, val: number) => {
     setDecisionProfile("personalizado");
-    const newWeights = [...weights];
-    newWeights[index] = val;
-    if (weights.length === 2) {
-      newWeights[1 - index] = Math.max(0, parseFloat((1 - val).toFixed(3)));
+    if (isNaN(val)) val = 0;
+    val = Math.max(0, Math.min(1, val));
+    val = parseFloat(val.toFixed(3));
+    const n = weights.length;
+    let newWeights = [...weights];
+
+    if (autoBalance && n > 1) {
+      newWeights[index] = val;
+      const rem = Math.max(0, 1.0 - val);
+      const otherIndices: number[] = [];
+      let sumOther = 0;
+      for (let j = 0; j < n; j++) {
+        if (j !== index) {
+          otherIndices.push(j);
+          sumOther += (weights[j] ?? 0);
+        }
+      }
+
+      if (sumOther > 0.0001) {
+        otherIndices.forEach(j => {
+          newWeights[j] = parseFloat((((weights[j] ?? 0) / sumOther) * rem).toFixed(3));
+        });
+      } else {
+        const share = parseFloat((rem / otherIndices.length).toFixed(3));
+        otherIndices.forEach(j => {
+          newWeights[j] = share;
+        });
+      }
+
+      // Ajuste de redondeo exacto para garantizar suma = 1.000
+      const currentSum = newWeights.reduce((a, b) => a + b, 0);
+      const diff = parseFloat((1.0 - currentSum).toFixed(3));
+      if (diff !== 0 && otherIndices.length > 0) {
+        let maxOtherIdx = otherIndices[0];
+        for (const j of otherIndices) {
+          if (newWeights[j] > newWeights[maxOtherIdx]) {
+            maxOtherIdx = j;
+          }
+        }
+        newWeights[maxOtherIdx] = parseFloat(Math.max(0, newWeights[maxOtherIdx] + diff).toFixed(3));
+      }
+    } else {
+      newWeights[index] = val;
     }
+
     setWeights(newWeights);
 
     if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
@@ -1259,6 +1332,28 @@ export default function ColabStyleApp() {
                       );
                     })}
                   </tbody>
+                  <tfoot className="bg-zinc-100 font-mono text-xs border-t-2 border-zinc-200">
+                    <tr>
+                      <td colSpan={6} className="p-2.5 text-right font-bold text-zinc-700">
+                        Suma Total de Pesos (∑ w_i):
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <span
+                          className={`font-bold px-2 py-0.5 rounded text-xs inline-flex items-center gap-1 ${
+                            isWeightSumValid
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-rose-100 text-rose-800"
+                          }`}
+                        >
+                          {isWeightSumValid ? "✓ " : "✕ "}
+                          {sumWeights.toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-[10px] text-zinc-500 font-sans">
+                        {isWeightSumValid ? "Correcto (100%)" : "¡Inválido! Debe sumar 1.00"}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -1341,39 +1436,162 @@ export default function ColabStyleApp() {
             </div>
           </div>
 
-          {/* Deslizadores Manuales de Pesos */}
-          <div className="pt-2">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
-                Ajuste Fino de Deslizadores (Suma = 1,0):
-              </label>
-              {decisionProfile === "personalizado" && (
-                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                  Modo Personalizado Activo
-                </span>
-              )}
+          {/* Deslizadores Manuales de Pesos y Validación Estricta */}
+          <div className="pt-2 space-y-3">
+            {/* Cabecera de Control y Estado de Suma */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-zinc-100">
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="text-[11px] font-bold text-zinc-600 uppercase tracking-wider block">
+                  Ajuste de Pesos (w_i):
+                </label>
+                {/* Indicador en vivo de suma */}
+                <div
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-bold border transition-colors ${
+                    isWeightSumValid
+                      ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                      : "bg-rose-50 text-rose-800 border-rose-300 animate-pulse"
+                  }`}
+                >
+                  {isWeightSumValid ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Σ w_i = {sumWeights.toFixed(2)} (100% Correcto)</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Σ w_i = {sumWeights.toFixed(2)} (¡Inválido! ≠ 1.00)</span>
+                    </>
+                  )}
+                </div>
+
+                {decisionProfile === "personalizado" && (
+                  <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                    Modo Manual Personalizado
+                  </span>
+                )}
+              </div>
+
+              {/* Controles de Balanceo y Normalización */}
+              <div className="flex items-center gap-3 self-end sm:self-auto">
+                <label className="flex items-center gap-1.5 text-xs text-zinc-600 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoBalance}
+                    onChange={(e) => setAutoBalance(e.target.checked)}
+                    className="rounded text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 accent-emerald-600"
+                  />
+                  <span className="text-[11px] font-medium">Auto-balancear suma a 1.00</span>
+                </label>
+                <button
+                  onClick={handleNormalizeWeights}
+                  type="button"
+                  title="Re-escala proporcionalmente todos los pesos para que su suma sea exactamente 1.00"
+                  className="px-2.5 py-1 bg-zinc-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-zinc-200 text-zinc-700 font-bold text-[11px] rounded-lg transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Normalizar a 1.00</span>
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {currentModel.objectives.map((obj, i) => (
-                <div key={i} className="p-4 bg-zinc-50 rounded-xl border border-zinc-200 space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-zinc-800">{obj.name}</span>
-                    <span className="font-mono font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded">
-                      w_{i + 1} = {(weights[i] ?? 0.5).toFixed(2)} ({((weights[i] ?? 0.5) * 100).toFixed(0)}%)
+            {/* BANNER DE ERROR CRÍTICO SI NO SUMA 1.00 */}
+            {!isWeightSumValid && (
+              <div className="p-4 bg-rose-50 border-2 border-rose-300 rounded-xl text-rose-900 text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-sm text-rose-900 block">
+                      ⚠️ Error en la Ponderación: La suma de los pesos es {sumWeights.toFixed(3)} (debe ser exactamente 1.00)
                     </span>
+                    <p className="text-rose-700 leading-relaxed">
+                      En la Programación Compromiso multiobjetivo, los pesos ponderados deben sumar exactamente <b>1,00 (100%)</b>. Una suma distinta distorsiona las métricas de distancia (L1, L2 y L_inf) y produce resultados inconsistentes.
+                      {sumWeights > 0 && (
+                        <span className="block mt-1 text-[11px] text-rose-800">
+                          (Para evitar incongruencias, el optimizador escalará internamente los pesos a:{" "}
+                          <span className="font-mono font-bold">
+                            [{weights.map((w) => (w / sumWeights).toFixed(2)).join(", ")}]
+                          </span>
+                          ).
+                        </span>
+                      )}
+                    </p>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={weights[i] ?? 0.5}
-                    onChange={(e) => handleWeightChange(i, parseFloat(e.target.value))}
-                    className="w-full h-2.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                  />
                 </div>
-              ))}
+                <button
+                  onClick={handleNormalizeWeights}
+                  className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-all shrink-0 shadow-xs flex items-center justify-center gap-1.5 self-start md:self-center cursor-pointer"
+                >
+                  <span>⚡ Auto-Normalizar a 1.00</span>
+                </button>
+              </div>
+            )}
+
+            {/* Cuadrícula de Deslizadores y Cajas Numéricas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {currentModel.objectives.map((obj, i) => {
+                const wVal = weights[i] ?? 0;
+                const effectivePct = sumWeights > 0 ? ((wVal / sumWeights) * 100).toFixed(0) : 0;
+                return (
+                  <div
+                    key={i}
+                    className={`p-4 rounded-xl border transition-all space-y-2.5 ${
+                      !isWeightSumValid
+                        ? "bg-rose-50/30 border-rose-200"
+                        : "bg-zinc-50 border-zinc-200"
+                    }`}
+                  >
+                    <div className="flex justify-between items-center text-xs">
+                      <div className="flex items-center gap-1.5 truncate pr-2">
+                        <span className="font-bold text-zinc-800 truncate" title={obj.name}>
+                          {obj.name}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 font-mono shrink-0">
+                          ({obj.sense === "min" || obj.sense === "minimize" ? "Min" : "Max"})
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded text-[11px]">
+                          w_{i + 1} = {wVal.toFixed(2)} ({((wVal) * 100).toFixed(0)}%)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={wVal}
+                        onChange={(e) => handleWeightChange(i, parseFloat(e.target.value))}
+                        className="flex-1 h-2.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={wVal}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          if (!isNaN(val)) handleWeightChange(i, val);
+                        }}
+                        className="w-16 px-2 py-1 text-xs font-mono font-bold text-right bg-white border border-zinc-300 rounded-md focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    {!isWeightSumValid && sumWeights > 0 && (
+                      <div className="text-[10px] text-zinc-500 font-mono flex justify-between pt-0.5">
+                        <span>Peso relativo efectivo:</span>
+                        <span className="font-bold text-zinc-700">
+                          {(wVal / sumWeights).toFixed(3)} ({effectivePct}%)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1393,6 +1611,24 @@ export default function ColabStyleApp() {
               </p>
             </div>
           </div>
+
+          {/* Alerta si la suma de pesos no es 1.00 */}
+          {!isWeightSumValid && (
+            <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <b>Aviso de Ponderación:</b> Los pesos ingresados suman <b>{sumWeights.toFixed(3)}</b> (≠ 1.00). El optimizador utilizó automáticamente los pesos normalizados a escala 1.00.
+                </span>
+              </div>
+              <button
+                onClick={handleNormalizeWeights}
+                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-lg transition-colors shrink-0 self-end sm:self-auto cursor-pointer"
+              >
+                ⚡ Normalizar a 1.00
+              </button>
+            </div>
+          )}
 
           {/* Tarjeta de Recomendación según el Perfil */}
           <div className="p-4 rounded-xl border bg-gradient-to-r from-zinc-50 to-emerald-50/40 border-zinc-200 flex items-start gap-3">
