@@ -430,23 +430,23 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
   return (
     <div className="space-y-6">
       {/* Guía Explicativa del Gráfico (Para que el usuario entienda exactamente qué representa cada elemento) */}
-      <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-200 text-xs text-emerald-950 space-y-2">
-        <div className="flex items-center gap-2 font-bold text-emerald-900 text-[13px]">
-          <Info className="w-4 h-4 text-emerald-700 shrink-0" />
+      <div className="p-4 bg-slate-50 border border-slate-200 border-l-4 border-l-[#E11D48] text-xs text-slate-800 space-y-2">
+        <div className="flex items-center gap-2 font-bold text-slate-900 text-[13px]">
+          <Info className="w-4 h-4 text-[#E11D48] shrink-0" />
           <span>Guía de Interpretación del Gráfico en el Espacio de Objetivos</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] leading-relaxed">
           <div>
-            <span className="font-bold text-zinc-900">★ Punto Ideal (Dorado):</span> El valor óptimo absoluto alcanzable si cada objetivo se optimizara en solitario (incompatible simultáneamente).
+            <span className="font-bold text-slate-900">★ Punto Ideal (Dorado):</span> El valor óptimo absoluto alcanzable si cada objetivo se optimizara en solitario (incompatible simultáneamente).
           </div>
           <div>
-            <span className="font-bold text-zinc-900">✕ Anti-Ideal / Nadir (Rojo):</span> El peor valor tolerable observado en la matriz de pagos bajo los óptimos de los demás.
+            <span className="font-bold text-slate-900">✕ Anti-Ideal / Nadir (Rojo):</span> El peor valor tolerable observado en la matriz de pagos bajo los óptimos de los demás.
           </div>
           <div>
-            <span className="font-bold text-zinc-900">🟦 L1, 🟢 L2, 🟣 L_inf:</span> Las tres soluciones compromiso calculadas. Observa cómo se ubican entre el Ideal y el Nadir.
+            <span className="font-bold text-slate-900">🟦 L1, 🟢 L2, 🟣 L_inf:</span> Las tres soluciones compromiso calculadas. Observa cómo se ubican entre el Ideal y el Nadir.
           </div>
           <div>
-            <span className="font-bold text-zinc-900">
+            <span className="font-bold text-slate-900">
               {is2D ? "Curva Verde Continua:" : "Puntos Verdes Discretos:"}
             </span>{" "}
             {is2D
@@ -457,20 +457,20 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
       </div>
 
       {/* Gráfico 2D de Objetivos con Controles de Ejes */}
-      <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-3">
+      <div className="bg-white border border-slate-200 p-4 space-y-3">
         {/* Controles Interactivos para cambiar ejes o activar/desactivar nube */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-zinc-100 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-100 text-xs">
           <div className="flex items-center gap-3">
-            <span className="font-bold text-zinc-700 flex items-center gap-1">
-              <Compass className="w-3.5 h-3.5 text-zinc-500" />
+            <span className="font-bold text-slate-800 flex items-center gap-1">
+              <Compass className="w-3.5 h-3.5 text-[#E11D48]" />
               Proyección 2D:
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 text-[11px]">Eje X:</span>
+              <span className="text-slate-500 text-[11px]">Eje X:</span>
               <select
                 value={safeAxisX}
                 onChange={(e) => setAxisX(parseInt(e.target.value))}
-                className="bg-zinc-50 border border-zinc-300 rounded px-2 py-0.5 font-bold text-xs text-zinc-800 focus:outline-emerald-500"
+                className="bg-slate-50 border border-slate-300 rounded-sm px-2 py-0.5 font-bold text-xs text-slate-800 focus:outline-[#E11D48]"
               >
                 {headers.map((h: string, idx: number) => (
                   <option key={idx} value={idx}>{h}</option>
@@ -478,11 +478,11 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
               </select>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-zinc-500 text-[11px]">Eje Y:</span>
+              <span className="text-slate-500 text-[11px]">Eje Y:</span>
               <select
                 value={safeAxisY}
                 onChange={(e) => setAxisY(parseInt(e.target.value))}
-                className="bg-zinc-50 border border-zinc-300 rounded px-2 py-0.5 font-bold text-xs text-zinc-800 focus:outline-emerald-500"
+                className="bg-slate-50 border border-slate-300 rounded-sm px-2 py-0.5 font-bold text-xs text-slate-800 focus:outline-[#E11D48]"
               >
                 {headers.map((h: string, idx: number) => (
                   <option key={idx} value={idx}>{h}</option>
@@ -491,12 +491,12 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
             </div>
           </div>
 
-          <label className="flex items-center gap-1.5 text-zinc-600 cursor-pointer select-none">
+          <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={showParetoCloud}
               onChange={(e) => setShowParetoCloud(e.target.checked)}
-              className="accent-emerald-600 rounded"
+              className="accent-[#E11D48] rounded-sm"
             />
             <span className="text-[11px]">Ver muestras de la Frontera ({paretoPts.length} pts)</span>
           </label>
@@ -507,33 +507,33 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
 
       {/* Gráfico de Barras de % Logro (SOLO cuando hay 2 objetivos) */}
       {n_objs === 2 && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
+        <div className="bg-white border border-slate-200 p-4">
           <Plot data={dataBar} layout={layoutBar} useResizeHandler={true} style={{ width: "100%", height: "380px" }} />
         </div>
       )}
 
       {/* Gráfico Radar de % Logro (SOLO cuando hay 3 o más objetivos, para formar un polígono real) */}
       {n_objs >= 3 && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
+        <div className="bg-white border border-slate-200 p-4">
           <Plot data={dataRadar} layout={layoutRadar} useResizeHandler={true} style={{ width: "100%", height: "450px" }} />
         </div>
       )}
 
       {/* Gráfico 3D si hay 3 o más objetivos (con rotación 360°, zoom y selección de 3 ejes) */}
       {n_objs >= 3 && (
-        <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-zinc-100 text-xs">
+        <div className="bg-white border border-slate-200 p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-slate-100 text-xs">
             <div className="flex flex-wrap items-center gap-3">
-              <span className="font-bold text-zinc-800 flex items-center gap-1.5 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                <Box className="w-3.5 h-3.5 text-purple-600" />
+              <span className="font-bold text-white flex items-center gap-1.5 bg-[#111524] px-2.5 py-1 rounded-sm">
+                <Box className="w-3.5 h-3.5 text-[#E11D48]" />
                 Visualizador 3D Interactivo:
               </span>
               <div className="flex items-center gap-1">
-                <span className="text-zinc-500 text-[11px]">Eje X:</span>
+                <span className="text-slate-500 text-[11px]">Eje X:</span>
                 <select
                   value={safe3DX}
                   onChange={(e) => setAxis3DX(parseInt(e.target.value))}
-                  className="bg-zinc-50 border border-zinc-300 rounded px-1.5 py-0.5 font-bold text-xs text-zinc-800 focus:outline-emerald-500"
+                  className="bg-slate-50 border border-slate-300 rounded-sm px-1.5 py-0.5 font-bold text-xs text-slate-800 focus:outline-[#E11D48]"
                 >
                   {headers.map((h: string, idx: number) => (
                     <option key={idx} value={idx}>{h}</option>
@@ -541,11 +541,11 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
                 </select>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-zinc-500 text-[11px]">Eje Y:</span>
+                <span className="text-slate-500 text-[11px]">Eje Y:</span>
                 <select
                   value={safe3DY}
                   onChange={(e) => setAxis3DY(parseInt(e.target.value))}
-                  className="bg-zinc-50 border border-zinc-300 rounded px-1.5 py-0.5 font-bold text-xs text-zinc-800 focus:outline-emerald-500"
+                  className="bg-slate-50 border border-slate-300 rounded-sm px-1.5 py-0.5 font-bold text-xs text-slate-800 focus:outline-[#E11D48]"
                 >
                   {headers.map((h: string, idx: number) => (
                     <option key={idx} value={idx}>{h}</option>
@@ -553,11 +553,11 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
                 </select>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-zinc-500 text-[11px]">Eje Z:</span>
+                <span className="text-slate-500 text-[11px]">Eje Z:</span>
                 <select
                   value={safe3DZ}
                   onChange={(e) => setAxis3DZ(parseInt(e.target.value))}
-                  className="bg-zinc-50 border border-zinc-300 rounded px-1.5 py-0.5 font-bold text-xs text-zinc-800 focus:outline-emerald-500"
+                  className="bg-slate-50 border border-slate-300 rounded-sm px-1.5 py-0.5 font-bold text-xs text-slate-800 focus:outline-[#E11D48]"
                 >
                   {headers.map((h: string, idx: number) => (
                     <option key={idx} value={idx}>{h}</option>
@@ -566,7 +566,7 @@ export default function InteractiveCharts({ solveResult, currentModel }: Interac
               </div>
             </div>
 
-            <span className="text-[11px] text-zinc-500 bg-zinc-50 px-2 py-1 rounded border border-zinc-200">
+            <span className="text-[11px] text-slate-500 bg-slate-50 px-2 py-1 rounded-sm border border-slate-200">
               💡 <b>Tip:</b> Arrastra con clic para rotar 360° | Rueda para zoom
             </span>
           </div>
