@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+}
+
+/* Custom sleek scrollbars for cockpit panels */
+.cockpit-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.cockpit-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cockpit-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+.cockpit-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.55);
+}
+
+/* Custom range slider for weight equalizer */
+input[type="range"].weight-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+input[type="range"].weight-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #06b6d4;
+  border: 2px solid #0f172a;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
+  transition: transform 0.15s ease;
+}
+
+input[type="range"].weight-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
