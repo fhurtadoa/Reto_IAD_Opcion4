@@ -15,10 +15,10 @@
 
 ## 🎯 Objetivo de la Herramienta (Opción 4 del Concurso IAD)
 
-**OptiCompromise Cockpit V2** es una aplicación web interactiva, educativa y de código abierto diseñada para formular, analizar y resolver problemas de optimización multiobjetivo lineales (continuos y enteros mixtos), encontrando las soluciones compromiso más cercanas al **Punto Ideal ($Z^*$)** bajo tres métricas de distancia normalizada respecto al rango Ideal–Anti-Ideal:
+**OptiCompromise Cockpit V2** es una aplicación web interactiva, educativa y de código abierto diseñada para formular, analizar y resolver problemas de optimización multiobjetivo lineales (continuos y enteros mixtos), encontrando las soluciones compromiso más cercanas al **Punto Ideal ($Z^*$)** bajo tres métricas de distancia normalizada respecto al rango de la matriz de pagos:
 
 1. **Métrica $L_1$ (Manhattan):** Programación Lineal (LP/MILP con **HiGHS**). Modela un decisor utilitarista/compensatorio que minimiza $\sum w_i D_i(x)$.
-2. **Métrica $L_2$ (Euclidiana):** Programación Cuadrática Convexa (QP con `SLSQP` y jacobiano analítico; y Branch-and-Bound Best-First para modelos MIP). Minimiza $\sqrt{\sum w_i D_i(x)^2}$, penalizando más las brechas individuales grandes.
+2. **Métrica $L_2$ (Euclidiana):** Programación Cuadrática Convexa (QP con `SLSQP` y jacobiano analítico; y Branch-and-Bound Best-First para modelos MIP). Minimiza $\sqrt{\sum (w_i D_i(x))^2}$, según las ecuaciones de Clase 15 (pp. 9 y 19).
 3. **Métrica $L_\infty$ (Tchebysheff / Minimax):** Programación Lineal minimax mediante variable auxiliar $\lambda$ ($\min \lambda$ s.a. $w_i D_i(x) \le \lambda$), con **Modo Rayos X** que muestra las restricciones linealizadas en LaTeX. Reduce la mayor brecha ponderada. Los logros pueden coincidir cuando varias restricciones minimax quedan activas.
 4. **Frontera Eficiente de Pareto:** Aproximación combinando barridos sistemáticos de pesos sobre $L_1$, $L_2$ y $L_\infty$, con visualización 2D (curvas de isodistancia y proyección factible), 3D interactiva, Radar de % de logro y Espacio de Decisiones (para 2 variables, incluyendo malla discreta en MIP).
 5. **Módulos de Bonificación Implementados (sujetos a evaluación del jurado):**
@@ -35,9 +35,9 @@ En modelos biobjetivo, **Sensibilidad de pesos** compara L₁, L₂ y L∞ en 21
 
 ## 📐 Casos de Validación del Curso y Pruebas Automatizadas
 
-La suite en `api/tests/` (27 pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
+La suite en `api/tests/` (pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
 
-| Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Anti-Ideal ($Z_{\text{peor}}$) | Solución $L_1$ | Solución $L_2$ | Solución $L_\infty$ |
+| Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Nadir aproximado ($Z_{\text{peor}}$) | Solución $L_1$ | Solución $L_2$ | Solución $L_\infty$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Celdas Fotovoltaicas (Clase 15)** ($w=[0.5, 0.5]$) | 2 cont. | 2 (Max Utilidad, Min Contam.) | $(800.000,\; 200)$ | $(300.000,\; 600)$ | $x=[0, 200] \Rightarrow Z=(600k, 400)$ ($60.0\% / 50.0\%$) | $x=[0, 198.36] \Rightarrow Z=(595.1k, 396.7)$ ($59.0\% / 50.8\%$) | $x=[0, 190.91] \Rightarrow Z=(572.7k, 381.8)$ ($54.55\% = 54.55\%$) |
 | **Transporte (Taller 3)** ($w=[0.5, 0.5]$) | 12 cont. | 2 (Min Costo, Min Riesgo) | $(16.800,\; 2.600)$ | $(18.500,\; 5.700)$ | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17\,382.33,\; 3\,661.88)$ ($65.75\% = 65.75\%$) |
@@ -66,14 +66,14 @@ npm run dev
 2. [`vercel.json`](vercel.json) compila `web/` con Next.js, enruta `/api/(.*)` hacia la función serverless [`api/index.py`](api/index.py) e incluye `examples/**` mediante `includeFiles`.
 
 ### Opción C: Ejecución Autónoma en Google Colab
-Abrir el cuaderno [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Colab.ipynb) en Google Colab y ejecutar todas las celdas en orden (*Entorno de ejecución → Ejecutar todas*). No requiere clonar repositorios externos.
+Abrir el cuaderno [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Colab.ipynb) en Google Colab y ejecutar todas las celdas en orden (*Entorno de ejecución → Ejecutar todas*). Incluye una copia del motor web y no requiere clonar repositorios externos. Para volver a incorporar el motor tras modificarlo, ejecuta `python3 colab/sync_engine.py` desde Cockpit V2.
 
 ---
 
 ## 🧪 Pruebas Automatizadas y Verificación de Calidad
 
 ```bash
-# Pruebas unitarias y de validación matemática del motor (27 pruebas)
+# Pruebas unitarias y de validación matemática del motor
 cd api
 PYTHONPATH=. python3 -m unittest discover tests/ -v
 

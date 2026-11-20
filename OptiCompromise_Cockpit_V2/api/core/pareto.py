@@ -2,7 +2,7 @@
 Generación y aproximación de la Frontera Eficiente de Pareto.
 """
 import numpy as np
-from typing import List, Dict
+from typing import List
 from .schemas import ModelDefinition, PayoffMatrixData, ParetoPoint
 from .compromise import compute_distance_coefficients, solve_l1, solve_l2, solve_linf
 
@@ -55,7 +55,7 @@ def compute_pareto_frontier(
             w1 = i / steps
             for j in range(steps + 1 - i):
                 w2 = j / steps
-                w3 = max(0.0, 1.0 - w1 - w2)
+                w3 = (steps - i - j) / steps
                 weight_vectors.append(np.array([w1, w2, w3]))
     else:
         # Para > 3 objetivos: vértices puros + centro equitativo + muestreo Dirichlet reproducible
@@ -100,14 +100,14 @@ def compute_pareto_frontier(
                 )
             )
 
-        # Para L_inf usamos pesos estrictamente positivos para evitar soluciones débilmente dominadas cuando w_i = 0
+        # El barrido minimax incluye pesos interiores cerca de los extremos de la cuadrícula.
         w_pos = np.maximum(w, 1e-3)
         w_pos = w_pos / np.sum(w_pos)
         sol_inf = solve_linf(model, payoff, alpha, beta, w_pos)
         if sol_inf.status == "optimal":
             raw_points.append(
                 ParetoPoint(
-                    weights=[round(float(val), 4) for val in w_pos],
+                    weights=w_pos.tolist(),
                     objectives=sol_inf.objectives,
                     variables=sol_inf.variables,
                     metric="L_inf"
@@ -133,7 +133,8 @@ def compute_pareto_frontier(
                     weights=w.tolist(),
                     objectives=sol_l2.objectives,
                     variables=sol_l2.variables,
-                    metric="L2"
+                    metric="L2",
+                    status=sol_l2.status,
                 )
             )
 
@@ -151,7 +152,7 @@ def compute_pareto_frontier(
             efficient_candidates.append(p)
 
     # Priorizar que queden representadas todas las métricas (L1 en extremos, L2 y L_inf en interiores)
-    for p in efficient_candidates:
+    for p in sorted(efficient_candidates, key=lambda p: p.status != "optimal"):
         obj_vals = (np.array(p.objectives) - ideal) / scales
         if any(np.max(np.abs(obj_vals - s)) <= 1e-5 for s in seen_coords):
             continue

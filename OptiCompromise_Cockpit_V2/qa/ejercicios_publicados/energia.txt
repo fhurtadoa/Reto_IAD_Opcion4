@@ -1,0 +1,10 @@
+Min Costo = 30*lb + 30*lm + 75*om + 75*op + 60*gb + 60*gm + 60*gp + 90*rb + 90*rp
+Min CO2 = 1.44*lb + 1.44*lm + 0.72*om + 0.72*op + 0.45*gb + 0.45*gm + 0.45*gp
+Max Endogena = lb + lm + rb + rp
+lb + lm <= 31000
+om + op <= 15000
+gb + gm + gp <= 22000
+rb + rp <= 10000
+lb + gb + rb >= 38400
+lm + om + gm >= 19200
+op + gp + rp >= 6400

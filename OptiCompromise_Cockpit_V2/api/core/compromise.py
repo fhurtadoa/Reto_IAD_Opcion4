@@ -6,10 +6,10 @@ import heapq
 import time
 import numpy as np
 from scipy.linalg import qr
-from scipy.optimize import linprog, minimize
+from scipy.optimize import Bounds, LinearConstraint, linprog, milp, minimize
 from typing import List, Dict, Tuple, Optional
 from .schemas import ModelDefinition, PayoffMatrixData, MetricSolution
-from .payoff import build_linear_constraints
+from .payoff import build_linear_constraints, scale_linear_objective
 
 def compute_distance_coefficients(
     model: ModelDefinition, payoff: PayoffMatrixData
@@ -26,6 +26,8 @@ def compute_distance_coefficients(
     beta = np.zeros(n_objs, dtype=float)
     
     for i, obj in enumerate(model.objectives):
+        if payoff.normalization_sources and payoff.normalization_sources[i] == "constant":
+            continue
         coeffs = list(obj.coefficients)
         if len(coeffs) < n_vars:
             coeffs += [0.0] * (n_vars - len(coeffs))
@@ -91,7 +93,7 @@ def format_solution(
     if metric_name == "L1":
         agg_dist = float(np.sum(weights * d_array))
     elif metric_name == "L2":
-        agg_dist = float(np.sqrt(np.sum(weights * (d_array ** 2))))
+        agg_dist = float(np.linalg.norm(weights * d_array))
     else:  # L_inf
         agg_dist = float(np.max(weights * d_array))
         
@@ -124,6 +126,27 @@ def _clean_solution_vector(
     return cleaned
 
 
+def _continuous_column_scale(model, payoff, bounds, integrality, minimum=1e4):
+    # Los óptimos individuales también revelan cotas efectivas impuestas por filas.
+    # Las coordenadas enteras conservan su retícula original.
+    scales = np.ones(len(bounds))
+    for j, (variable, (lo, hi)) in enumerate(zip(model.variables, bounds)):
+        if integrality is not None and integrality[j]:
+            continue
+        witness = max((abs(row[variable.name]) for row in payoff.independent_solutions), default=0.0)
+        scale = max(witness, abs(lo or 0.0), abs(hi or 0.0))
+        if scale >= minimum:
+            scales[j] = scale
+    return scales
+
+
+def _scale_bounds(bounds, column_scale):
+    return [
+        tuple(None if bound is None else bound / scale for bound in pair)
+        for pair, scale in zip(bounds, column_scale)
+    ]
+
+
 def solve_l1(
     model: ModelDefinition,
     payoff: PayoffMatrixData,
@@ -138,7 +161,7 @@ def solve_l1(
     """
     A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
 
-    c_l1 = weights @ alpha
+    c_l1 = scale_linear_objective(weights @ alpha)
 
     res = linprog(
         c_l1,
@@ -164,13 +187,10 @@ def solve_l1(
 
     x = res.x
     if np.any(weights == 0):
-        # Escalar la igualdad protege la prioridad de objetivos con coeficientes pequeños.
-        scale = np.max(np.abs(c_l1))
-        if scale > 0:
-            primary = c_l1 / scale
-            A_eq = np.vstack([A_eq, primary]) if A_eq is not None else primary[None, :]
-            b_eq = np.append(b_eq, primary @ x) if b_eq is not None else [primary @ x]
-        tie = linprog(alpha.sum(axis=0), A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+        if np.any(c_l1):
+            A_eq = np.vstack([A_eq, c_l1]) if A_eq is not None else c_l1[None, :]
+            b_eq = np.append(b_eq, c_l1 @ x) if b_eq is not None else [c_l1 @ x]
+        tie = linprog(scale_linear_objective(alpha.sum(axis=0)), A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
                       bounds=bounds, integrality=integrality, method="highs")
         if tie.success:
             x = tie.x
@@ -194,18 +214,8 @@ def solve_linf(
     n_objs = len(model.objectives)
     A_ub_orig, b_ub_orig, A_eq_orig, b_eq_orig, bounds_orig, integrality_orig = build_linear_constraints(model)
 
-    # Solve in scaled coordinates for large continuous variables. Integer
-    # coordinates stay unchanged to preserve their original lattice.
-    column_scale = np.array([
-        max(1.0, abs(lo or 0.0), abs(hi or 0.0))
-        if integrality_orig is None or not integrality_orig[j] else 1.0
-        for j, (lo, hi) in enumerate(bounds_orig)
-    ])
-    column_scale[column_scale < 1e4] = 1.0
-    scaled_bounds = [
-        tuple(None if bound is None else bound / scale for bound in bounds)
-        for bounds, scale in zip(bounds_orig, column_scale)
-    ]
+    column_scale = _continuous_column_scale(model, payoff, bounds_orig, integrality_orig)
+    scaled_bounds = _scale_bounds(bounds_orig, column_scale)
 
     c_inf = np.zeros(n_vars + 1, dtype=float)
     c_inf[-1] = 1.0
@@ -267,7 +277,7 @@ def solve_linf(
         )
 
     tie = linprog(
-        np.append(alpha.sum(axis=0) * column_scale, 0.0),
+        np.append(scale_linear_objective(alpha.sum(axis=0) * column_scale), 0.0),
         A_ub=A_ub_total,
         b_ub=b_ub_total,
         A_eq=A_eq_total,
@@ -331,7 +341,7 @@ def _solve_continuous_qp(
     x0_candidates: List[np.ndarray],
 ) -> Tuple[Optional[np.ndarray], float, bool]:
     """
-    Resuelve la relajación cuadrática continua Min sum(w_i * (alpha_i^T x + beta_i)^2)
+    Resuelve la relajación cuadrática continua Min sum((w_i * (alpha_i^T x + beta_i))^2)
     con restricciones escaladas por fila para estabilidad numérica de SLSQP.
     """
     n_vars = len(bounds)
@@ -341,13 +351,16 @@ def _solve_continuous_qp(
         if lb is not None and ub is not None and lb > ub + 1e-9:
             return None, float("inf"), True
 
+    weighted_alpha = weights[:, None] * alpha
+    weighted_beta = weights * beta
+
     def objective(x: np.ndarray) -> float:
-        d = alpha @ x + beta
-        return float(np.sum(weights * (d ** 2)))
+        d = weighted_alpha @ x + weighted_beta
+        return float(d @ d)
 
     def jacobian(x: np.ndarray) -> np.ndarray:
-        d = alpha @ x + beta
-        return 2.0 * (alpha.T @ (weights * d))
+        d = weighted_alpha @ x + weighted_beta
+        return 2.0 * (weighted_alpha.T @ d)
 
     # Normalización de restricciones por norma de fila para evitar mal condicionamiento (ej. 2.35M vs 50)
     constraints = []
@@ -469,6 +482,61 @@ def _solve_continuous_qp(
     return best_x, max(0.0, best_val - gap), gap <= 1e-7
 
 
+def _refine_integer_qp(alpha, beta, linear_rows, bounds, integrality, seeds,
+                       incumbent, max_rounds, deadline):
+    """Acota la suma de cuadrados con tangentes y resuelve los cortes como MILP."""
+    A_ub, b_ub, A_eq, b_eq = linear_rows
+    n_obj, n_var = alpha.shape
+    rows, lower, upper = [], [], []
+    if A_ub is not None:
+        rows.extend(np.pad(A_ub, ((0, 0), (0, n_obj))))
+        lower.extend([-np.inf] * len(b_ub))
+        upper.extend(b_ub)
+    if A_eq is not None:
+        rows.extend(np.pad(A_eq, ((0, 0), (0, n_obj))))
+        lower.extend(b_eq)
+        upper.extend(b_eq)
+
+    def add_support(x):
+        d = alpha @ x + beta
+        # t_i >= d_i^2 + 2*d_i*((alpha*x + beta)_i - d_i)
+        rows.extend(np.column_stack((2 * d[:, None] * alpha, -np.eye(n_obj))))
+        lower.extend([-np.inf] * n_obj)
+        upper.extend(d * (d - 2 * beta))
+
+    for seed in seeds:
+        add_support(seed)
+    lb = [lo if lo is not None else -np.inf for lo, _ in bounds]
+    ub = [hi if hi is not None else np.inf for _, hi in bounds]
+    extended_bounds = Bounds(lb + [0.] * n_obj, ub + [np.inf] * n_obj)
+    extended_integrality = np.r_[integrality, np.zeros(n_obj, dtype=int)]
+    cost = np.r_[np.zeros(n_var), np.ones(n_obj)]
+    best_x, best_val = incumbent
+
+    for _ in range(max_rounds):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        result = milp(cost, integrality=extended_integrality, bounds=extended_bounds,
+                      constraints=LinearConstraint(rows, lower, upper),
+                      options={"time_limit": remaining, "mip_rel_gap": 0.0})
+        if result.x is None:
+            break
+        x = _clean_solution_vector(result.x[:n_var], bounds, integrality)
+        if not _is_feasible(x, A_ub, b_ub, A_eq, b_eq, bounds, integrality):
+            break
+        d = alpha @ x + beta
+        value = float(d @ d)
+        if value < best_val:
+            best_x, best_val = x, value
+        bound = getattr(result, "mip_dual_bound", None)
+        if bound is not None and np.isfinite(bound) and best_val - bound <= 1e-7:
+            return best_x, best_val, True
+        add_support(x)
+
+    return best_x, best_val, False
+
+
 def solve_l2(
     model: ModelDefinition,
     payoff: PayoffMatrixData,
@@ -482,34 +550,50 @@ def solve_l2(
 ) -> MetricSolution:
     """
     Resuelve la métrica L2 (Euclidiana) como Programación Cuadrática Convexa (QP):
-    Min sum(w_i * (alpha_i^T @ x + beta_i)^2)
+    Min sum((w_i * (alpha_i^T @ x + beta_i))^2)
     s.a. restricciones originales.
     - Para LP continuo: SLSQP con restricciones normalizadas y validación estricta de factibilidad.
-    - Para MIP: Branch-and-Bound Best-First con presupuesto de tiempo y nodos.
+    - Para MIP: cortes externos y ramificación y poda con presupuesto acotado.
     """
     n_vars = len(model.variables)
     var_names = [v.name for v in model.variables]
-    A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
+    A_ub_orig, b_ub, A_eq_orig, b_eq, bounds_orig, integrality = build_linear_constraints(model)
+    # Llevar las variables continuas a una escala manejable evita que
+    # SLSQP se detenga prematuramente con gradientes pequeños en unidades físicas.
+    column_scale = _continuous_column_scale(model, payoff, bounds_orig, integrality, minimum=1.0)
+    bounds = _scale_bounds(bounds_orig, column_scale)
+    A_ub = None if A_ub_orig is None else A_ub_orig * column_scale
+    A_eq = None if A_eq_orig is None else A_eq_orig * column_scale
+    scaled_alpha = alpha * column_scale
 
     def objective(x: np.ndarray) -> float:
-        d = alpha @ x + beta
-        return float(np.sum(weights * (d ** 2)))
+        d = scaled_alpha @ x + beta
+        return float(np.sum((weights * d) ** 2))
+
+    def report(x: np.ndarray, certified: bool) -> MetricSolution:
+        x = _clean_solution_vector(x * column_scale, bounds_orig, integrality)
+        if not _is_feasible(x, A_ub_orig, b_ub, A_eq_orig, b_eq, bounds_orig, integrality):
+            return MetricSolution(metric="L2", variables={}, objectives=[], normalized_distances=[],
+                                  achievement_pct=[], aggregate_distance=0.0,
+                                  status="error: la solución L2 no cumple el modelo original")
+        return format_solution("L2", x, model, payoff, alpha, beta, weights,
+                               status="optimal" if certified else "feasible_suboptimal")
 
     # Construir candidatos iniciales factibles
     x0_candidates: List[np.ndarray] = []
     if x0 is not None and len(x0) == n_vars:
-        x0_candidates.append(np.array(x0, dtype=float))
+        x0_candidates.append(np.array(x0, dtype=float) / column_scale)
     if incumbents:
         for inc in incumbents:
             if inc is not None and len(inc) == n_vars:
-                x0_candidates.append(np.array(inc, dtype=float))
+                x0_candidates.append(np.array(inc, dtype=float) / column_scale)
     if payoff.independent_solutions:
         ind_vecs = [np.array([sol[name] for name in var_names], dtype=float) for sol in payoff.independent_solutions]
-        x0_candidates.append(np.mean(ind_vecs, axis=0))
+        x0_candidates.append(np.mean(ind_vecs, axis=0) / column_scale)
 
     # --- CASO 1: CONTINUO PURO ---
     if integrality is None:
-        best_x, _, certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+        best_x, _, certified = _solve_continuous_qp(scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
         if best_x is None:
             return MetricSolution(
                 metric="L2",
@@ -520,13 +604,9 @@ def solve_l2(
                 aggregate_distance=0.0,
                 status="error: no se encontró solución factible L2",
             )
-        best_x = _clean_solution_vector(best_x, bounds, None)
-        return format_solution(
-            "L2", best_x, model, payoff, alpha, beta, weights,
-            status="optimal" if certified else "feasible_suboptimal",
-        )
+        return report(best_x, certified)
 
-    # --- CASO 2: MIP (ENTERO / BINARIO) — BRANCH AND BOUND EXACTO ---
+    # --- CASO 2: MIP (ENTERO / BINARIO) — RAMIFICACIÓN Y PODA CON PRESUPUESTO ---
     int_indices = [j for j, flag in enumerate(integrality) if flag == 1]
 
     best_int_x: Optional[np.ndarray] = None
@@ -536,7 +616,7 @@ def solve_l2(
     seed_pool: List[np.ndarray] = list(x0_candidates)
     if payoff.independent_solutions:
         for sol in payoff.independent_solutions:
-            seed_pool.append(np.array([sol[name] for name in var_names], dtype=float))
+            seed_pool.append(np.array([sol[name] for name in var_names], dtype=float) / column_scale)
 
     for cand in seed_pool:
         snapped = np.array(cand, dtype=float)
@@ -549,18 +629,30 @@ def solve_l2(
                 best_int_x = snapped
 
     # Resolver relajación raíz
-    root_x, root_lb, root_certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+    root_x, root_lb, root_certified = _solve_continuous_qp(scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
     tree_exhausted = root_x is not None or root_certified
     if root_x is not None:
+        start = time.monotonic()
+        deadline = start + max_seconds
+        if max_nodes > 0 and root_lb < best_int_val - 1e-7:
+            # Las tangentes permiten saltar entre flujos enteros usando el
+            # solver lineal entero, en vez de explorar todos los desgloses.
+            best_int_x, best_int_val, certified = _refine_integer_qp(
+                weights[:, None] * scaled_alpha, weights * beta,
+                (A_ub, b_ub, A_eq, b_eq), bounds, integrality, [root_x, *seed_pool],
+                (best_int_x, best_int_val), min(8, max_nodes), start + max_seconds / 2,
+            )
+            if certified:
+                return report(best_int_x, True)
+
         # Cola de prioridad Best-First: (lower_bound, tie_breaker, node_bounds, node_x)
         heap: List[Tuple[float, int, List[Tuple[Optional[float], Optional[float]]], np.ndarray]] = []
         counter = 0
         heapq.heappush(heap, (root_lb, counter, bounds, root_x))
 
-        t_start = time.monotonic()
         nodes_explored = 0
 
-        while heap and nodes_explored < max_nodes and (time.monotonic() - t_start) < max_seconds:
+        while heap and nodes_explored < max_nodes and time.monotonic() < deadline:
             lb_val, _, node_bounds, node_x = heapq.heappop(heap)
             if lb_val >= best_int_val - 1e-7:
                 continue
@@ -580,7 +672,7 @@ def solve_l2(
                 snapped = np.array(node_x, dtype=float)
                 for j in int_indices:
                     snapped[j] = round(float(snapped[j]))
-                if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, bounds, integrality=integrality, tol=1e-7):
+                if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, node_bounds, integrality=integrality, tol=1e-7):
                     val = objective(snapped)
                     if val < best_int_val:
                         best_int_val = val
@@ -599,7 +691,7 @@ def solve_l2(
                     continue
                 c_bounds = list(node_bounds)
                 c_bounds[branch_j] = (child_lb, child_ub)
-                c_x, c_lb, c_certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, c_bounds, [node_x])
+                c_x, c_lb, c_certified = _solve_continuous_qp(scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, c_bounds, [node_x])
                 if c_x is None and not c_certified:
                     tree_exhausted = False
                 if c_x is not None and c_lb < best_int_val - 1e-7:
@@ -624,9 +716,7 @@ def solve_l2(
             status="error: no se encontró solución entera factible para L2",
         )
 
-    best_int_x = _clean_solution_vector(best_int_x, bounds, integrality)
-    sol_status = "optimal" if tree_exhausted else "feasible_suboptimal"
-    return format_solution("L2", best_int_x, model, payoff, alpha, beta, weights, status=sol_status)
+    return report(best_int_x, tree_exhausted)
 
 
 def solve_all_metrics(

@@ -1,0 +1,25 @@
+OptiCompromise Cockpit V2, 20 de noviembre de 2026
+Entorno local Mac14,2. Python 3.14.0, SciPy 1.17.1, NumPy 2.4.0.
+Oráculo PuLP 2.9.0 (CBC) y CVXPY 1.9.3 (Clarabel 0.11.1).
+Node v26.13.1, Chrome 157.0.8103.79 y playwright-core 1.65.1.
+
+navegador.cjs — 27 formulaciones, 37 respuestas HTTP 200, 37 estados optimal.
+Tablas y muestras 2D cotejadas, dos regiones por vértices, fórmulas de 27
+modelos y una descarga CSV contrastada. Cero excepciones de página.
+oraculo.py y matriz.py — 37 perfiles aceptados. 81 óptimos contrastados.
+Regresión Red Team complementaria — F (continuo) y H (mixto) en Chrome.
+Las seis métricas pasaron el oráculo Red Team. H tuvo 106 muestras,
+sin puntos dominados entre ellas.
+
+PYTHONPATH=. python3 -m unittest discover -s tests (desde api)
+............................................
+----------------------------------------------------------------------
+Ran 44 tests in 8.218s
+
+OK
+
+npx tsc --noEmit — código 0.
+npm run lint — sin avisos o errores de ESLint.
+npm run build — compilación Next.js de producción correcta.
+Colab — igualdad de la celda generada comprobada. La celda se compiló
+localmente y devolvió L2 óptimo para Transporte 0.25/0.75 y Cadena entera.

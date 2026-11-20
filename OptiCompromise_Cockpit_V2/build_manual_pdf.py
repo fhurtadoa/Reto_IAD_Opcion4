@@ -97,7 +97,7 @@ def generate_figures():
     ax.add_patch(patches.Rectangle((1.2, 45.2), 97.6, 5.5, facecolor="#FFFFFF", edgecolor="#CBD5E1", lw=1))
     ax.add_patch(patches.Rectangle((2.0, 46.5), 3.0, 3.0, facecolor="#E11D48", edgecolor="none"))
     ax.text(5.8, 48.0, "OptiCompromise  [COCKPIT V2]", fontsize=9, fontweight="bold", color="#0F172A", va="center")
-    ax.text(33, 48.0, "Ejemplos (5 casos + En Blanco)  |  ● Óptimo", fontsize=7.5, color="#059669", fontweight="bold", va="center")
+    ax.text(33, 48.0, "Ejemplos (6 casos + En blanco)  |  ● Estado del solver", fontsize=7.5, color="#059669", fontweight="bold", va="center")
     ax.text(65, 48.0, "[Importar] [JSON] [Excel] [CSV] [Manual PDF] [Tema]", fontsize=7.2, color="#334155", va="center")
 
     # Panel Izquierdo (35%)
@@ -128,13 +128,13 @@ def generate_figures():
     ax.text(38.2, 41.9, "[Objetivos 2D]  [Espacio 3D]  [Radar % Logro]  [Región Factible]   |   [PNG]", fontsize=7.0, fontweight="bold", color="#0F172A", va="center")
 
     ax.add_patch(patches.Rectangle((37.2, 23.0), 60.6, 16.6, facecolor="#F8FAFC", edgecolor="#CBD5E1", lw=0.9))
-    ax.text(67.5, 31.3, "Lienzo Interactivo Plotly (Frontera Pareto + Curvas Isodistancia + Ideal ★ / Nadir ✕ / L₁ / L₂ / L∞)\n+ Explorador Desplegable de Puntos Pareto (Pesos × Métricas)", fontsize=7.4, color="#334155", ha="center", va="center")
+    ax.text(67.5, 31.3, "Lienzo Interactivo Plotly (Muestra Pareto + Curvas Isodistancia + Ideal ★ / Nadir ✕ / L₁ / L₂ / L∞)\n+ Explorador Desplegable de Puntos Pareto (Pesos × Métricas)", fontsize=7.4, color="#334155", ha="center", va="center")
 
     blocks_right = [
         (17.7, 4.5, "Recomendación Analítica + Comparativa Unificada (Zᵢ, % Logro Z'ᵢ, Distancia Dₚ)"),
         (12.6, 4.4, "Decisiones Óptimas por Variable (Vector x* en L₁, L₂, L∞)"),
-        (7.5, 4.4, "Matriz de Pagos (q×q) + Vectores Punto Ideal (Z*) y Anti-Ideal (Z_peor)"),
-        (2.3, 4.5, "Normalización Ideal–Nadir [0, 1] + Acordeón Modo Rayos X (L∞ · λ*)"),
+        (7.5, 4.4, "Matriz de pagos (q×q), ideal (Z*) y nadir aproximado"),
+        (2.3, 4.5, "Normalización por rango + Acordeón Modo Rayos X (L∞ · λ*)"),
     ]
     for y, h, lbl in blocks_right:
         ax.add_patch(patches.Rectangle((37.2, y), 60.6, h, facecolor="#F8FAFC", edgecolor="#E2E8F0", lw=0.8))
@@ -151,9 +151,9 @@ def generate_figures():
     # Subplot 1: Espacio de Objetivos
     px = [p.objectives[0] / 1000.0 for p in par_cel]
     py = [p.objectives[1] for p in par_cel]
-    ax1.plot(px, py, color="#E11D48", lw=2.5, label="Frontera de Pareto", zorder=3)
+    ax1.plot(px, py, color="#E11D48", lw=2.5, label="Unión de muestras Pareto", marker=".", zorder=3)
     ax1.scatter([p_cel.ideal_point[0] / 1000.0], [p_cel.ideal_point[1]], color="#D97706", s=190, marker="*", label="★ Ideal (800k, 200)", zorder=6)
-    ax1.scatter([p_cel.anti_ideal_point[0] / 1000.0], [p_cel.anti_ideal_point[1]], color="#BE123C", s=95, marker="X", label="✕ Nadir (300k, 600)", zorder=6)
+    ax1.scatter([p_cel.anti_ideal_point[0] / 1000.0], [p_cel.anti_ideal_point[1]], color="#BE123C", s=95, marker="X", label="✕ Nadir aprox. (300k, 600)", zorder=6)
     for k, lbl, col, mk, dx, dy in [
         ("L1", "L₁ (600k, 400)", "#2563EB", "s", -75, 16),
         ("L2", "L₂ (595.1k, 396.7)", "#334155", "o", -110, -28),
@@ -197,10 +197,10 @@ def generate_figures():
         [p.objectives[0] for p in par_tri],
         [p.objectives[1] for p in par_tri],
         [p.objectives[2] for p in par_tri],
-        c="#0F766E", s=16, alpha=0.45, label="Frontera Pareto 3D"
+        c="#0F766E", s=16, alpha=0.45, label="Muestra Pareto 3D"
     )
     ax3d.scatter([p_tri.ideal_point[0]], [p_tri.ideal_point[1]], [p_tri.ideal_point[2]], c="#D97706", s=150, marker="*", label="★ Ideal (260, 0, 300)")
-    ax3d.scatter([p_tri.anti_ideal_point[0]], [p_tri.anti_ideal_point[1]], [p_tri.anti_ideal_point[2]], c="#BE123C", s=80, marker="X", label="✕ Nadir (0, 280, 0)")
+    ax3d.scatter([p_tri.anti_ideal_point[0]], [p_tri.anti_ideal_point[1]], [p_tri.anti_ideal_point[2]], c="#BE123C", s=80, marker="X", label="✕ Nadir aprox. (0, 280, 0)")
     for k, lbl, col, mk in [("L1", "L₁", "#2563EB", "s"), ("L2", "L₂", "#334155", "o"), ("L_inf", "L∞", "#E11D48", "D")]:
         sol = s_tri[k]
         ax3d.scatter([sol.objectives[0]], [sol.objectives[1]], [sol.objectives[2]], c=col, s=80, marker=mk, label=lbl)
@@ -217,10 +217,10 @@ def generate_figures():
     N = len(cats)
     angles = [n / float(N) * 2 * np.pi for n in range(N)] + [0.0]
     ax_rad.set_xticks(angles[:-1]); ax_rad.set_xticklabels(cats, fontsize=8, fontweight="bold")
-    ax_rad.set_ylim(0, 108)
+    ax_rad.set_ylim(min(0, *(v for sol in s_flo.values() for v in sol.achievement_pct)), 108)
     ax_rad.plot(angles, [100] * (N + 1), lw=1.4, ls="--", color="#D97706", label="Ideal (100%)")
     for k, lbl, col in [("L1", "L₁", "#2563EB"), ("L2", "L₂", "#334155"), ("L_inf", "L∞", "#E11D48")]:
-        vals = [max(0, min(100, v)) for v in s_flo[k].achievement_pct]
+        vals = s_flo[k].achievement_pct.copy()
         vals += [vals[0]]
         ax_rad.plot(angles, vals, lw=2, color=col, label=lbl)
         ax_rad.fill(angles, vals, color=col, alpha=0.10)
@@ -239,10 +239,16 @@ def generate_figures():
         if pts:
             ax.scatter([p.objectives[0] for p in pts], [p.objectives[1] for p in pts], color=col, marker=mk, s=55, alpha=0.8, label=lbl, zorder=4)
     ax.scatter([p_mip.ideal_point[0]], [p_mip.ideal_point[1]], color="#D97706", s=190, marker="*", label="★ Ideal (1350, 230)", zorder=6)
-    ax.scatter([p_mip.anti_ideal_point[0]], [p_mip.anti_ideal_point[1]], color="#BE123C", s=95, marker="X", label="✕ Nadir (750, 380)", zorder=6)
+    ax.scatter([p_mip.anti_ideal_point[0]], [p_mip.anti_ideal_point[1]], color="#BE123C", s=95, marker="X", label="✕ Nadir aprox. (750, 380)", zorder=6)
     ax.scatter([s_mip["L1"].objectives[0]], [s_mip["L1"].objectives[1]], color="#2563EB", s=110, marker="s", edgecolors="#FFFFFF", lw=1.2, label="Solución L₁", zorder=7)
-    ax.scatter([s_mip["L2"].objectives[0]], [s_mip["L2"].objectives[1]], color="#E11D48", s=110, marker="D", edgecolors="#FFFFFF", lw=1.2, label="Solución L₂ = L∞", zorder=7)
-    ax.set_title("Producción Mixta MIP: Frontera Discreta (sin interpolación continua entre saltos enteros)", fontsize=9.5, fontweight="bold", pad=28)
+    for metric, label, color, marker in [
+        ("L2", "Solución L₂", "#334155", "o"),
+        ("L_inf", "Solución L∞", "#E11D48", "D"),
+    ]:
+        ax.scatter(*s_mip[metric].objectives, color=color, s=110, marker=marker,
+                   edgecolors="#FFFFFF", lw=1.2, label=label, zorder=7)
+
+    ax.set_title("Producción mixta: aproximación de Pareto mediante puntos", fontsize=9.5, fontweight="bold", y=1.22)
     ax.set_xlabel("Rendimiento (USD)", fontsize=8.5)
     ax.set_ylabel("Costo Operativo (USD)", fontsize=8.5)
     ax.grid(True); ax.legend(fontsize=7.0, loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=3, frameon=True)
@@ -353,6 +359,22 @@ def build_pdf(output_path: str):
 
     story.append(Image(os.path.join(FIG_DIR, "v2_arquitectura_cockpit.png"), width=516, height=226))
     story.append(Paragraph("Figura 1: Arquitectura visual de OptiCompromise Cockpit V2 (barra superior, panel de formulación 35% y lienzo analítico 65%).", cap_style))
+    story.append(Spacer(1, 8))
+    story.append(Table(
+        [[Paragraph(
+            "<b>Declaración de Software Libre e IA (Sección 12):</b> Todo el proyecto está licenciado bajo MIT y emplea exclusivamente bibliotecas libres (SciPy BSD-3, NumPy BSD-3, FastAPI MIT, Next.js/React MIT, Plotly MIT, KaTeX MIT, SheetJS Apache-2.0). Se utilizó IA como apoyo en arquitectura, pruebas y contraste de las fórmulas con el material de IAD.",
+            box_style
+        )]],
+        colWidths=[516],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFF1F2")),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E11D48")),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ])
+    ))
     story.append(PageBreak())
 
     # =========================================================================
@@ -361,25 +383,25 @@ def build_pdf(output_path: str):
     story.append(Paragraph("1. Fundamentación Teórica y Formulación Matemática", h1_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E11D48"), spaceAfter=8))
     story.append(Paragraph(
-        "En problemas reales con <i>q ≥ 2</i> criterios en conflicto (por ejemplo maximizar utilidad económica mientras se minimiza contaminación), no existe una solución única que optimice todos los objetivos simultáneamente. La <b>Programación de Compromiso</b> (Zeleny, 1973; Romero, 1993) busca las soluciones factibles eficientes más cercanas al <b>Punto Ideal (Z*)</b>.",
+        "En problemas reales con <i>q ≥ 2</i> criterios en conflicto (por ejemplo maximizar utilidad económica mientras se minimiza contaminación), los óptimos individuales pueden ser incompatibles. La <b>programación de compromiso</b> minimiza una distancia ponderada al <b>punto ideal (Z*)</b> sobre la región factible.",
         body_style
     ))
 
-    story.append(Paragraph("1.1 Matriz de Pagos, Punto Ideal (Z*) y Anti-Ideal (Nadir)", h2_style))
+    story.append(Paragraph("1.1 Matriz de pagos, punto ideal y nadir aproximado", h2_style))
     story.append(Paragraph(
-        "El motor resuelve primero cada objetivo <i>Z_k(x)</i> en solitario sobre la región factible <i>X</i> (con desempate lexicográfico secundario para evitar puntos dominados cuando hay óptimos múltiples) y construye la matriz <i>M[k, i] = Z_i(x*(k))</i>:",
+        "El motor resuelve primero cada objetivo <i>Z_k(x)</i> en solitario sobre la región factible <i>X</i> (entre óptimos alternativos, mejora la suma de los otros objetivos escalados) y construye la matriz <i>M[k, i] = Z_i(x*(k))</i>:",
         body_style
     ))
     story.append(Paragraph(
         "• <b>Punto Ideal (Z*):</b> Z*_i = max_k M[k, i] si Z_i se maximiza, o min_k M[k, i] si Z_i se minimiza (diagonal de la matriz).<br/>"
-        "• <b>Punto Anti-Ideal / Nadir (Z_peor):</b> peor valor observado por columna en la matriz de pagos.<br/>"
-        "• <b>Rango de Conflicto:</b> R_i = |Z*_i − Z_peor,i|. Si un objetivo no presenta conflicto (Z*_i = Z_peor,i), el sistema lo reporta y aplica un rango auxiliar del 5% para evitar división por cero.",
+        "• <b>Nadir aproximado (Z_peor):</b> peor valor observado por columna de pagos. El nadir teórico toma los peores valores entre las soluciones eficientes. El antiideal los toma sobre toda la región factible.<br/>"
+        "• <b>Rango de Conflicto:</b> R_i = |Z*_i − Z_peor,i|. Si el rango de pagos es cero, se usa el rango factible si es positivo y finito. Un objetivo constante tiene brecha cero. Si el peor extremo factible no se puede calcular, se usa una unidad del objetivo.",
         bullet_style
     ))
 
-    story.append(Paragraph("1.2 Normalización Ideal–Anti-Ideal y Métricas L₁, L₂ y L∞", h2_style))
+    story.append(Paragraph("1.2 Normalización por rango y métricas L₁, L₂ y L∞", h2_style))
     story.append(Paragraph(
-        "Para eliminar efectos de escala (ej. dólares vs kg de CO₂), cada objetivo se transforma en una distancia relativa normalizada adimensional <b>D_i(x) ∈ [0, 1]</b> (donde 0 es el Ideal y 1 es el Nadir) y en un porcentaje de logro <b>Z'_i(x) = 100 · (1 − D_i(x)) [%]</b>:",
+        "La desviación D_i(x) divide la brecha al ideal por el rango R_i. Para maximizar se resta Z_i(x) del ideal y para minimizar se resta el ideal de Z_i(x). El logro es <b>100 · (1 − D_i(x)) %</b>. Una brecha superior a 1 da un logro negativo.",
         body_style
     ))
     met_rows = [
@@ -391,13 +413,13 @@ def build_pdf(output_path: str):
         ],
         [
             Paragraph("<b>L₂ (Euclidiana)</b>", td_bold),
-            Paragraph("min ∑ w_i · [D_i(x)]²  (D₂ = √(∑ w_i D_i²))<br/>Solver: QP SLSQP / Branch-and-Bound MIP", code_style),
-            Paragraph("<b>Compromiso Suave:</b> penaliza desviaciones grandes cuadráticamente, logrando mezclas balanceadas.", td_style),
+            Paragraph("min ∑ (w_i · D_i(x))²<br/>D₂ = √(∑ (w_i · D_i)²)<br/>Solver: QP SLSQP / Branch-and-Bound MIP", code_style),
+            Paragraph("Eleva al cuadrado cada brecha ya ponderada. La función cuadrática es convexa y puede tener varios óptimos.", td_style),
         ],
         [
             Paragraph("<b>L∞ (Minimax)</b>", td_bold),
             Paragraph("min λ  s.a.  w_i · D_i(x) ≤ λ (∀i), λ ≥ 0<br/>Solver: LP / MILP Minimax (HiGHS)", code_style),
-            Paragraph("<b>Equidad Estricta:</b> eleva el objetivo más rezagado. Con pesos iguales se cumple Z'₁ = Z'₂ = … = Z'_q.", td_style),
+            Paragraph("Reduce la mayor brecha ponderada. Las restricciones activas comparten esa brecha.", td_style),
         ],
     ]
     t_met = Table(met_rows, colWidths=[85, 210, 221])
@@ -412,7 +434,7 @@ def build_pdf(output_path: str):
     story.append(t_met)
     story.append(Spacer(1, 4))
     story.append(Paragraph(
-        "<i>Nota técnica sobre L₂ y pesos nulos:</i> L₂ pondera linealmente cada término cuadrático (w_i · D_i²), coincidiendo exactamente con la distancia ponderada estándar para pesos iguales y conservando convexidad estricta. Cuando algún peso es cero (w_i = 0), el motor añade un término aumentado ε = 10⁻⁶·∑D_j para garantizar optimalidad de Pareto fuerte.",
+        "<b>Convención de IAD:</b> Clase 15 (pp. 9 y 19) eleva al cuadrado la brecha ya ponderada. Minimizar su suma equivale a minimizar la raíz. En los empates de L∞ y de L₁ con pesos nulos, el motor busca reducir la suma de brechas manteniendo el valor óptimo primario.",
         body_style
     ))
 
@@ -425,10 +447,10 @@ def build_pdf(output_path: str):
 
     steps_rows = [
         [Paragraph("<b>Paso</b>", th_style), Paragraph("<b>Zona de la Interfaz</b>", th_style), Paragraph("<b>Acción del Usuario</b>", th_style)],
-        [Paragraph("<b>1. Cargar o Crear</b>", td_bold), Paragraph("Barra Superior (<b>Ejemplos</b>)", td_style), Paragraph("Elige entre los 5 casos precargados (Celdas, Transporte, Triobjetivo 3D, MIP, Flota) o <b>+ Nuevo Modelo en Blanco</b> para empezar desde cero. También puedes abrir un archivo con <b>Importar</b> (.json, .xlsx, .csv).", td_style)],
+        [Paragraph("<b>1. Cargar o Crear</b>", td_bold), Paragraph("Barra Superior (<b>Ejemplos</b>)", td_style), Paragraph("Elige entre los seis casos precargados (Celdas, Transporte, Papel, Triobjetivo 3D, MIP y Flota) o <b>+ Nuevo Modelo en Blanco</b> para empezar desde cero. También puedes abrir un archivo con <b>Importar</b> (.json, .xlsx, .csv).", td_style)],
         [Paragraph("<b>2. Definir Modelo</b>", td_bold), Paragraph("Panel Izquierdo (<b>Modo Tabla</b> o <b>Modo Algebraico</b>)", td_style), Paragraph("Edita título, descripción, variables (nombre, tipo Continua ℝ / Entera ℤ / Binaria {0,1}, cotas Mín/Máx), ≥2 o ≥3 objetivos (Max/Min) y restricciones (≤, ≥, =). En Modo Algebraico escribe ecuaciones como <font face='DejaVuMono'>Max Z1 = 50*x1 + 120*x2</font> y pulsa <b>Aplicar Ecuaciones y Resolver</b>. La <b>Vista Previa LaTeX</b> se actualiza en tiempo real.", td_style)],
         [Paragraph("<b>3. Ajustar Pesos</b>", td_bold), Paragraph("Panel Izquierdo (<b>Perfil &amp; Pesos</b>)", td_style), Paragraph("Selecciona un perfil rápido (<b>Equitativo</b>, <b>Compensatorio</b>, <b>Moderado</b>) o mueve los deslizadores w_i. Con <i>Auto-balancear</i> activo la suma se mantiene en 1.00; si lo desactivas y Σw ≠ 1.00, el botón <b>1.00</b> normaliza el vector.", td_style)],
-        [Paragraph("<b>4. Analizar</b>", td_bold), Paragraph("Canvas Derecho (Gráficos, Tablas y Rayos X)", td_style), Paragraph("Explora <b>Objetivos 2D</b> (Frontera Pareto + Curvas Isodistancia + Zona Factible), <b>Espacio 3D</b> (rotación 360°), <b>Radar % Logro</b> y <b>Región Factible</b> (2 variables, incluyendo puntos discretos ℤ). Abre el explorador de Pareto y el acordeón <b>Modo Rayos X (L∞)</b> para ver λ* y las ecuaciones exactas.", td_style)],
+        [Paragraph("<b>4. Analizar</b>", td_bold), Paragraph("Canvas Derecho (Gráficos, Tablas y Rayos X)", td_style), Paragraph("Explora <b>Objetivos 2D</b> (Muestra Pareto + Curvas Isodistancia + Zona Factible), <b>Espacio 3D</b> (rotación 360°), <b>Radar % Logro</b> y <b>Región Factible</b> (2 variables, incluyendo puntos discretos ℤ). Abre el explorador de Pareto y el acordeón <b>Modo Rayos X (L∞)</b> para ver λ y las ecuaciones con coeficientes redondeados.", td_style)],
         [Paragraph("<b>5. Exportar</b>", td_bold), Paragraph("Barra Superior y Gráfico", td_style), Paragraph("Guarda la definición en <b>JSON</b>, exporta el libro multi-hoja <b>Excel (.xlsx)</b>, descarga resultados re-importables en <b>CSV</b> o captura el gráfico actual en alta resolución <b>PNG</b>.", td_style)],
     ]
     t_steps = Table(steps_rows, colWidths=[85, 130, 301])
@@ -455,61 +477,53 @@ def build_pdf(output_path: str):
         body_style
     ))
     story.append(Image(os.path.join(FIG_DIR, "v2_clase15_pareto_iso.png"), width=500, height=192))
-    story.append(Paragraph("Figura 2: Espacio de objetivos con frontera de Pareto (izquierda) y región factible en espacio de decisiones (derecha) para Clase 15.", cap_style))
+    story.append(Paragraph("Figura 2: Espacio de objetivos con una unión de muestras de Pareto (izquierda) y región factible en espacio de decisiones (derecha) para Clase 15.", cap_style))
 
     story.append(PageBreak())
     story.append(Paragraph("3.2 Casos Avanzados y Bonus: Triobjetivo 3D, Flota (4Z) y Producción Mixta MIP", h2_style))
     story.append(Paragraph(
-        "La herramienta incorpora dos casos de bonificación verificados: (a) <b>Sostenibilidad Triobjetivo 3D</b> (3 variables continuas, 3 objetivos Max/Min/Max, visualizado en 3D interactivo y matriz 3×3) y <b>Flota de Vehículos Eléctricos</b> (6 variables, 4 criterios, perfil Radar); y (b) <b>Producción Mixta MIP</b> con variable continua x₁, entera x₂ ∈ ℤ y binaria y₁ ∈ {0, 1}, cuya frontera discreta evita interpolaciones lineales falsas.",
+        "La herramienta incorpora dos casos de bonificación verificados: (a) <b>Sostenibilidad Triobjetivo 3D</b> (3 variables continuas, 3 objetivos Max/Min/Max, visualizado en 3D interactivo y matriz 3×3) y <b>Flota de Vehículos Eléctricos</b> (6 variables, 4 criterios, perfil Radar); y (b) <b>Producción Mixta MIP</b> con variable continua x₁, entera x₂ ∈ ℤ y binaria y₁ ∈ {0, 1}, cuya muestra se dibuja con puntos individuales.",
         body_style
     ))
     story.append(Image(os.path.join(FIG_DIR, "v2_triobjetivo_3d_y_radar.png"), width=500, height=204))
     story.append(Paragraph("Figura 3: Visualización 3D del caso Triobjetivo (izquierda) y gráfico Radar de % de logro para Flota de 4 objetivos (derecha).", cap_style))
     story.append(Image(os.path.join(FIG_DIR, "v2_mip_discreto.png"), width=490, height=188))
-    story.append(Paragraph("Figura 4: Frontera eficiente discreta del caso Producción Mixta MIP (L₁ por HiGHS y L₂ por Branch-and-Bound exacto).", cap_style))
+    story.append(Paragraph("Figura 4: Muestra de Pareto del caso Producción Mixta. En L₂, la ramificación y poda puede devolver una solución factible sin certificado si se agota el presupuesto.", cap_style))
 
     story.append(PageBreak())
-    story.append(Paragraph("4. Tabla de Validación Cruzada (Suite api/tests/ — 16 Pruebas OK)", h1_style))
+    story.append(Paragraph("4. Resultados de los casos de demostración", h1_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E11D48"), spaceAfter=6))
 
     val_rows = [
-        [Paragraph("<b>Caso Validado</b>", th_style), Paragraph("<b>Ideal / Nadir</b>", th_style), Paragraph("<b>Solución L₁</b>", th_style), Paragraph("<b>Solución L₂</b>", th_style), Paragraph("<b>Solución L∞</b>", th_style)],
-        [
-            Paragraph("<b>Clase 15: Celdas</b><br/>(2V, 2Z, w=[0.5,0.5])", td_bold),
-            Paragraph("Z*=(800k, 200)<br/>N=(300k, 600)", td_style),
-            Paragraph("x=(0, 200)<br/>Z=(600k, 400)<br/>60.0% / 50.0%", td_style),
-            Paragraph("x=(0, 198.36)<br/>Z=(595.1k, 396.7)<br/>59.02% / 50.82%", td_style),
-            Paragraph("x=(0, 190.91)<br/>Z=(572.7k, 381.8)<br/><b>54.55% = 54.55%</b>", td_style),
-        ],
-        [
-            Paragraph("<b>Taller 3: Transporte</b><br/>(12V, 2Z, w=[0.5,0.5])", td_bold),
-            Paragraph("Z*=(16.8k, 2.6k)<br/>N=(18.5k, 5.7k)", td_style),
-            Paragraph("Z=(17.4k, 3.6k)<br/>64.71% / 67.74%", td_style),
-            Paragraph("Z=(17.4k, 3.6k)<br/>64.71% / 67.74%", td_style),
-            Paragraph("Z=(17.382, 3.662)<br/><b>65.75% = 65.75%</b>", td_style),
-        ],
-        [
-            Paragraph("<b>Triobjetivo 3D (Bonus)</b><br/>(3V, 3Z, w=[1/3,1/3,1/3])", td_bold),
-            Paragraph("Z*=(260, 0, 300)<br/>N=(0, 280, 0)", td_style),
-            Paragraph("Z=(100, 100, 300)<br/>38.5/64.3/100%", td_style),
-            Paragraph("Z=(140, 120, 260)<br/>53.8/57.1/86.7%", td_style),
-            Paragraph("Z=(151.7, 116.7, 175)<br/><b>58.3% ≈ 58.3%</b>", td_style),
-        ],
-        [
-            Paragraph("<b>Producción MIP (Bonus)</b><br/>(3V mixtas, w=[0.6,0.4])", td_bold),
-            Paragraph("Z*=(1350, 230)<br/>N=(750, 380)", td_style),
-            Paragraph("x=(30, 0, 1)<br/>Z=(1350, 380)", td_style),
-            Paragraph("x=(24, 0, 1)<br/>Z=(1110, 320)", td_style),
-            Paragraph("x=(24, 0, 1)<br/>Z=(1110, 320)", td_style),
-        ],
-        [
-            Paragraph("<b>Flota Eléctrica (4Z)</b><br/>(6V, 4Z, w=[.3,.25,.25,.2])", td_bold),
-            Paragraph("Z*=(2.13M,31.5k,<br/>966.7, 488.0)", td_style),
-            Paragraph("D₁=0.4786<br/>Z₄=488 (100%)", td_style),
-            Paragraph("D₂=0.5361<br/>Mezcla 3 autos", td_style),
-            Paragraph("λ*=0.1601<br/>Z'₂=Z'₃=35.96%", td_style),
-        ],
+        [Paragraph("<b>Caso Validado</b>", th_style), Paragraph("<b>Ideal / Nadir aprox.</b>", th_style), Paragraph("<b>Solución L₁</b>", th_style), Paragraph("<b>Solución L₂</b>", th_style), Paragraph("<b>Solución L∞</b>", th_style)],
     ]
+
+    def values(data):
+        return "(" + ", ".join(f"{value:,.2f}" for value in data) + ")"
+
+    for filename, name in [
+        ("01_celdas_fotovoltaicas.json", "Celdas · Clase 15"),
+        ("02_problema_transporte.json", "Transporte · Taller 3"),
+        ("06_produccion_papel.json", "Papel · Taller 3 (n = 6)"),
+        ("04_triobjetivo_3d.json", "Sostenibilidad 3D"),
+        ("03_mip_produccion.json", "Producción mixta"),
+        ("05_flota_vehiculos.json", "Flota eléctrica"),
+    ]:
+        with open(os.path.join(EXAMPLES_DIR, filename), encoding="utf-8") as file:
+            model = ModelDefinition.model_validate_json(file.read())
+        if filename == "06_produccion_papel.json":
+            model.constraints[3].rhs = 83
+            model.weights = [0.56, 0.44]
+        payoff = compute_payoff_matrix(model)
+        solutions, weights = solve_all_metrics(model, payoff, model.weights)
+        row = [
+            Paragraph(f"<b>{name}</b><br/>w = {values(weights)}", td_style),
+            Paragraph(f"{values(payoff.ideal_point)}<br/>{values(payoff.anti_ideal_point)}", td_style),
+        ]
+        for sol in solutions.values():
+            state = "" if sol.status == "optimal" else "<br/>Sin certificado"
+            row.append(Paragraph(f"Z = {values(sol.objectives)}<br/>D = {sol.aggregate_distance:.4f}{state}", td_style))
+        val_rows.append(row)
     t_val = Table(val_rows, colWidths=[106, 98, 104, 104, 104])
     t_val.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#111524")),
@@ -532,16 +546,16 @@ def build_pdf(output_path: str):
         ("Programación de Compromiso", "Metodología de decisión multicriterio que selecciona la solución factible más cercana al Punto Ideal según una métrica de distancia Lp y un vector de pesos w."),
         ("Matriz de Pagos (Payoff Matrix)", "Tabla cuadrada q×q cuya fila k contiene los valores de todos los objetivos evaluados en el óptimo individual x*(k) del k-ésimo objetivo."),
         ("Punto Ideal (Z*)", "Vector formado por el mejor desempeño individual de cada objetivo (diagonal de la matriz de pagos). Es inalcanzable simultáneamente cuando existe conflicto."),
-        ("Punto Anti-Ideal / Nadir (Z_peor)", "Vector formado por el peor valor de cada objetivo observado en la matriz de pagos; define el extremo inferior del rango factible de referencia."),
-        ("Normalización por Rango", "Transformación lineal D_i(x) ∈ [0, 1] que divide la desviación al ideal por R_i = |Z*_i − Z_peor,i| para eliminar diferencias de escala y unidades."),
-        ("Grado de Logro (Z'_i)", "Porcentaje de satisfacción respecto al ideal: Z'_i(x) = 100 · (1 − D_i(x))%. Vale 100% en el Ideal y 0% en el Nadir."),
+        ("Nadir aproximado (Z_peor)", "Peor valor de cada columna de pagos. El nadir teórico considera las soluciones eficientes. El antiideal considera todas las soluciones factibles."),
+        ("Normalización por Rango", "Cociente entre la brecha al ideal y el rango. Puede superar 1 cuando se usa la referencia de pagos."),
+        ("Grado de Logro (Z'_i)", "Porcentaje de satisfacción respecto al ideal: Z'_i(x) = 100 · (1 − D_i(x))%. Vale 100 % en el ideal. Con rango de pagos positivo, vale 0 % en la referencia de pagos."),
         ("Métrica L₁ (Manhattan)", "Distancia ponderada lineal ∑ w_i D_i(x). Permite compensación total entre objetivos y suele ubicarse en vértices extremos."),
-        ("Métrica L₂ (Euclidiana)", "Distancia cuadrática ponderada √(∑ w_i D_i(x)²). Produce compromisos suaves e intermedios sobre la frontera eficiente."),
-        ("Métrica L∞ (Minimax / λ*)", "Minimiza la máxima desviación ponderada λ = max_i [w_i · D_i(x)]. Garantiza equidad entre criterios sin dejar ninguno rezagado."),
-        ("Frontera Eficiente de Pareto", "Conjunto de soluciones factibles no dominadas: ninguna otra solución factible mejora un objetivo sin empeorar al menos otro."),
-        ("Curvas de Isodistancia", "Contornos de igual distancia al Ideal en 2D: recta (L₁), arco elíptico (L₂) y esquina rectangular (L∞) tangentes a la frontera."),
-        ("Programación Entera Mixta (MIP)", "Extensión con variables continuas (ℝ), enteras (ℤ) y binarias ({0,1}), resuelta exactamente con HiGHS y Branch-and-Bound."),
-        ("Objetivo Degenerado", "Objetivo cuyo valor Ideal coincide con su Anti-Ideal (R_i = 0) porque no entra en conflicto con los demás criterios."),
+        ("Métrica L₂ (Euclidiana)", "Distancia euclidiana de brechas ponderadas √(∑ (w_i D_i(x))²)."),
+        ("Métrica L∞ (Minimax / λ*)", "Minimiza la máxima desviación ponderada λ = max_i [w_i · D_i(x)]. Las restricciones activas comparten la máxima brecha ponderada."),
+        ("Frontera Eficiente de Pareto", "Conjunto de soluciones factibles no dominadas en todo el modelo. La aplicación filtra dominancia entre las soluciones muestreadas."),
+        ("Curvas de Isodistancia", "Contornos de igual distancia en los dos ejes elegidos. Su forma depende de la métrica y de los pesos."),
+        ("Programación Entera Mixta (MIP)", "Extensión con variables continuas (ℝ), enteras (ℤ) y binarias ({0,1}), tratada con HiGHS para L₁ y L∞ y ramificación y poda con presupuesto para L₂."),
+        ("Rango de pagos nulo", "Ideal y peor valor de la columna de pagos coinciden. El objetivo puede variar en la región factible."),
     ]
     gl_rows = [[Paragraph(f"<b>{term}</b>", td_bold), Paragraph(defn, td_style)] for term, defn in glossary]
     t_gl = Table(gl_rows, colWidths=[145, 371])
@@ -555,21 +569,7 @@ def build_pdf(output_path: str):
     story.append(t_gl)
     story.append(Spacer(1, 3))
 
-    story.append(Table(
-        [[Paragraph(
-            "<b>Declaración de Software Libre e IA (Sección 12):</b> Todo el proyecto está licenciado bajo MIT y emplea exclusivamente bibliotecas libres (SciPy BSD-3, NumPy BSD-3, FastAPI MIT, Next.js/React MIT, Plotly MIT, KaTeX MIT, SheetJS Apache-2.0). La IA se utilizó como apoyo en arquitectura UI/pruebas; todas las formulaciones fueron validadas contra el material de la Prof. Patricia Jaramillo Álvarez.",
-            box_style
-        )]],
-        colWidths=[516],
-        style=TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFF1F2")),
-            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#E11D48")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ])
-    ))
+
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"✓ Manual PDF V2 generado: {output_path}")

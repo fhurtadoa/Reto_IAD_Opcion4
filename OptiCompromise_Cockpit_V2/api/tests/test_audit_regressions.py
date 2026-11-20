@@ -9,7 +9,8 @@ import numpy as np
 from fastapi.testclient import TestClient
 from scipy.optimize import linprog
 
-from core.compromise import solve_all_metrics
+from core.compromise import compute_distance_coefficients, solve_all_metrics, solve_l2
+from core.pareto import compute_pareto_frontier
 from core.payoff import compute_payoff_matrix
 from core.schemas import ModelDefinition
 from index import app
@@ -23,6 +24,114 @@ def example(filename):
 
 
 class TestAuditRegressions(unittest.TestCase):
+    def test_class15_weight_is_squared_in_lp_tradeoff_and_sensitivity(self):
+        # d1=1-x, d2=x. The analytic minimizer is w1²/(w1²+w2²).
+        model = ModelDefinition.model_validate({
+            "variables": [{"name": "x", "upper_bound": 1}],
+            "objectives": [
+                {"name": "Max x", "sense": "maximize", "coefficients": [1]},
+                {"name": "Min x", "sense": "minimize", "coefficients": [1]},
+            ],
+            "weights": [0.8, 0.2],
+        })
+        result = TestClient(app).post("/api/solve", json=model.model_dump())
+        self.assertEqual(result.status_code, 200)
+        body = result.json()
+        l2 = body["solutions"]["L2"]
+        optimum = 16 / 17
+        self.assertAlmostEqual(l2["variables"]["x"], optimum, places=7)
+        self.assertAlmostEqual(l2["aggregate_distance"], 0.8 / np.sqrt(17), places=7)
+        self.assertAlmostEqual(body["solutions"]["L_inf"]["variables"]["x"], 0.8)
+        sweep = body["weight_sensitivity"]["l2"]
+        np.testing.assert_allclose(sweep[16]["deviations_pct"], [100 / 17, 1600 / 17])
+        self.assertEqual(sweep[0]["deviations_pct"], [100, 0])
+        self.assertEqual(sweep[-1]["deviations_pct"], [0, 100])
+
+    def test_paper_asymmetric_weights_match_class_notebook(self):
+        model = example("06_produccion_papel.json")
+        model.constraints[3].rhs = 83
+        model.weights = [0.56, 0.44]
+        payoff = compute_payoff_matrix(model)
+        solutions, _ = solve_all_metrics(model, payoff, model.weights)
+        # Valores publicados con redondeo en el entregable del Taller 3, celda 12.
+        self.assertEqual(solutions["L2"].status, "optimal")
+        np.testing.assert_allclose(solutions["L2"].objectives, [33727.49, 22062.27], rtol=0, atol=0.02)
+        self.assertAlmostEqual(solutions["L2"].aggregate_distance, 0.33333, places=5)
+
+    def test_l2_integer_matches_enumeration_and_reports_cutoff(self):
+        model = ModelDefinition.model_validate({
+            "variables": [{"name": "x", "var_type": "integer", "upper_bound": 5}],
+            "objectives": [
+                {"name": "Max x", "sense": "maximize", "coefficients": [1]},
+                {"name": "Min x", "sense": "minimize", "coefficients": [1]},
+            ],
+        })
+        payoff = compute_payoff_matrix(model)
+        weights = np.array([0.65, 0.35])
+        expected = min(range(6), key=lambda x: (0.65 * (1 - x/5))**2 + (0.35 * x/5)**2)
+        solutions, _ = solve_all_metrics(model, payoff, weights.tolist())
+        self.assertEqual(solutions["L2"].status, "optimal")
+        self.assertEqual(solutions["L2"].variables["x"], expected)
+        alpha, beta = compute_distance_coefficients(model, payoff)
+        partial = solve_l2(model, payoff, alpha, beta, weights, max_nodes=0)
+        self.assertEqual(partial.status, "feasible_suboptimal")
+        self.assertIn(partial.variables["x"], range(6))
+
+    def test_zero_payoff_span_distinguishes_constant_and_variable_criteria(self):
+        model = ModelDefinition.model_validate({
+            "variables": [{"name": "x", "upper_bound": 5}, {"name": "y"}],
+            "objectives": [
+                {"name": "Max x", "sense": "maximize", "coefficients": [1, 0]},
+                {"name": "Min y", "sense": "minimize", "coefficients": [0, 1]},
+                {"name": "Constante", "sense": "maximize", "coefficients": [0, 0]},
+            ],
+        })
+        payoff = compute_payoff_matrix(model)
+        self.assertEqual(payoff.ideal_point, [5, 0, 0])
+        self.assertEqual(payoff.anti_ideal_point, [5, 0, 0])
+        self.assertEqual(payoff.normalization_sources, ["feasible_range", "unit", "constant"])
+        self.assertEqual(payoff.normalization_ranges, [5, 1, 1])
+        alpha, beta = compute_distance_coefficients(model, payoff)
+        np.testing.assert_allclose(alpha @ [0, 3] + beta, [1, 3, 0])
+
+    def test_payoff_nadir_is_not_a_bound_on_efficient_achievement(self):
+        model = ModelDefinition.model_validate({
+            "variables": [{"name": f"a{i}"} for i in range(4)],
+            "constraints": [{"coefficients": [1, 1, 1, 1], "sense": "==", "rhs": 1}],
+            "objectives": [
+                {"name": "Z1", "coefficients": [10, 0, 5, 6]},
+                {"name": "Z2", "coefficients": [0, 10, 5, 6]},
+                {"name": "Z3", "coefficients": [5, 5, 10, 0]},
+            ],
+        })
+        payoff = compute_payoff_matrix(model)
+        self.assertEqual(payoff.anti_ideal_point, [0, 0, 5])
+        solutions, _ = solve_all_metrics(model, payoff, [0.5, 0.5, 0])
+        # D maximiza de forma única Z1+Z2. Su tercer objetivo queda bajo la referencia.
+        l1 = solutions["L1"]
+        self.assertEqual(l1.objectives, [6, 6, 0])
+        self.assertEqual(l1.normalized_distances[2], 2)
+        self.assertEqual(l1.achievement_pct[2], -100)
+
+    def test_pareto_sample_preserves_partial_solver_status(self):
+        model = ModelDefinition.model_validate({
+            "variables": [{"name": "x", "upper_bound": 1}],
+            "objectives": [
+                {"name": "Max x", "sense": "maximize", "coefficients": [1]},
+                {"name": "Min x", "sense": "minimize", "coefficients": [1]},
+            ],
+        })
+        payoff = compute_payoff_matrix(model)
+        def partial(*args, **kwargs):
+            solution = solve_l2(*args, **kwargs)
+            return solution.model_copy(update={"status": "feasible_suboptimal"})
+
+        with patch("core.pareto.solve_l2", side_effect=partial):
+            points = compute_pareto_frontier(model, payoff, num_samples=5)
+        l2_points = [p for p in points if p.metric == "L2"]
+        self.assertTrue(l2_points)
+        self.assertTrue(all(p.status == "feasible_suboptimal" for p in l2_points))
+
     def test_minimax_with_large_variable_bounds(self):
         model = ModelDefinition.model_validate({
             "name": "Escala de minimax",

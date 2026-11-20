@@ -20,14 +20,14 @@
 |---|---|
 | Ideal | Vector con el mejor valor de cada objetivo, calculado por separado. |
 | Nadir aproximado | Peor valor de cada criterio entre las filas de la matriz de pagos. |
-| Logro | 100% en el ideal y 0% en el nadir de referencia. Puede ser negativo si una solución queda por debajo de esa referencia. |
+| Logro | 100 % en el ideal. Con rango de pagos positivo, corresponde 0 % al peor valor de pagos y un logro negativo a un desempeño peor. |
 | Frontera aproximada | Alternativas de la muestra para las que ninguna otra de la muestra mejora un criterio sin empeorar otro. |
-| L₁ / L₂ / L∞ | Suma de brechas ponderadas, suma ponderada de brechas al cuadrado y mayor brecha ponderada, respectivamente. La distancia L₂ mostrada incluye la raíz cuadrada. |
+| L₁ / L₂ / L∞ | Suma de brechas ponderadas, raíz de la suma de los cuadrados de las brechas ya ponderadas y mayor brecha ponderada, respectivamente. |
 | Resultado parcial | Alguna métrica quedó sin verificación de optimalidad. Si existe un candidato factible, la aplicación lo identifica como tal. |
 
 ## Capturas del recorrido
 
-**Explorar resultados en escritorio.** El espacio de objetivos muestra la región proyectada, el ideal, el nadir, la frontera aproximada y las tres soluciones. Las preferencias se pueden modificar sin abandonar el gráfico.
+**Explorar resultados en escritorio.** El espacio de objetivos muestra la región proyectada, el ideal, el nadir, las muestras del barrido de Pareto y las tres soluciones. Las preferencias se pueden modificar sin abandonar el gráfico.
 
 ![Gráfico de Celdas y los deslizadores de preferencias](capturas/opticompromise-escritorio.jpg)
 

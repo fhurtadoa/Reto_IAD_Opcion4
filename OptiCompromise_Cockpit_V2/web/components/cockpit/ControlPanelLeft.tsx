@@ -981,7 +981,7 @@ export default function ControlPanelLeft({
             <span>L₂</span>
             <TooltipBadge
               title="Métrica L₂ (Euclidiana)"
-              content="Minimiza la distancia geométrica cuadrática al punto Ideal. Penaliza desviaciones grandes más que pequeñas."
+              content="Eleva al cuadrado cada brecha ya ponderada y minimiza la suma. La distancia mostrada incluye la raíz cuadrada."
               align="center"
             />
           </div>
@@ -990,7 +990,7 @@ export default function ControlPanelLeft({
             <span>L∞</span>
             <TooltipBadge
               title="Métrica L∞ (Equilibrio Minimax / Tchebysheff)"
-              content="Minimiza la máxima desviación ponderada (λ). Busca equidad entre objetivos evitando que alguno quede rezagado."
+              content="Minimiza la mayor desviación ponderada (λ). Las restricciones activas comparten ese valor."
               align="right"
             />
           </div>

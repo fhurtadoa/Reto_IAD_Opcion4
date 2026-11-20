@@ -1,0 +1,1029 @@
+[
+  {
+    "tag": "A",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "A",
+    "failed": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "name": "Nuevo Modelo Multiobjetivo"
+  },
+  {
+    "tag": "A",
+    "request": "RT A",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "A",
+    "request": "RT A",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "A",
+    "request": "RT A",
+    "weights": [
+      0.8,
+      0.2
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0,
+      1
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      1,
+      0
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.23,
+      0.77
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "failed": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "name": "RT A"
+  },
+  {
+    "tag": "FLOW",
+    "request": "Optimización Sostenible Triobjetivo 3D (Bonus)",
+    "weights": [
+      0.3333,
+      0.3333,
+      0.3334
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Retorno Económico (kUSD)",
+      "Impacto Ambiental (CO2 eq)",
+      "Beneficio Social (Puntos)"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "FLOW",
+    "request": "RT A",
+    "weights": [
+      0.73,
+      0.27
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "B",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "B",
+    "request": "RT B",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "B",
+    "request": "RT B",
+    "weights": [
+      0.8,
+      0.2
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "C",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "C",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "C",
+    "failed": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "name": "Nuevo Modelo Multiobjetivo"
+  },
+  {
+    "tag": "C",
+    "request": "RT C",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "C",
+    "request": "RT C",
+    "weights": [
+      0.8,
+      0.2
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "D",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "D",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "D",
+    "failed": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "name": "Nuevo Modelo Multiobjetivo"
+  },
+  {
+    "tag": "D",
+    "request": "RT D",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "D",
+    "request": "RT D",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Retorno",
+      "Servicio"
+    ]
+  },
+  {
+    "tag": "E",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "E",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "E",
+    "request": "RT E",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Retorno",
+      "Servicio"
+    ]
+  },
+  {
+    "tag": "F",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "F",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "F",
+    "request": "RT F",
+    "weights": [
+      0.3333333333333333,
+      0.3333333333333333,
+      0.3333333333333333
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Cobertura",
+      "Costo",
+      "Puntaje"
+    ]
+  },
+  {
+    "tag": "G",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "G",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "G",
+    "request": "RT G",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "G",
+    "request": "RT G",
+    "weights": [
+      0.65,
+      0.35
+    ],
+    "types": [
+      "integer",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "H",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "H",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "H",
+    "request": "RT H",
+    "weights": [
+      0.3333333333333333,
+      0.3333333333333333,
+      0.3333333333333333
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Produccion",
+      "Costos",
+      "Servicio"
+    ]
+  },
+  {
+    "tag": "H",
+    "request": "RT H",
+    "weights": [
+      0.5,
+      0.3,
+      0.2
+    ],
+    "types": [
+      "integer",
+      "continuous",
+      "binary"
+    ],
+    "objectives": [
+      "Produccion",
+      "Costos",
+      "Servicio"
+    ]
+  },
+  {
+    "tag": "I",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "I",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "I",
+    "request": "RT I",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "J",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "J",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "J",
+    "failed": {
+      "errorText": "net::ERR_ABORTED"
+    },
+    "name": "Nuevo Modelo Multiobjetivo"
+  },
+  {
+    "tag": "J",
+    "request": "RT J",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "K",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "K",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "K",
+    "request": "RT K",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "L",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "L",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "L",
+    "request": "RT L",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "N",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "N",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "N",
+    "request": "RT N",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "N",
+    "request": "RT N",
+    "weights": [
+      0.8,
+      0.2
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Beneficio",
+      "Costo"
+    ]
+  },
+  {
+    "tag": "M",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "M",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "M",
+    "request": "RT M",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "O",
+    "request": "Planificación de Celdas Fotovoltaicas (Clase 15)",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Utilidad Total (USD)",
+      "Emisión Contaminantes (kg)"
+    ]
+  },
+  {
+    "tag": "O",
+    "request": "Nuevo Modelo Multiobjetivo",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Objetivo 1",
+      "Objetivo 2"
+    ]
+  },
+  {
+    "tag": "O",
+    "request": "RT O",
+    "weights": [
+      0.5,
+      0.5
+    ],
+    "types": [
+      "continuous",
+      "continuous",
+      "continuous",
+      "continuous"
+    ],
+    "objectives": [
+      "Servicio",
+      "Cobertura"
+    ]
+  }
+]

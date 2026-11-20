@@ -1,0 +1,7497 @@
+{
+  "antes": {
+    "A": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT A",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              10,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            10,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              10
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 9.41176470588235,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.41176470588235,
+              9.41176470588235
+            ],
+            "achievement_pct": [
+              94.11764705882351,
+              5.882352941176494
+            ],
+            "normalized_distances": [
+              0.05882352941176494,
+              0.9411764705882351
+            ],
+            "aggregate_distance": 0.1940285000290664,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 7.999999999999998,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              7.999999999999998,
+              7.999999999999998
+            ],
+            "achievement_pct": [
+              79.99999999999999,
+              20.000000000000018
+            ],
+            "normalized_distances": [
+              0.20000000000000018,
+              0.7999999999999998
+            ],
+            "aggregate_distance": 0.16000000000000014,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n10\n100%\n\t\n9,41\n94,1%\n\t\n8\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10\n0%\n\t\n9,41\n5,9%\n\t\n8\n20%"
+    },
+    "B": {
+      "input": "Max Beneficio = t\nMin Costo = t\nt <= 1e10\nx1 = 0\nx2 = 0",
+      "request": {
+        "name": "RT B",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "t",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10000000000,
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Resultado parcial",
+      "code": 200,
+      "response": {
+        "status": "partial",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              10000000000,
+              10000000000
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            10000000000,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10000000000
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 10000000000
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 0
+            }
+          ],
+          "normalization_ranges": [
+            10000000000,
+            10000000000
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": null,
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 10000000000
+            },
+            "objectives": [
+              10000000000,
+              10000000000
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 10000000000
+            },
+            "objectives": [
+              10000000000,
+              10000000000
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "feasible_suboptimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              0,
+              100
+            ],
+            "normalized_distances": [
+              1,
+              0
+            ],
+            "aggregate_distance": 0.8,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 3,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.2000\t0.8000\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n10.000.000.000\n100%\n\t\n10.000.000.000\n100%\n\t\n0\n0%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10.000.000.000\n0%\n\t\n10.000.000.000\n0%\n\t\n0\n100%"
+    },
+    "C": {
+      "input": "Max Beneficio = 1e-12*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT C",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1e-12,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            0,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            1,
+            10
+          ],
+          "normalization_sources": [
+            "constant",
+            "feasible_range"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [
+            0,
+            1
+          ],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 1,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.0000\t0.0000\t0.0000\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n0\n100%\n\t\n0\n100%\n\t\n0\n100%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n0\n100%\n\t\n0\n100%\n\t\n0\n100%"
+    },
+    "D": {
+      "input": "Max Retorno = x1\nMax Servicio = x2\nx1 + x2 <= 10",
+      "request": {
+        "name": "RT D",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Retorno",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Retorno",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              10,
+              0
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "ideal_point": [
+            10,
+            10
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 10
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5.000000000000001,
+              "x2 (Alternativa B)": 4.999999999999999
+            },
+            "objectives": [
+              5.000000000000001,
+              4.999999999999999
+            ],
+            "achievement_pct": [
+              50.000000000000014,
+              50
+            ],
+            "normalized_distances": [
+              0.4999999999999999,
+              0.5
+            ],
+            "aggregate_distance": 0.35355339059327373,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 5
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "polygon": {
+        "name": "Región factible visible",
+        "x": [
+          0,
+          10,
+          10,
+          0,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      },
+      "axis": "Retorno",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Retorno\n▲ Maximizar\t50%\t\n10\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Servicio\n▲ Maximizar\t50%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%"
+    },
+    "E": {
+      "input": "Max Retorno = x1\nMax Servicio = x2\n1e-9*x1 + 1e-9*x2 <= 1e-8",
+      "request": {
+        "name": "RT E",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Retorno",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 1e-08,
+            "coefficients": [
+              1e-09,
+              1e-09
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Retorno",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              10,
+              0
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "ideal_point": [
+            10,
+            10
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 10
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5.000000000000001,
+              "x2 (Alternativa B)": 4.999999999999999
+            },
+            "objectives": [
+              5.000000000000001,
+              4.999999999999999
+            ],
+            "achievement_pct": [
+              50.000000000000014,
+              50
+            ],
+            "normalized_distances": [
+              0.4999999999999999,
+              0.5
+            ],
+            "aggregate_distance": 0.35355339059327373,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 5
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "polygon": {
+        "name": "Región factible visible",
+        "x": [
+          0,
+          10,
+          10,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      },
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Retorno\n▲ Maximizar\t50%\t\n10\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Servicio\n▲ Maximizar\t50%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%"
+    },
+    "F": {
+      "input": "Max Cobertura = x1\nMin Costo = x1\nMax Puntaje = x2\nx1 <= 10\nx2 = 4",
+      "request": {
+        "name": "RT F",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Cobertura",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Puntaje",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 4,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "payoff": {
+          "headers": [
+            "Cobertura",
+            "Costo",
+            "Puntaje"
+          ],
+          "matrix": [
+            [
+              10,
+              10,
+              4
+            ],
+            [
+              0,
+              0,
+              4
+            ],
+            [
+              0,
+              0,
+              4
+            ]
+          ],
+          "ideal_point": [
+            10,
+            0,
+            4
+          ],
+          "anti_ideal_point": [
+            0,
+            10,
+            4
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 4
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10,
+            1
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff",
+            "constant"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "degenerate_objectives": [
+            2
+          ],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              0,
+              0,
+              4
+            ],
+            "achievement_pct": [
+              0,
+              100,
+              100
+            ],
+            "normalized_distances": [
+              1,
+              0,
+              0
+            ],
+            "aggregate_distance": 0.3333333333333333,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              5,
+              5,
+              4
+            ],
+            "achievement_pct": [
+              50,
+              50,
+              100
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5,
+              0
+            ],
+            "aggregate_distance": 0.23570226039551584,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              5,
+              5,
+              4
+            ],
+            "achievement_pct": [
+              50,
+              50,
+              100
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5,
+              0
+            ],
+            "aggregate_distance": 0.16666666666666666,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 79,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.3333\t0.2357\t0.1667\n\nZ1: Cobertura\n▲ Maximizar\t33%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Costo\n▼ Minimizar\t33%\t\n0\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ3: Puntaje\n▲ Maximizar\t33%\t\n4\n100%\n\t\n4\n100%\n\t\n4\n100%"
+    },
+    "G": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 5\nx2 = 0",
+      "request": {
+        "name": "RT G",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "integer",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 5,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.65,
+          0.35
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.65,
+          0.35
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              5,
+              5
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            5,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            5
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            5,
+            5
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.35,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              4,
+              4
+            ],
+            "achievement_pct": [
+              80,
+              19.999999999999996
+            ],
+            "normalized_distances": [
+              0.19999999999999996,
+              0.8
+            ],
+            "aggregate_distance": 0.3087069808086626,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 3,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              3,
+              3
+            ],
+            "achievement_pct": [
+              60.00000000000001,
+              39.99999999999999
+            ],
+            "normalized_distances": [
+              0.3999999999999999,
+              0.6000000000000001
+            ],
+            "aggregate_distance": 0.25999999999999995,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 6,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.3500\t0.3087\t0.2600\n\nZ1: Beneficio\n▲ Maximizar\t65%\t\n5\n100%\n\t\n4\n80%\n\t\n3\n60%\n\n\nZ2: Costo\n▼ Minimizar\t35%\t\n5\n0%\n\t\n4\n20%\n\t\n3\n40%"
+    },
+    "H": {
+      "input": "Max Produccion = 3*x1 + 2*x2 + b\nMin Costos = x1 + 2*x2 + 4*b\nMax Servicio = x2 - b\nx1 + x2 <= 9\nx1 <= 4*b\nx2 >= 1",
+      "request": {
+        "name": "RT H",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "integer",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "b",
+            "var_type": "binary",
+            "lower_bound": 0,
+            "upper_bound": 1
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Produccion",
+            "sense": "maximize",
+            "coefficients": [
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "name": "Costos",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              2,
+              4
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1,
+              -1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 9,
+            "coefficients": [
+              1,
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "<=",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              -4
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": ">=",
+            "rhs": 1,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.3,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Produccion",
+            "Costos",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              23,
+              18,
+              4
+            ],
+            [
+              2,
+              2,
+              1
+            ],
+            [
+              18,
+              18,
+              9
+            ]
+          ],
+          "ideal_point": [
+            23,
+            2,
+            9
+          ],
+          "anti_ideal_point": [
+            2,
+            18,
+            1
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 5,
+              "b": 1
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 1,
+              "b": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 9,
+              "b": 0
+            }
+          ],
+          "normalization_ranges": [
+            21,
+            16,
+            8
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": null,
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 9,
+              "b": 0
+            },
+            "objectives": [
+              18,
+              18,
+              9
+            ],
+            "achievement_pct": [
+              76.19047619047618,
+              0,
+              100
+            ],
+            "normalized_distances": [
+              0.23809523809523825,
+              1,
+              0
+            ],
+            "aggregate_distance": 0.4190476190476191,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 3.109948075496579,
+              "b": 1
+            },
+            "objectives": [
+              19.219896150993158,
+              14.219896150993158,
+              2.109948075496579
+            ],
+            "achievement_pct": [
+              81.9995054809198,
+              23.625649056292765,
+              13.874350943707237
+            ],
+            "normalized_distances": [
+              0.18000494519080212,
+              0.7637435094370724,
+              0.8612564905629276
+            ],
+            "aggregate_distance": 0.300446880685105,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 3,
+              "x2 (Alternativa B)": 2.5349650349650354,
+              "b": 1
+            },
+            "objectives": [
+              15.06993006993007,
+              12.06993006993007,
+              1.5349650349650354
+            ],
+            "achievement_pct": [
+              62.237762237762226,
+              37.06293706293706,
+              6.6870629370629375
+            ],
+            "normalized_distances": [
+              0.3776223776223777,
+              0.6293706293706294,
+              0.9331293706293706
+            ],
+            "aggregate_distance": 0.18881118881118886,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 106,
+      "axis": "Produccion",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.4190\t0.3004\t0.1888\n\nZ1: Produccion\n▲ Maximizar\t50%\t\n18\n76,2%\n\t\n19,22\n82%\n\t\n15,07\n62,2%\n\n\nZ2: Costos\n▼ Minimizar\t30%\t\n18\n0%\n\t\n14,22\n23,6%\n\t\n12,07\n37,1%\n\n\nZ3: Servicio\n▲ Maximizar\t20%\t\n9\n100%\n\t\n2,11\n13,9%\n\t\n1,53\n6,7%"
+    },
+    "I": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 2\nx1 >= 3\nx2 = 0",
+      "request": {
+        "name": "RT I",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 2,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": ">=",
+            "rhs": 3,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Infactible",
+      "code": 400,
+      "pngEnabled": true,
+      "pngDownloaded": true,
+      "response": {
+        "detail": "Modelo infactible. Las cotas y restricciones son incompatibles."
+      },
+      "axis": "Produccion",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.4190\t0.3004\t0.1888\n\nZ1: Produccion\n▲ Maximizar\t50%\t\n18\n76,2%\n\t\n19,22\n82%\n\t\n15,07\n62,2%\n\n\nZ2: Costos\n▼ Minimizar\t30%\t\n18\n0%\n\t\n14,22\n23,6%\n\t\n12,07\n37,1%\n\n\nZ3: Servicio\n▲ Maximizar\t20%\t\n9\n100%\n\t\n2,11\n13,9%\n\t\n1,53\n6,7%"
+    },
+    "J": {
+      "input": "Max Beneficio = t\nMin Costo = t\nx1 = 0\nx2 = 0",
+      "request": {
+        "name": "RT J",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "t",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "No acotado",
+      "code": 400,
+      "response": {
+        "detail": "Modelo no acotado. Al menos un objetivo puede mejorar sin límite."
+      }
+    },
+    "K": {
+      "input": "Max Beneficio = x1*x2\nMin Costo = x1\nx1 <= 10",
+      "status": "Óptimo",
+      "alert": "Errores de sintaxis detectados:\nLínea 1: término inválido \"+x1*x2\". Usa formato como \"3*x1\", \"2x1\" o \"1e3*x1\".\nUn problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min)."
+    },
+    "L": {
+      "input": "Max Beneficio = *x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT L",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              10,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            10,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              0,
+              100
+            ],
+            "normalized_distances": [
+              1,
+              0
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.3535533905932738,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Beneficio\n▲ Maximizar\t50%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Costo\n▼ Minimizar\t50%\t\n0\n100%\n\t\n5\n50%\n\t\n5\n50%"
+    },
+    "M": {
+      "input": "Max Beneficio = 1e309*x1 - 1e309*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT M",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              0,
+              0
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            0,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            1,
+            10
+          ],
+          "normalization_sources": [
+            "constant",
+            "feasible_range"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [
+            0,
+            1
+          ],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              0,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              100
+            ],
+            "normalized_distances": [
+              0,
+              0
+            ],
+            "aggregate_distance": 0,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 1,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.0000\t0.0000\t0.0000\n\nZ1: Beneficio\n▲ Maximizar\t50%\t\n0\n100%\n\t\n0\n100%\n\t\n0\n100%\n\n\nZ2: Costo\n▼ Minimizar\t50%\t\n0\n100%\n\t\n0\n100%\n\t\n0\n100%"
+    },
+    "N": {
+      "input": "Max Beneficio = 1e-6*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT N",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1e-06,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "csv": "﻿\"OptiCompromise - Reporte de Resultados Multiobjetivo\"\n\"Modelo\",\"RT N\"\n\n\"MATRIZ DE PAGOS\"\n\"Solución Óptima de:\",\"Beneficio\",\"Costo\"\n\"Beneficio\",\"0.0000\",\"10.0000\"\n\"Costo\",\"0.0000\",\"0.0000\"\n\"Punto Ideal (Z*)\",\"0.0000\",\"0.0000\"\n\"Nadir aproximado (peor observado en pagos)\",\"0.0000\",\"10.0000\"\n\n\"SOLUCIONES DE COMPROMISO\"\n\"Métrica\",\"Estado\",\"Distancia D_p\",\"x1 (Alternativa A)\",\"x2 (Alternativa B)\",\"Z: Beneficio\",\"Z: Costo\",\"% Logro: Beneficio\",\"% Logro: Costo\"\n\"L1\",\"optimal\",\"0.200000\",\"10.0000\",\"0.0000\",\"0.0000\",\"10.0000\",\"100.00%\",\"0.00%\"\n\"L2\",\"optimal\",\"0.194029\",\"9.4118\",\"0.0000\",\"0.0000\",\"9.4118\",\"94.12%\",\"5.88%\"\n\"L_inf\",\"optimal\",\"0.160000\",\"8.0000\",\"0.0000\",\"0.0000\",\"8.0000\",\"80.00%\",\"20.00%\"\n\n\"DEFINICION DEL MODELO (RE-IMPORTABLE)\"\n\"Seccion\",\"Nombre\",\"Tipo_o_Sentido\",\"Min_o_RHS\",\"Max_o_Peso\",\"x1 (Alternativa A)\",\"x2 (Alternativa B)\"\n\"Meta\",\"RT N\",\"Modelo editable desde cero para formular variables, objetivos y restricciones.\",\"42\",\"\",\"\",\"\"\n\"Variable\",\"x1 (Alternativa A)\",\"continuous\",\"0\",\"100\",\"\",\"\"\n\"Variable\",\"x2 (Alternativa B)\",\"continuous\",\"0\",\"100\",\"\",\"\"\n\"Objetivo\",\"Beneficio\",\"maximize\",\"\",\"0.8\",\"0.000001\",\"0\"\n\"Objetivo\",\"Costo\",\"minimize\",\"\",\"0.2\",\"1\",\"0\"\n\"Restriccion\",\"Restricción 1\",\"<=\",\"10\",\"\",\"1\",\"0\"\n\"Restriccion\",\"Restricción 2\",\"==\",\"0\",\"\",\"0\",\"1\"",
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              9.999999999999999e-06,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            9.999999999999999e-06,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            9.999999999999999e-06,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.999999999999999e-06,
+              10
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 9.41176470588235,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.411764705882349e-06,
+              9.41176470588235
+            ],
+            "achievement_pct": [
+              94.11764705882351,
+              5.882352941176494
+            ],
+            "normalized_distances": [
+              0.05882352941176494,
+              0.9411764705882351
+            ],
+            "aggregate_distance": 0.1940285000290664,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 7.999999999999998,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              7.999999999999998e-06,
+              7.999999999999998
+            ],
+            "achievement_pct": [
+              79.99999999999999,
+              20.000000000000018
+            ],
+            "normalized_distances": [
+              0.20000000000000018,
+              0.7999999999999998
+            ],
+            "aggregate_distance": 0.16000000000000014,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n0\n100%\n\t\n0\n94,1%\n\t\n0\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10\n0%\n\t\n9,41\n5,9%\n\t\n8\n20%"
+    },
+    "FLOW": {
+      "JSON": {
+        "filename": "RT-A-JSON-rt_a.json",
+        "size": 991
+      },
+      "CSV": {
+        "filename": "RT-A-CSV-resultados_rt_a.csv",
+        "size": 1290
+      },
+      "Excel": {
+        "filename": "RT-A-Excel-OptiCompromise_rt_a.xlsx",
+        "size": 31665
+      },
+      "PNG": {
+        "filename": "RT-A-PNG-opticompromise_objectives2d.png",
+        "size": 191622
+      },
+      "extreme0": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0,
+            1
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0,
+            1
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "extreme1": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            1,
+            0
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            1,
+            0
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "rapid": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0.73,
+            0.27
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.73,
+            0.27
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0.27,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 8.796632551997357,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                8.796632551997357,
+                8.796632551997357
+              ],
+              "achievement_pct": [
+                87.96632551997358,
+                12.033674480026423
+              ],
+              "normalized_distances": [
+                0.12033674480026424,
+                0.8796632551997358
+              ],
+              "aggregate_distance": 0.25323398528645547,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 7.3,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                7.3,
+                7.3
+              ],
+              "achievement_pct": [
+                73,
+                27
+              ],
+              "normalized_distances": [
+                0.27,
+                0.73
+              ],
+              "aggregate_distance": 0.1971,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39,
+        "axis": "Beneficio",
+        "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2700\t0.2532\t0.1971\n\nZ1: Beneficio\n▲ Maximizar\t73%\t\n10\n100%\n\t\n8,8\n88%\n\t\n7,3\n73%\n\n\nZ2: Costo\n▼ Minimizar\t27%\t\n10\n0%\n\t\n8,8\n12%\n\t\n7,3\n27%"
+      },
+      "edit": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 6,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0.73,
+            0.27
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.73,
+            0.27
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                6,
+                6
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              6,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              6
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 6,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              6,
+              6
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                6
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 6,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                6,
+                6
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0.27,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 5.277979531198415,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                5.277979531198415,
+                5.277979531198415
+              ],
+              "achievement_pct": [
+                87.9663255199736,
+                12.033674480026413
+              ],
+              "normalized_distances": [
+                0.12033674480026413,
+                0.8796632551997359
+              ],
+              "aggregate_distance": 0.25323398528645547,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 4.38,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                4.38,
+                4.38
+              ],
+              "achievement_pct": [
+                73,
+                27
+              ],
+              "normalized_distances": [
+                0.27,
+                0.73
+              ],
+              "aggregate_distance": 0.1971,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "switch": {
+        "request": {
+          "name": "Optimización Sostenible Triobjetivo 3D (Bonus)",
+          "description": "Problema con 3 dimensiones de impacto: maximizar retorno económico, minimizar impacto ambiental y maximizar beneficio social.",
+          "variables": [
+            {
+              "name": "x1 (Línea Rentable)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            },
+            {
+              "name": "x2 (Línea Social)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            },
+            {
+              "name": "x3 (Línea Intensiva)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Retorno Económico (kUSD)",
+              "sense": "maximize",
+              "coefficients": [
+                3,
+                1,
+                2
+              ],
+              "expression": null
+            },
+            {
+              "name": "Impacto Ambiental (CO2 eq)",
+              "sense": "minimize",
+              "coefficients": [
+                2,
+                1,
+                4
+              ],
+              "expression": null
+            },
+            {
+              "name": "Beneficio Social (Puntos)",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                3,
+                1
+              ],
+              "expression": null
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Presupuesto de Capital",
+              "coefficients": [
+                1,
+                1,
+                1
+              ],
+              "sense": "<=",
+              "rhs": 100,
+              "expression": null
+            },
+            {
+              "name": "Capacidad Técnica Operativa A",
+              "coefficients": [
+                2,
+                1,
+                0
+              ],
+              "sense": "<=",
+              "rhs": 120,
+              "expression": null
+            },
+            {
+              "name": "Capacidad Técnica Operativa B",
+              "coefficients": [
+                0,
+                1,
+                2
+              ],
+              "sense": "<=",
+              "rhs": 140,
+              "expression": null
+            }
+          ],
+          "weights": [
+            0.3333,
+            0.3333,
+            0.3334
+          ],
+          "pareto_seed": 42
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.3333,
+            0.3333,
+            0.3334
+          ],
+          "payoff": {
+            "headers": [
+              "Retorno Económico (kUSD)",
+              "Impacto Ambiental (CO2 eq)",
+              "Beneficio Social (Puntos)"
+            ],
+            "matrix": [
+              [
+                260,
+                280,
+                100
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                100,
+                100,
+                300
+              ]
+            ],
+            "ideal_point": [
+              260,
+              0,
+              300
+            ],
+            "anti_ideal_point": [
+              0,
+              280,
+              0
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Línea Rentable)": 60,
+                "x2 (Línea Social)": 0,
+                "x3 (Línea Intensiva)": 40
+              },
+              {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 0,
+                "x3 (Línea Intensiva)": 0
+              },
+              {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 100,
+                "x3 (Línea Intensiva)": 0
+              }
+            ],
+            "normalization_ranges": [
+              260,
+              280,
+              300
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": null,
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 100,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                100,
+                100,
+                300
+              ],
+              "achievement_pct": [
+                38.46153846153846,
+                64.28571428571428,
+                100
+              ],
+              "normalized_distances": [
+                0.6153846153846154,
+                0.35714285714285715,
+                0
+              ],
+              "aggregate_distance": 0.32414340659340657,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Línea Rentable)": 19.999999999999996,
+                "x2 (Línea Social)": 80,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                140,
+                120,
+                260
+              ],
+              "achievement_pct": [
+                53.84615384615385,
+                57.14285714285715,
+                86.66666666666667
+              ],
+              "normalized_distances": [
+                0.46153846153846156,
+                0.4285714285714285,
+                0.1333333333333333
+              ],
+              "aggregate_distance": 0.21457885786654124,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Línea Rentable)": 34.99472749342697,
+                "x2 (Línea Social)": 46.679945572109844,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                151.66412805239077,
+                116.66940055896379,
+                175.03456420975652
+              ],
+              "achievement_pct": [
+                58.33235694322722,
+                58.332356943227225,
+                58.3448547365855
+              ],
+              "normalized_distances": [
+                0.41667643056772785,
+                0.4166764305677278,
+                0.41655145263414495
+              ],
+              "aggregate_distance": 0.13887825430822393,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 128
+      },
+      "final_axis": "Retorno Económico (kUSD)",
+      "invalidWeights": {
+        "status": "Error Solver",
+        "excelEnabled": false
+      },
+      "import": {
+        "CSV": {
+          "status": "Error",
+          "title": "Usa <=, >= o = en la restricción «Restricción 2»."
+        }
+      }
+    }
+  },
+  "despues": {
+    "A": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT A",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              10,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            10,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              10
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 9.41176470588235,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.41176470588235,
+              9.41176470588235
+            ],
+            "achievement_pct": [
+              94.11764705882351,
+              5.882352941176494
+            ],
+            "normalized_distances": [
+              0.05882352941176494,
+              0.9411764705882351
+            ],
+            "aggregate_distance": 0.1940285000290664,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 7.999999999999998,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              7.999999999999998,
+              7.999999999999998
+            ],
+            "achievement_pct": [
+              79.99999999999999,
+              20.000000000000018
+            ],
+            "normalized_distances": [
+              0.20000000000000018,
+              0.7999999999999998
+            ],
+            "aggregate_distance": 0.16000000000000014,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n10\n100%\n\t\n9,41\n94,1%\n\t\n8\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10\n0%\n\t\n9,41\n5,9%\n\t\n8\n20%"
+    },
+    "B": {
+      "input": "Max Beneficio = t\nMin Costo = t\nt <= 1e10\nx1 = 0\nx2 = 0",
+      "request": {
+        "name": "RT B",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "t",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10000000000,
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              10000000000,
+              10000000000
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            10000000000,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10000000000
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 10000000000
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 0
+            }
+          ],
+          "normalization_ranges": [
+            10000000000,
+            10000000000
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": null,
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 10000000000
+            },
+            "objectives": [
+              10000000000,
+              10000000000
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 9411764705.882353
+            },
+            "objectives": [
+              9411764705.882353,
+              9411764705.882353
+            ],
+            "achievement_pct": [
+              94.11764705882352,
+              5.882352941176472
+            ],
+            "normalized_distances": [
+              0.05882352941176472,
+              0.9411764705882353
+            ],
+            "aggregate_distance": 0.19402850002906638,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "t": 8000000000.000002
+            },
+            "objectives": [
+              8000000000.000002,
+              8000000000.000002
+            ],
+            "achievement_pct": [
+              80.00000000000003,
+              19.99999999999997
+            ],
+            "normalized_distances": [
+              0.19999999999999973,
+              0.8000000000000003
+            ],
+            "aggregate_distance": 0.16000000000000006,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Peso w₁",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n10.000.000.000\n100%\n\t\n9.411.764.705,9\n94,1%\n\t\n8.000.000.000\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10.000.000.000\n0%\n\t\n9.411.764.705,9\n5,9%\n\t\n8.000.000.000\n20%"
+    },
+    "C": {
+      "input": "Max Beneficio = 1e-12*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT C",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1e-12,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              1e-11,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            1e-11,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            1e-11,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              1e-11,
+              10
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 9.41176470588235,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.41176470588235e-12,
+              9.41176470588235
+            ],
+            "achievement_pct": [
+              94.11764705882351,
+              5.882352941176494
+            ],
+            "normalized_distances": [
+              0.05882352941176494,
+              0.9411764705882351
+            ],
+            "aggregate_distance": 0.1940285000290664,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 7.999999999999998,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              7.999999999999998e-12,
+              7.999999999999998
+            ],
+            "achievement_pct": [
+              79.99999999999999,
+              20.000000000000018
+            ],
+            "normalized_distances": [
+              0.20000000000000018,
+              0.7999999999999998
+            ],
+            "aggregate_distance": 0.16000000000000014,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Peso w₁",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n1E-11\n100%\n\t\n9,412E-12\n94,1%\n\t\n8E-12\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10\n0%\n\t\n9,41\n5,9%\n\t\n8\n20%"
+    },
+    "D": {
+      "input": "Max Retorno = x1\nMax Servicio = x2\nx1 + x2 <= 10",
+      "request": {
+        "name": "RT D",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Retorno",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Retorno",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              10,
+              0
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "ideal_point": [
+            10,
+            10
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 10
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5.000000000000001,
+              "x2 (Alternativa B)": 4.999999999999999
+            },
+            "objectives": [
+              5.000000000000001,
+              4.999999999999999
+            ],
+            "achievement_pct": [
+              50.000000000000014,
+              50
+            ],
+            "normalized_distances": [
+              0.4999999999999999,
+              0.5
+            ],
+            "aggregate_distance": 0.35355339059327373,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 5
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "polygon": {
+        "name": "Región factible visible",
+        "x": [
+          0,
+          10,
+          10,
+          0,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      },
+      "axis": "Peso w₁",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Retorno\n▲ Maximizar\t50%\t\n10\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Servicio\n▲ Maximizar\t50%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%",
+      "leyenda": [
+        "Región factible visible",
+        "Óptimos Individuales",
+        "Solución L₁",
+        "Solución L₂",
+        "Solución L∞"
+      ]
+    },
+    "E": {
+      "input": "Max Retorno = x1\nMax Servicio = x2\n1e-9*x1 + 1e-9*x2 <= 1e-8",
+      "request": {
+        "name": "RT E",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Retorno",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 1e-08,
+            "coefficients": [
+              1e-09,
+              1e-09
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Retorno",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              10,
+              0
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "ideal_point": [
+            10,
+            10
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 10
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              10
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              10,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5.000000000000001,
+              "x2 (Alternativa B)": 4.999999999999999
+            },
+            "objectives": [
+              5.000000000000001,
+              4.999999999999999
+            ],
+            "achievement_pct": [
+              50.000000000000014,
+              50
+            ],
+            "normalized_distances": [
+              0.4999999999999999,
+              0.5
+            ],
+            "aggregate_distance": 0.35355339059327373,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 5
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "polygon": {
+        "name": "Región factible visible",
+        "x": [
+          0,
+          10,
+          10,
+          0,
+          0,
+          0
+        ],
+        "y": [
+          0,
+          0,
+          0,
+          10,
+          10,
+          0
+        ]
+      },
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Retorno\n▲ Maximizar\t50%\t\n10\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Servicio\n▲ Maximizar\t50%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%",
+      "leyenda": [
+        "Región factible visible",
+        "Óptimos Individuales",
+        "Solución L₁",
+        "Solución L₂",
+        "Solución L∞"
+      ]
+    },
+    "F": {
+      "input": "Max Cobertura = x1\nMin Costo = x1\nMax Puntaje = x2\nx1 <= 10\nx2 = 4",
+      "request": {
+        "name": "RT F",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Cobertura",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Puntaje",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 4,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.3333333333333333,
+          0.3333333333333333,
+          0.3333333333333333
+        ],
+        "payoff": {
+          "headers": [
+            "Cobertura",
+            "Costo",
+            "Puntaje"
+          ],
+          "matrix": [
+            [
+              10,
+              10,
+              4
+            ],
+            [
+              0,
+              0,
+              4
+            ],
+            [
+              0,
+              0,
+              4
+            ]
+          ],
+          "ideal_point": [
+            10,
+            0,
+            4
+          ],
+          "anti_ideal_point": [
+            0,
+            10,
+            4
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 4
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            }
+          ],
+          "normalization_ranges": [
+            10,
+            10,
+            1
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff",
+            "constant"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              4,
+              4
+            ]
+          ],
+          "degenerate_objectives": [
+            2
+          ],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              0,
+              0,
+              4
+            ],
+            "achievement_pct": [
+              0,
+              100,
+              100
+            ],
+            "normalized_distances": [
+              1,
+              0,
+              0
+            ],
+            "aggregate_distance": 0.3333333333333333,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              5,
+              5,
+              4
+            ],
+            "achievement_pct": [
+              50,
+              50,
+              100
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5,
+              0
+            ],
+            "aggregate_distance": 0.23570226039551584,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 4
+            },
+            "objectives": [
+              5,
+              5,
+              4
+            ],
+            "achievement_pct": [
+              50,
+              50,
+              100
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5,
+              0
+            ],
+            "aggregate_distance": 0.16666666666666666,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 79,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.3333\t0.2357\t0.1667\n\nZ1: Cobertura\n▲ Maximizar\t33%\t\n0\n0%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ2: Costo\n▼ Minimizar\t33%\t\n0\n100%\n\t\n5\n50%\n\t\n5\n50%\n\n\nZ3: Puntaje\n▲ Maximizar\t33%\t\n4\n100%\n\t\n4\n100%\n\t\n4\n100%"
+    },
+    "G": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 5\nx2 = 0",
+      "request": {
+        "name": "RT G",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "integer",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 5,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.65,
+          0.35
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.65,
+          0.35
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              5,
+              5
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            5,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            5
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            5,
+            5
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              5
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 5,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              5,
+              5
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.35,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              4,
+              4
+            ],
+            "achievement_pct": [
+              80,
+              19.999999999999996
+            ],
+            "normalized_distances": [
+              0.19999999999999996,
+              0.8
+            ],
+            "aggregate_distance": 0.3087069808086626,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 3,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              3,
+              3
+            ],
+            "achievement_pct": [
+              60.00000000000001,
+              39.99999999999999
+            ],
+            "normalized_distances": [
+              0.3999999999999999,
+              0.6000000000000001
+            ],
+            "aggregate_distance": 0.25999999999999995,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 6,
+      "axis": "x1 (Alternativa A)",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.3500\t0.3087\t0.2600\n\nZ1: Beneficio\n▲ Maximizar\t65%\t\n5\n100%\n\t\n4\n80%\n\t\n3\n60%\n\n\nZ2: Costo\n▼ Minimizar\t35%\t\n5\n0%\n\t\n4\n20%\n\t\n3\n40%"
+    },
+    "H": {
+      "input": "Max Produccion = 3*x1 + 2*x2 + b\nMin Costos = x1 + 2*x2 + 4*b\nMax Servicio = x2 - b\nx1 + x2 <= 9\nx1 <= 4*b\nx2 >= 1",
+      "request": {
+        "name": "RT H",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "integer",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "b",
+            "var_type": "binary",
+            "lower_bound": 0,
+            "upper_bound": 1
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Produccion",
+            "sense": "maximize",
+            "coefficients": [
+              3,
+              2,
+              1
+            ]
+          },
+          {
+            "name": "Costos",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              2,
+              4
+            ]
+          },
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              1,
+              -1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 9,
+            "coefficients": [
+              1,
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "<=",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              -4
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": ">=",
+            "rhs": 1,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.3,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.3,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Produccion",
+            "Costos",
+            "Servicio"
+          ],
+          "matrix": [
+            [
+              23,
+              18,
+              4
+            ],
+            [
+              2,
+              2,
+              1
+            ],
+            [
+              18,
+              18,
+              9
+            ]
+          ],
+          "ideal_point": [
+            23,
+            2,
+            9
+          ],
+          "anti_ideal_point": [
+            2,
+            18,
+            1
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 5,
+              "b": 1
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 1,
+              "b": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 9,
+              "b": 0
+            }
+          ],
+          "normalization_ranges": [
+            21,
+            16,
+            8
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": null,
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 9,
+              "b": 0
+            },
+            "objectives": [
+              18,
+              18,
+              9
+            ],
+            "achievement_pct": [
+              76.19047619047618,
+              0,
+              100
+            ],
+            "normalized_distances": [
+              0.23809523809523825,
+              1,
+              0
+            ],
+            "aggregate_distance": 0.4190476190476191,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 3.109948075496579,
+              "b": 1
+            },
+            "objectives": [
+              19.219896150993158,
+              14.219896150993158,
+              2.109948075496579
+            ],
+            "achievement_pct": [
+              81.9995054809198,
+              23.625649056292765,
+              13.874350943707237
+            ],
+            "normalized_distances": [
+              0.18000494519080212,
+              0.7637435094370724,
+              0.8612564905629276
+            ],
+            "aggregate_distance": 0.300446880685105,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 3,
+              "x2 (Alternativa B)": 2.5349650349650354,
+              "b": 1
+            },
+            "objectives": [
+              15.06993006993007,
+              12.06993006993007,
+              1.5349650349650354
+            ],
+            "achievement_pct": [
+              62.237762237762226,
+              37.06293706293706,
+              6.6870629370629375
+            ],
+            "normalized_distances": [
+              0.3776223776223777,
+              0.6293706293706294,
+              0.9331293706293706
+            ],
+            "aggregate_distance": 0.18881118881118886,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 104,
+      "axis": "Produccion",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.4190\t0.3004\t0.1888\n\nZ1: Produccion\n▲ Maximizar\t50%\t\n18\n76,2%\n\t\n19,22\n82%\n\t\n15,07\n62,2%\n\n\nZ2: Costos\n▼ Minimizar\t30%\t\n18\n0%\n\t\n14,22\n23,6%\n\t\n12,07\n37,1%\n\n\nZ3: Servicio\n▲ Maximizar\t20%\t\n9\n100%\n\t\n2,11\n13,9%\n\t\n1,53\n6,7%"
+    },
+    "I": {
+      "input": "Max Beneficio = x1\nMin Costo = x1\nx1 <= 2\nx1 >= 3\nx2 = 0",
+      "request": {
+        "name": "RT I",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 2,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": ">=",
+            "rhs": 3,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Infactible",
+      "code": 400,
+      "pngEnabled": false,
+      "response": {
+        "detail": "Modelo infactible. Las cotas y restricciones son incompatibles."
+      },
+      "axis": "Objetivo 1",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.4712\t0.3391\t0.2400\n\nZ1: Objetivo 1\n▲ Maximizar\t50%\t\n60\n30,8%\n\t\n85,21\n50,2%\n\t\n87,6\n52%\n\n\nZ2: Objetivo 2\n▼ Minimizar\t50%\t\n20\n75%\n\t\n28,4\n54%\n\t\n29,2\n52%"
+    },
+    "J": {
+      "input": "Max Beneficio = t\nMin Costo = t\nx1 = 0\nx2 = 0",
+      "request": {
+        "name": "RT J",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "t",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1,
+              0
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "No acotado",
+      "code": 400,
+      "response": {
+        "detail": "Modelo no acotado. Al menos un objetivo puede mejorar sin límite."
+      }
+    },
+    "K": {
+      "input": "Max Beneficio = x1*x2\nMin Costo = x1\nx1 <= 10",
+      "status": "Óptimo",
+      "alert": "Errores de sintaxis detectados:\nLínea 1: término inválido \"+x1*x2\". Usa formato como \"3*x1\", \"2x1\" o \"1e3*x1\".\nUn problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min)."
+    },
+    "L": {
+      "input": "Max Beneficio = *x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "status": "Óptimo",
+      "alert": "Errores de sintaxis detectados:\nLínea 1: término inválido \"+*x1\". Usa formato como \"3*x1\", \"2x1\" o \"1e3*x1\".\nUn problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min)."
+    },
+    "N": {
+      "input": "Max Beneficio = 1e-6*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "request": {
+        "name": "RT N",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Beneficio",
+            "sense": "maximize",
+            "coefficients": [
+              1e-06,
+              0
+            ]
+          },
+          {
+            "name": "Costo",
+            "sense": "minimize",
+            "coefficients": [
+              1,
+              0
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 10,
+            "coefficients": [
+              1,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              1
+            ]
+          }
+        ],
+        "weights": [
+          0.8,
+          0.2
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "csv": "﻿\"OptiCompromise - Reporte de Resultados Multiobjetivo\"\n\"Modelo\",\"RT N\"\n\n\"MATRIZ DE PAGOS\"\n\"Solución Óptima de:\",\"Beneficio\",\"Costo\"\n\"Beneficio\",\"0.000009999999999999999\",\"10\"\n\"Costo\",\"0\",\"0\"\n\"Punto Ideal (Z*)\",\"0.000009999999999999999\",\"0\"\n\"Nadir aproximado (peor observado en pagos)\",\"0\",\"10\"\n\n\"SOLUCIONES DE COMPROMISO\"\n\"Métrica\",\"Estado\",\"Distancia D_p\",\"x1 (Alternativa A)\",\"x2 (Alternativa B)\",\"Z: Beneficio\",\"Z: Costo\",\"% Logro: Beneficio\",\"% Logro: Costo\"\n\"L1\",\"optimal\",\"0.2\",\"10\",\"0\",\"0.000009999999999999999\",\"10\",\"100%\",\"0%\"\n\"L2\",\"optimal\",\"0.1940285000290664\",\"9.41176470588235\",\"0\",\"0.000009411764705882349\",\"9.41176470588235\",\"94.11764705882351%\",\"5.882352941176494%\"\n\"L_inf\",\"optimal\",\"0.16000000000000014\",\"7.999999999999998\",\"0\",\"0.000007999999999999998\",\"7.999999999999998\",\"79.99999999999999%\",\"20.000000000000018%\"\n\n\"DEFINICION DEL MODELO (RE-IMPORTABLE)\"\n\"Seccion\",\"Nombre\",\"Tipo_o_Sentido\",\"Min_o_RHS\",\"Max_o_Peso\",\"x1 (Alternativa A)\",\"x2 (Alternativa B)\"\n\"Meta\",\"RT N\",\"Modelo editable desde cero para formular variables, objetivos y restricciones.\",\"42\",\"\",\"\",\"\"\n\"Variable\",\"x1 (Alternativa A)\",\"continuous\",\"0\",\"100\",\"\",\"\"\n\"Variable\",\"x2 (Alternativa B)\",\"continuous\",\"0\",\"100\",\"\",\"\"\n\"Objetivo\",\"Beneficio\",\"maximize\",\"\",\"0.8\",\"0.000001\",\"0\"\n\"Objetivo\",\"Costo\",\"minimize\",\"\",\"0.2\",\"1\",\"0\"\n\"Restriccion\",\"Restricción 1\",\"<=\",\"10\",\"\",\"1\",\"0\"\n\"Restriccion\",\"Restricción 2\",\"==\",\"0\",\"\",\"0\",\"1\"",
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.8,
+          0.2
+        ],
+        "payoff": {
+          "headers": [
+            "Beneficio",
+            "Costo"
+          ],
+          "matrix": [
+            [
+              9.999999999999999e-06,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "ideal_point": [
+            9.999999999999999e-06,
+            0
+          ],
+          "anti_ideal_point": [
+            0,
+            10
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0
+            }
+          ],
+          "normalization_ranges": [
+            9.999999999999999e-06,
+            10
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": [
+            [
+              0,
+              10
+            ],
+            [
+              0,
+              0
+            ]
+          ],
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 10,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.999999999999999e-06,
+              10
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.2,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 9.41176470588235,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              9.411764705882349e-06,
+              9.41176470588235
+            ],
+            "achievement_pct": [
+              94.11764705882351,
+              5.882352941176494
+            ],
+            "normalized_distances": [
+              0.05882352941176494,
+              0.9411764705882351
+            ],
+            "aggregate_distance": 0.1940285000290664,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 7.999999999999998,
+              "x2 (Alternativa B)": 0
+            },
+            "objectives": [
+              7.999999999999998e-06,
+              7.999999999999998
+            ],
+            "achievement_pct": [
+              79.99999999999999,
+              20.000000000000018
+            ],
+            "normalized_distances": [
+              0.20000000000000018,
+              0.7999999999999998
+            ],
+            "aggregate_distance": 0.16000000000000014,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Beneficio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2000\t0.1940\t0.1600\n\nZ1: Beneficio\n▲ Maximizar\t80%\t\n1E-5\n100%\n\t\n9,412E-6\n94,1%\n\t\n8E-6\n80%\n\n\nZ2: Costo\n▼ Minimizar\t20%\t\n10\n0%\n\t\n9,41\n5,9%\n\t\n8\n20%"
+    },
+    "M": {
+      "input": "Max Beneficio = 1e309*x1 - 1e309*x1\nMin Costo = x1\nx1 <= 10\nx2 = 0",
+      "status": "Óptimo",
+      "alert": "Errores de sintaxis detectados:\nLínea 1: coeficiente fuera del rango numérico en \"+1e309*x1\".\nUn problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min)."
+    },
+    "O": {
+      "input": "Max Servicio = x1 + x2\nMax Cobertura = y + z\nx1 + x2 + y + z <= 12\n2*x1 - x2 = 0\ny - z = 0",
+      "request": {
+        "name": "RT O",
+        "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+        "variables": [
+          {
+            "name": "x1 (Alternativa A)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "x2 (Alternativa B)",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": 100
+          },
+          {
+            "name": "y",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          },
+          {
+            "name": "z",
+            "var_type": "continuous",
+            "lower_bound": 0,
+            "upper_bound": null
+          }
+        ],
+        "objectives": [
+          {
+            "name": "Servicio",
+            "sense": "maximize",
+            "coefficients": [
+              1,
+              1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Cobertura",
+            "sense": "maximize",
+            "coefficients": [
+              0,
+              0,
+              1,
+              1
+            ]
+          }
+        ],
+        "constraints": [
+          {
+            "name": "Restricción 1",
+            "sense": "<=",
+            "rhs": 12,
+            "coefficients": [
+              1,
+              1,
+              1,
+              1
+            ]
+          },
+          {
+            "name": "Restricción 2",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              2,
+              -1,
+              0,
+              0
+            ]
+          },
+          {
+            "name": "Restricción 3",
+            "sense": "==",
+            "rhs": 0,
+            "coefficients": [
+              0,
+              0,
+              1,
+              -1
+            ]
+          }
+        ],
+        "weights": [
+          0.5,
+          0.5
+        ]
+      },
+      "status": "Óptimo",
+      "code": 200,
+      "response": {
+        "status": "optimal",
+        "weights": [
+          0.5,
+          0.5
+        ],
+        "payoff": {
+          "headers": [
+            "Servicio",
+            "Cobertura"
+          ],
+          "matrix": [
+            [
+              12,
+              0
+            ],
+            [
+              0,
+              12
+            ]
+          ],
+          "ideal_point": [
+            12,
+            12
+          ],
+          "anti_ideal_point": [
+            0,
+            0
+          ],
+          "independent_solutions": [
+            {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 8,
+              "y": 0,
+              "z": 0
+            },
+            {
+              "x1 (Alternativa A)": 0,
+              "x2 (Alternativa B)": 0,
+              "y": 6,
+              "z": 6
+            }
+          ],
+          "normalization_ranges": [
+            12,
+            12
+          ],
+          "normalization_sources": [
+            "payoff",
+            "payoff"
+          ],
+          "decision_ranges_2d": null,
+          "degenerate_objectives": [],
+          "status": "optimal"
+        },
+        "solutions": {
+          "L1": {
+            "metric": "L1",
+            "variables": {
+              "x1 (Alternativa A)": 4,
+              "x2 (Alternativa B)": 8,
+              "y": 0,
+              "z": 0
+            },
+            "objectives": [
+              12,
+              0
+            ],
+            "achievement_pct": [
+              100,
+              0
+            ],
+            "normalized_distances": [
+              0,
+              1
+            ],
+            "aggregate_distance": 0.5,
+            "status": "optimal"
+          },
+          "L2": {
+            "metric": "L2",
+            "variables": {
+              "x1 (Alternativa A)": 2,
+              "x2 (Alternativa B)": 4,
+              "y": 3,
+              "z": 3
+            },
+            "objectives": [
+              6,
+              6
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.3535533905932738,
+            "status": "optimal"
+          },
+          "L_inf": {
+            "metric": "L_inf",
+            "variables": {
+              "x1 (Alternativa A)": 2,
+              "x2 (Alternativa B)": 4,
+              "y": 3,
+              "z": 3
+            },
+            "objectives": [
+              6,
+              6
+            ],
+            "achievement_pct": [
+              50,
+              50
+            ],
+            "normalized_distances": [
+              0.5,
+              0.5
+            ],
+            "aggregate_distance": 0.25,
+            "status": "optimal"
+          }
+        }
+      },
+      "pareto_count": 39,
+      "axis": "Servicio",
+      "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.5000\t0.3536\t0.2500\n\nZ1: Servicio\n▲ Maximizar\t50%\t\n12\n100%\n\t\n6\n50%\n\t\n6\n50%\n\n\nZ2: Cobertura\n▲ Maximizar\t50%\t\n0\n0%\n\t\n6\n50%\n\t\n6\n50%"
+    },
+    "FLOW": {
+      "JSON": {
+        "filename": "RT-A-JSON-rt_a.json",
+        "size": 991
+      },
+      "CSV": {
+        "filename": "RT-A-CSV-resultados_rt_a.csv",
+        "size": 1262
+      },
+      "Excel": {
+        "filename": "RT-A-Excel-OptiCompromise_rt_a.xlsx",
+        "size": 31665
+      },
+      "PNG": {
+        "filename": "RT-A-PNG-opticompromise_objectives2d.png",
+        "size": 191622
+      },
+      "mobile": {
+        "width": 390,
+        "scrollWidth": 390
+      },
+      "invalidWeights": {
+        "status": "Error",
+        "excelEnabled": false
+      },
+      "extreme0": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0,
+            1
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0,
+            1
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                0,
+                0
+              ],
+              "achievement_pct": [
+                0,
+                100
+              ],
+              "normalized_distances": [
+                1,
+                0
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "extreme1": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            1,
+            0
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            1,
+            0
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "rapid": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 10,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0.73,
+            0.27
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.73,
+            0.27
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                10,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              10,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              10
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              10,
+              10
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 10,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                10,
+                10
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0.27,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 8.796632551997357,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                8.796632551997357,
+                8.796632551997357
+              ],
+              "achievement_pct": [
+                87.96632551997358,
+                12.033674480026423
+              ],
+              "normalized_distances": [
+                0.12033674480026424,
+                0.8796632551997358
+              ],
+              "aggregate_distance": 0.25323398528645547,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 7.3,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                7.3,
+                7.3
+              ],
+              "achievement_pct": [
+                73,
+                27
+              ],
+              "normalized_distances": [
+                0.27,
+                0.73
+              ],
+              "aggregate_distance": 0.1971,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39,
+        "axis": "Beneficio",
+        "table": "Criterio / Métrica\tPeso (wᵢ)\tL₁ (Manhattan)\tL₂ (Euclidiana)\tL∞ (Minimax)\nDistancia Agregada Dₚ al Ideal\tΣw = 1.00\t0.2700\t0.2532\t0.1971\n\nZ1: Beneficio\n▲ Maximizar\t73%\t\n10\n100%\n\t\n8,8\n88%\n\t\n7,3\n73%\n\n\nZ2: Costo\n▼ Minimizar\t27%\t\n10\n0%\n\t\n8,8\n12%\n\t\n7,3\n27%"
+      },
+      "edit": {
+        "request": {
+          "name": "RT A",
+          "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+          "variables": [
+            {
+              "name": "x1 (Alternativa A)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            },
+            {
+              "name": "x2 (Alternativa B)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": 100
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Beneficio",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Costo",
+              "sense": "minimize",
+              "coefficients": [
+                1,
+                0
+              ]
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Restricción 1",
+              "sense": "<=",
+              "rhs": 6,
+              "coefficients": [
+                1,
+                0
+              ]
+            },
+            {
+              "name": "Restricción 2",
+              "sense": "==",
+              "rhs": 0,
+              "coefficients": [
+                0,
+                1
+              ]
+            }
+          ],
+          "weights": [
+            0.73,
+            0.27
+          ]
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.73,
+            0.27
+          ],
+          "payoff": {
+            "headers": [
+              "Beneficio",
+              "Costo"
+            ],
+            "matrix": [
+              [
+                6,
+                6
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "ideal_point": [
+              6,
+              0
+            ],
+            "anti_ideal_point": [
+              0,
+              6
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Alternativa A)": 6,
+                "x2 (Alternativa B)": 0
+              },
+              {
+                "x1 (Alternativa A)": 0,
+                "x2 (Alternativa B)": 0
+              }
+            ],
+            "normalization_ranges": [
+              6,
+              6
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": [
+              [
+                0,
+                6
+              ],
+              [
+                0,
+                0
+              ]
+            ],
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Alternativa A)": 6,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                6,
+                6
+              ],
+              "achievement_pct": [
+                100,
+                0
+              ],
+              "normalized_distances": [
+                0,
+                1
+              ],
+              "aggregate_distance": 0.27,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Alternativa A)": 5.277979531198415,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                5.277979531198415,
+                5.277979531198415
+              ],
+              "achievement_pct": [
+                87.9663255199736,
+                12.033674480026413
+              ],
+              "normalized_distances": [
+                0.12033674480026413,
+                0.8796632551997359
+              ],
+              "aggregate_distance": 0.25323398528645547,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Alternativa A)": 4.38,
+                "x2 (Alternativa B)": 0
+              },
+              "objectives": [
+                4.38,
+                4.38
+              ],
+              "achievement_pct": [
+                73,
+                27
+              ],
+              "normalized_distances": [
+                0.27,
+                0.73
+              ],
+              "aggregate_distance": 0.1971,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 39
+      },
+      "switch": {
+        "request": {
+          "name": "Optimización Sostenible Triobjetivo 3D (Bonus)",
+          "description": "Problema con 3 dimensiones de impacto: maximizar retorno económico, minimizar impacto ambiental y maximizar beneficio social.",
+          "variables": [
+            {
+              "name": "x1 (Línea Rentable)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            },
+            {
+              "name": "x2 (Línea Social)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            },
+            {
+              "name": "x3 (Línea Intensiva)",
+              "var_type": "continuous",
+              "lower_bound": 0,
+              "upper_bound": null
+            }
+          ],
+          "objectives": [
+            {
+              "name": "Retorno Económico (kUSD)",
+              "sense": "maximize",
+              "coefficients": [
+                3,
+                1,
+                2
+              ],
+              "expression": null
+            },
+            {
+              "name": "Impacto Ambiental (CO2 eq)",
+              "sense": "minimize",
+              "coefficients": [
+                2,
+                1,
+                4
+              ],
+              "expression": null
+            },
+            {
+              "name": "Beneficio Social (Puntos)",
+              "sense": "maximize",
+              "coefficients": [
+                1,
+                3,
+                1
+              ],
+              "expression": null
+            }
+          ],
+          "constraints": [
+            {
+              "name": "Presupuesto de Capital",
+              "coefficients": [
+                1,
+                1,
+                1
+              ],
+              "sense": "<=",
+              "rhs": 100,
+              "expression": null
+            },
+            {
+              "name": "Capacidad Técnica Operativa A",
+              "coefficients": [
+                2,
+                1,
+                0
+              ],
+              "sense": "<=",
+              "rhs": 120,
+              "expression": null
+            },
+            {
+              "name": "Capacidad Técnica Operativa B",
+              "coefficients": [
+                0,
+                1,
+                2
+              ],
+              "sense": "<=",
+              "rhs": 140,
+              "expression": null
+            }
+          ],
+          "weights": [
+            0.3333,
+            0.3333,
+            0.3334
+          ],
+          "pareto_seed": 42
+        },
+        "code": 200,
+        "response": {
+          "status": "optimal",
+          "weights": [
+            0.3333,
+            0.3333,
+            0.3334
+          ],
+          "payoff": {
+            "headers": [
+              "Retorno Económico (kUSD)",
+              "Impacto Ambiental (CO2 eq)",
+              "Beneficio Social (Puntos)"
+            ],
+            "matrix": [
+              [
+                259.99999999999994,
+                279.99999999999994,
+                99.99999999999997
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                100,
+                100,
+                300
+              ]
+            ],
+            "ideal_point": [
+              259.99999999999994,
+              0,
+              300
+            ],
+            "anti_ideal_point": [
+              0,
+              279.99999999999994,
+              0
+            ],
+            "independent_solutions": [
+              {
+                "x1 (Línea Rentable)": 59.99999999999999,
+                "x2 (Línea Social)": 0,
+                "x3 (Línea Intensiva)": 39.999999999999986
+              },
+              {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 0,
+                "x3 (Línea Intensiva)": 0
+              },
+              {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 100,
+                "x3 (Línea Intensiva)": 0
+              }
+            ],
+            "normalization_ranges": [
+              259.99999999999994,
+              279.99999999999994,
+              300
+            ],
+            "normalization_sources": [
+              "payoff",
+              "payoff",
+              "payoff"
+            ],
+            "decision_ranges_2d": null,
+            "degenerate_objectives": [],
+            "status": "optimal"
+          },
+          "solutions": {
+            "L1": {
+              "metric": "L1",
+              "variables": {
+                "x1 (Línea Rentable)": 0,
+                "x2 (Línea Social)": 100,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                100,
+                100,
+                300
+              ],
+              "achievement_pct": [
+                38.46153846153847,
+                64.28571428571428,
+                100
+              ],
+              "normalized_distances": [
+                0.6153846153846153,
+                0.3571428571428572,
+                0
+              ],
+              "aggregate_distance": 0.32414340659340657,
+              "status": "optimal"
+            },
+            "L2": {
+              "metric": "L2",
+              "variables": {
+                "x1 (Línea Rentable)": 20.00000000000001,
+                "x2 (Línea Social)": 79.99999999999999,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                140,
+                120,
+                259.99999999999994
+              ],
+              "achievement_pct": [
+                53.84615384615387,
+                57.14285714285714,
+                86.66666666666664
+              ],
+              "normalized_distances": [
+                0.46153846153846134,
+                0.42857142857142866,
+                0.13333333333333353
+              ],
+              "aggregate_distance": 0.21457885786654124,
+              "status": "optimal"
+            },
+            "L_inf": {
+              "metric": "L_inf",
+              "variables": {
+                "x1 (Línea Rentable)": 34.994727493426964,
+                "x2 (Línea Social)": 46.679945572109844,
+                "x3 (Línea Intensiva)": 0
+              },
+              "objectives": [
+                151.66412805239074,
+                116.66940055896377,
+                175.03456420975652
+              ],
+              "achievement_pct": [
+                58.33235694322722,
+                58.33235694322722,
+                58.344854736585496
+              ],
+              "normalized_distances": [
+                0.41667643056772785,
+                0.41667643056772785,
+                0.41655145263414506
+              ],
+              "aggregate_distance": 0.13887825430822395,
+              "status": "optimal"
+            }
+          }
+        },
+        "pareto_count": 128
+      },
+      "final_axis": "Retorno Económico (kUSD)",
+      "import": {
+        "JSON": {
+          "request": {
+            "name": "RT A",
+            "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+            "variables": [
+              {
+                "name": "x1 (Alternativa A)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              },
+              {
+                "name": "x2 (Alternativa B)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              }
+            ],
+            "objectives": [
+              {
+                "name": "Beneficio",
+                "sense": "maximize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "name": "Costo",
+                "sense": "minimize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              }
+            ],
+            "constraints": [
+              {
+                "name": "Restricción 1",
+                "sense": "<=",
+                "rhs": 10,
+                "coefficients": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "name": "Restricción 2",
+                "sense": "==",
+                "rhs": 0,
+                "coefficients": [
+                  0,
+                  1
+                ]
+              }
+            ],
+            "weights": [
+              0.73,
+              0.27
+            ]
+          },
+          "code": 200,
+          "response": {
+            "status": "optimal",
+            "weights": [
+              0.73,
+              0.27
+            ],
+            "payoff": {
+              "headers": [
+                "Beneficio",
+                "Costo"
+              ],
+              "matrix": [
+                [
+                  10,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "ideal_point": [
+                10,
+                0
+              ],
+              "anti_ideal_point": [
+                0,
+                10
+              ],
+              "independent_solutions": [
+                {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                {
+                  "x1 (Alternativa A)": 0,
+                  "x2 (Alternativa B)": 0
+                }
+              ],
+              "normalization_ranges": [
+                10,
+                10
+              ],
+              "normalization_sources": [
+                "payoff",
+                "payoff"
+              ],
+              "decision_ranges_2d": [
+                [
+                  0,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "degenerate_objectives": [],
+              "status": "optimal"
+            },
+            "solutions": {
+              "L1": {
+                "metric": "L1",
+                "variables": {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  10,
+                  10
+                ],
+                "achievement_pct": [
+                  100,
+                  0
+                ],
+                "normalized_distances": [
+                  0,
+                  1
+                ],
+                "aggregate_distance": 0.27,
+                "status": "optimal"
+              },
+              "L2": {
+                "metric": "L2",
+                "variables": {
+                  "x1 (Alternativa A)": 8.796632551997357,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  8.796632551997357,
+                  8.796632551997357
+                ],
+                "achievement_pct": [
+                  87.96632551997358,
+                  12.033674480026423
+                ],
+                "normalized_distances": [
+                  0.12033674480026424,
+                  0.8796632551997358
+                ],
+                "aggregate_distance": 0.25323398528645547,
+                "status": "optimal"
+              },
+              "L_inf": {
+                "metric": "L_inf",
+                "variables": {
+                  "x1 (Alternativa A)": 7.3,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  7.3,
+                  7.3
+                ],
+                "achievement_pct": [
+                  73,
+                  27
+                ],
+                "normalized_distances": [
+                  0.27,
+                  0.73
+                ],
+                "aggregate_distance": 0.1971,
+                "status": "optimal"
+              }
+            }
+          },
+          "pareto_count": 39
+        },
+        "Excel": {
+          "request": {
+            "name": "RT A",
+            "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+            "variables": [
+              {
+                "name": "x1 (Alternativa A)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              },
+              {
+                "name": "x2 (Alternativa B)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              }
+            ],
+            "objectives": [
+              {
+                "name": "Beneficio",
+                "sense": "maximize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "name": "Costo",
+                "sense": "minimize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              }
+            ],
+            "constraints": [
+              {
+                "name": "Restricción 1",
+                "coefficients": [
+                  1,
+                  0
+                ],
+                "sense": "<=",
+                "rhs": 10
+              },
+              {
+                "name": "Restricción 2",
+                "coefficients": [
+                  0,
+                  1
+                ],
+                "sense": "==",
+                "rhs": 0
+              }
+            ],
+            "weights": [
+              0.73,
+              0.27
+            ],
+            "pareto_seed": 42
+          },
+          "code": 200,
+          "response": {
+            "status": "optimal",
+            "weights": [
+              0.73,
+              0.27
+            ],
+            "payoff": {
+              "headers": [
+                "Beneficio",
+                "Costo"
+              ],
+              "matrix": [
+                [
+                  10,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "ideal_point": [
+                10,
+                0
+              ],
+              "anti_ideal_point": [
+                0,
+                10
+              ],
+              "independent_solutions": [
+                {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                {
+                  "x1 (Alternativa A)": 0,
+                  "x2 (Alternativa B)": 0
+                }
+              ],
+              "normalization_ranges": [
+                10,
+                10
+              ],
+              "normalization_sources": [
+                "payoff",
+                "payoff"
+              ],
+              "decision_ranges_2d": [
+                [
+                  0,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "degenerate_objectives": [],
+              "status": "optimal"
+            },
+            "solutions": {
+              "L1": {
+                "metric": "L1",
+                "variables": {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  10,
+                  10
+                ],
+                "achievement_pct": [
+                  100,
+                  0
+                ],
+                "normalized_distances": [
+                  0,
+                  1
+                ],
+                "aggregate_distance": 0.27,
+                "status": "optimal"
+              },
+              "L2": {
+                "metric": "L2",
+                "variables": {
+                  "x1 (Alternativa A)": 8.796632551997357,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  8.796632551997357,
+                  8.796632551997357
+                ],
+                "achievement_pct": [
+                  87.96632551997358,
+                  12.033674480026423
+                ],
+                "normalized_distances": [
+                  0.12033674480026424,
+                  0.8796632551997358
+                ],
+                "aggregate_distance": 0.25323398528645547,
+                "status": "optimal"
+              },
+              "L_inf": {
+                "metric": "L_inf",
+                "variables": {
+                  "x1 (Alternativa A)": 7.3,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  7.3,
+                  7.3
+                ],
+                "achievement_pct": [
+                  73,
+                  27
+                ],
+                "normalized_distances": [
+                  0.27,
+                  0.73
+                ],
+                "aggregate_distance": 0.1971,
+                "status": "optimal"
+              }
+            }
+          },
+          "pareto_count": 39
+        },
+        "CSV": {
+          "request": {
+            "name": "RT A",
+            "description": "Modelo editable desde cero para formular variables, objetivos y restricciones.",
+            "variables": [
+              {
+                "name": "x1 (Alternativa A)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              },
+              {
+                "name": "x2 (Alternativa B)",
+                "var_type": "continuous",
+                "lower_bound": 0,
+                "upper_bound": 100
+              }
+            ],
+            "objectives": [
+              {
+                "name": "Beneficio",
+                "sense": "maximize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              },
+              {
+                "name": "Costo",
+                "sense": "minimize",
+                "coefficients": [
+                  1,
+                  0
+                ]
+              }
+            ],
+            "constraints": [
+              {
+                "name": "Restricción 1",
+                "coefficients": [
+                  1,
+                  0
+                ],
+                "sense": "<=",
+                "rhs": 10
+              },
+              {
+                "name": "Restricción 2",
+                "coefficients": [
+                  0,
+                  1
+                ],
+                "sense": "==",
+                "rhs": 0
+              }
+            ],
+            "weights": [
+              0.73,
+              0.27
+            ],
+            "pareto_seed": 42
+          },
+          "code": 200,
+          "response": {
+            "status": "optimal",
+            "weights": [
+              0.73,
+              0.27
+            ],
+            "payoff": {
+              "headers": [
+                "Beneficio",
+                "Costo"
+              ],
+              "matrix": [
+                [
+                  10,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "ideal_point": [
+                10,
+                0
+              ],
+              "anti_ideal_point": [
+                0,
+                10
+              ],
+              "independent_solutions": [
+                {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                {
+                  "x1 (Alternativa A)": 0,
+                  "x2 (Alternativa B)": 0
+                }
+              ],
+              "normalization_ranges": [
+                10,
+                10
+              ],
+              "normalization_sources": [
+                "payoff",
+                "payoff"
+              ],
+              "decision_ranges_2d": [
+                [
+                  0,
+                  10
+                ],
+                [
+                  0,
+                  0
+                ]
+              ],
+              "degenerate_objectives": [],
+              "status": "optimal"
+            },
+            "solutions": {
+              "L1": {
+                "metric": "L1",
+                "variables": {
+                  "x1 (Alternativa A)": 10,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  10,
+                  10
+                ],
+                "achievement_pct": [
+                  100,
+                  0
+                ],
+                "normalized_distances": [
+                  0,
+                  1
+                ],
+                "aggregate_distance": 0.27,
+                "status": "optimal"
+              },
+              "L2": {
+                "metric": "L2",
+                "variables": {
+                  "x1 (Alternativa A)": 8.796632551997357,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  8.796632551997357,
+                  8.796632551997357
+                ],
+                "achievement_pct": [
+                  87.96632551997358,
+                  12.033674480026423
+                ],
+                "normalized_distances": [
+                  0.12033674480026424,
+                  0.8796632551997358
+                ],
+                "aggregate_distance": 0.25323398528645547,
+                "status": "optimal"
+              },
+              "L_inf": {
+                "metric": "L_inf",
+                "variables": {
+                  "x1 (Alternativa A)": 7.3,
+                  "x2 (Alternativa B)": 0
+                },
+                "objectives": [
+                  7.3,
+                  7.3
+                ],
+                "achievement_pct": [
+                  73,
+                  27
+                ],
+                "normalized_distances": [
+                  0.27,
+                  0.73
+                ],
+                "aggregate_distance": 0.1971,
+                "status": "optimal"
+              }
+            }
+          },
+          "pareto_count": 39
+        }
+      },
+      "sensibilidad_l2": [
+        {
+          "name": "Beneficio",
+          "axis": "x2",
+          "x": [
+            0,
+            0.05,
+            0.1,
+            0.15000000000000002,
+            0.2,
+            0.25,
+            0.30000000000000004,
+            0.35000000000000003,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6000000000000001,
+            0.65,
+            0.7000000000000001,
+            0.75,
+            0.8,
+            0.8500000000000001,
+            0.9,
+            0.9500000000000001,
+            1
+          ],
+          "y": [
+            100,
+            99.72375690607734,
+            98.78048780487805,
+            96.97986577181209,
+            94.11764705882352,
+            90,
+            84.48275862068965,
+            77.5229357798165,
+            69.23076923076924,
+            59.90099009900991,
+            50,
+            40.099009900990104,
+            30.76923076923075,
+            22.477064220183472,
+            15.517241379310331,
+            10.000000000000032,
+            5.882352941176483,
+            3.0201342281879318,
+            1.2195121951219523,
+            0.2762430939226346,
+            0
+          ]
+        },
+        {
+          "name": "Costo",
+          "axis": "x2",
+          "x": [
+            0,
+            0.05,
+            0.1,
+            0.15000000000000002,
+            0.2,
+            0.25,
+            0.30000000000000004,
+            0.35000000000000003,
+            0.4,
+            0.45,
+            0.5,
+            0.55,
+            0.6000000000000001,
+            0.65,
+            0.7000000000000001,
+            0.75,
+            0.8,
+            0.8500000000000001,
+            0.9,
+            0.9500000000000001,
+            1
+          ],
+          "y": [
+            0,
+            0.2762430939226518,
+            1.2195121951219527,
+            3.0201342281879193,
+            5.882352941176472,
+            9.999999999999995,
+            15.517241379310349,
+            22.4770642201835,
+            30.76923076923076,
+            40.09900990099009,
+            50,
+            59.900990099009896,
+            69.23076923076925,
+            77.52293577981652,
+            84.48275862068967,
+            89.99999999999997,
+            94.11764705882352,
+            96.97986577181207,
+            98.78048780487805,
+            99.72375690607737,
+            100
+          ]
+        },
+        {
+          "name": "Beneficio",
+          "axis": "x2",
+          "x": [
+            0.73
+          ],
+          "y": [
+            12.033674480026423
+          ]
+        },
+        {
+          "name": "Costo",
+          "axis": "x2",
+          "x": [
+            0.73
+          ],
+          "y": [
+            87.96632551997358
+          ]
+        }
+      ]
+    }
+  }
+}

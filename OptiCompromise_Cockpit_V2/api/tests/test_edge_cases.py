@@ -105,8 +105,8 @@ class TestEdgeCases(unittest.TestCase):
             x2 = sol.variables["x2"]
             self.assertAlmostEqual(x2, round(x2), places=6)
 
-        # Verificar distancia L2 exacta (~0.149381 calculada por fuerza bruta)
-        self.assertAlmostEqual(solutions["L2"].aggregate_distance, 0.149381, places=4)
+        # Referencia independiente: enumerar x2=0,…,15 y minimizar en cada polígono.
+        self.assertAlmostEqual(solutions["L2"].aggregate_distance, 0.08373323735, places=6)
         self.assertAlmostEqual(solutions["L2"].variables["x2"], 15.0, places=5)
 
         # Verificar que Pareto MIP incluye puntos de L1, L2 y L_inf todos con x2 entero

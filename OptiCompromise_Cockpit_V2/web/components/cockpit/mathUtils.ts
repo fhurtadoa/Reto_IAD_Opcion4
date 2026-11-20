@@ -18,6 +18,9 @@ export function fmtNum(val: number | undefined | null, decimals = 2): string {
   if (Math.abs(val) >= 10000) {
     return val.toLocaleString("es-CO", { maximumFractionDigits: Math.min(decimals, 1) });
   }
+  if (val !== 0 && Number(val.toFixed(decimals)) === 0) {
+    return val.toLocaleString("es-CO", { notation: "scientific", maximumSignificantDigits: 4 });
+  }
   return val.toLocaleString("es-CO", { maximumFractionDigits: decimals });
 }
 
@@ -28,6 +31,10 @@ export function fmtNum(val: number | undefined | null, decimals = 2): string {
 export function fmtLatexNum(val: number | undefined | null, decimals = 2): string {
   if (val === undefined || val === null || Number.isNaN(val)) return "0";
   const rounded = Number(val.toFixed(Math.abs(val) >= 10000 ? Math.min(decimals, 1) : decimals));
+  if ((rounded === 0 && val !== 0) || Math.abs(val) >= 1e21) {
+    const [mantissa, exponent] = val.toExponential(decimals).split("e");
+    return `${Number(mantissa)} \\times 10^{${Number(exponent)}}`;
+  }
   const [intPart, decPart] = String(rounded).split(".");
   const sign = intPart.startsWith("-") ? "-" : "";
   const digits = intPart.replace("-", "");
@@ -46,11 +53,11 @@ export function formatLinearExpr(
   const parts: string[] = [];
   for (let i = 0; i < varNames.length; i++) {
     const c = coeffs[i] ?? 0;
-    if (asLatex ? Math.abs(c) < 1e-12 : c === 0) continue;
+    if (c === 0) continue;
     const absC = Math.abs(c);
     const vRaw = varNames[i];
     const vStr = asLatex ? formatVarLatex(vRaw) : vRaw;
-    const coeffStr = (asLatex ? Math.abs(absC - 1) < 1e-9 : absC === 1) ? "" : `${asLatex ? Number(absC.toFixed(4)) : absC}${asLatex ? "\\," : "*"}`;
+    const coeffStr = absC === 1 ? "" : `${asLatex ? fmtLatexNum(absC, 4) : absC}${asLatex ? "\\," : "*"}`;
     if (parts.length === 0) {
       parts.push(c < 0 ? `-${coeffStr}${vStr}` : `${coeffStr}${vStr}`);
     } else {
@@ -185,28 +192,29 @@ export function parseAlgebraicModel(
       // Forma 1: constante numérica pura (ej. "+100" o "50")
       if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(body)) {
         const cVal = parseFloat(body);
-        if (Number.isNaN(cVal)) {
-          errors.push(`Línea ${lineNo}: constante numérica inválida "${match[0]}".`);
+        constant += sign * cVal;
+        if (!Number.isFinite(constant)) {
+          errors.push(`Línea ${lineNo}: constante fuera del rango numérico "${match[0]}".`);
           return null;
         }
-        constant += sign * cVal;
         continue;
       }
 
       // Forma 2: [numero][*][variable] o [variable]
-      const mTerm = body.match(/^(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)?\*?([a-zA-Z][a-zA-Z0-9_]*)$/);
+      const mTerm = body.match(/^(?:(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\*?)?([a-zA-Z][a-zA-Z0-9_]*)$/);
       if (!mTerm) {
         errors.push(`Línea ${lineNo}: término inválido "${match[0]}". Usa formato como "3*x1", "2x1" o "1e3*x1".`);
         return null;
       }
       const numVal = mTerm[1] !== undefined ? parseFloat(mTerm[1]) : 1.0;
       const varName = mTerm[2];
-      if (Number.isNaN(numVal)) {
-        errors.push(`Línea ${lineNo}: coeficiente numérico inválido en "${match[0]}".`);
+      const coefficient = (coeffsMap[varName] ?? 0) + sign * numVal;
+      if (!Number.isFinite(coefficient)) {
+        errors.push(`Línea ${lineNo}: coeficiente fuera del rango numérico en "${match[0]}".`);
         return null;
       }
       ensureVar(varName);
-      coeffsMap[varName] = (coeffsMap[varName] || 0) + sign * numVal;
+      coeffsMap[varName] = coefficient;
     }
 
     if (consumed !== normalized.length) {
@@ -283,6 +291,10 @@ export function parseAlgebraicModel(
       netCoeffs[v] = (netCoeffs[v] || 0) - val;
     }
     const netRhs = rhsParsed.constant - lhsParsed.constant;
+    if (![netRhs, ...Object.values(netCoeffs)].every(Number.isFinite)) {
+      errors.push(`Línea ${lineNo}: la restricción supera el rango numérico al agrupar términos.`);
+      return;
+    }
     const existingName = existingModel.constraints[parsedConstraints.length]?.name;
     parsedConstraints.push({
       name: existingName || `Restricción ${parsedConstraints.length + 1}`,
@@ -374,6 +386,7 @@ export function buildLinfXRayLatex(
   const headerLatex = `\\min\\; \\lambda \\quad \\text{sujeto a } \\lambda \\ge 0,\\; w_i \\cdot D_i(x) \\le \\lambda\\; \\forall i`;
 
   const constraintsLatex = model.objectives.map((obj, i) => {
+    if (payoff.normalization_sources?.[i] === "constant") return String.raw`0 \le \lambda`;
     const w = weights[i] ?? 1 / model.objectives.length;
     const zIdeal = payoff.ideal_point[i] ?? 0;
     const zNadir = payoff.anti_ideal_point[i] ?? 0;
@@ -390,7 +403,7 @@ export function buildLinfXRayLatex(
       wdVal !== undefined && wdVal !== null
         ? `\\quad \\Rightarrow \\; ${wdVal.toFixed(4)} \\le ${(solLinf?.aggregate_distance ?? 0).toFixed(4)}`
         : "";
-    return `${w.toFixed(3)} \\cdot \\frac{${numLatex}}{${fmtLatexNum(denom, 2)}} \\le \\lambda ${evalSuffix}`;
+    return `${fmtLatexNum(w, 4)} \\cdot \\frac{${numLatex}}{${fmtLatexNum(denom, 2)}} \\le \\lambda ${evalSuffix}`;
   });
 
   return {
@@ -398,6 +411,15 @@ export function buildLinfXRayLatex(
     constraintsLatex,
     lambdaVal: solLinf ? solLinf.aggregate_distance : null,
   };
+}
+
+function normalizedRow2D(constraint: ConstraintModel): [number, number, number] {
+  const a = constraint.coefficients[0] ?? 0;
+  const b = constraint.coefficients[1] ?? 0;
+  const scale = Math.max(Math.abs(a), Math.abs(b));
+  return scale && Number.isFinite(constraint.rhs / scale)
+    ? [a / scale, b / scale, constraint.rhs / scale]
+    : [a, b, constraint.rhs];
 }
 
 /**
@@ -459,15 +481,14 @@ export function computeFeasiblePolygon2D(
   };
 
   for (const c of model.constraints) {
-    const a = c.coefficients[0] ?? 0;
-    const b = c.coefficients[1] ?? 0;
+    const [a, b, rhs] = normalizedRow2D(c);
     if (c.sense === "<=") {
-      poly = clipHalfPlane(poly, a, b, c.rhs);
+      poly = clipHalfPlane(poly, a, b, rhs);
     } else if (c.sense === ">=") {
-      poly = clipHalfPlane(poly, -a, -b, -c.rhs);
+      poly = clipHalfPlane(poly, -a, -b, -rhs);
     } else if (c.sense === "==") {
-      poly = clipHalfPlane(poly, a, b, c.rhs);
-      poly = clipHalfPlane(poly, -a, -b, -c.rhs);
+      poly = clipHalfPlane(poly, a, b, rhs);
+      poly = clipHalfPlane(poly, -a, -b, -rhs);
     }
   }
 
@@ -566,10 +587,34 @@ export function computeIsodistanceTraces2D(
   const sX = model.objectives[idxX]?.sense === "maximize" ? -1 : 1;
   const sY = model.objectives[idxY]?.sense === "maximize" ? -1 : 1;
 
-  const wX = Math.max(weights[idxX] ?? 0.5, 1e-4);
-  const wY = Math.max(weights[idxY] ?? 0.5, 1e-4);
+  const wX = weights[idxX];
+  const wY = weights[idxY];
 
   const traces: Array<{ name: string; x: number[]; y: number[]; color: string; dash: string }> = [];
+
+  if (wX === 0 && wY === 0) return traces;
+  if (wX === 0 || wY === 0) {
+    // Los tres niveles fijan solo la desviación del eje con peso positivo.
+    const span = Math.max(1, ...Object.values(solutions).map(
+      (sol) => sol.normalized_distances[wX === 0 ? idxX : idxY] ?? 0,
+    ));
+    for (const [metric, name, color, dash] of [
+      ["L1", "Iso L₁", "#2563EB", "dot"],
+      ["L2", "Iso L₂", "#334155", "dash"],
+      ["L_inf", "Iso L∞", "#E11D48", "dashdot"],
+    ] as const) {
+      const distances = solutions[metric].normalized_distances;
+      if (distances.length <= Math.max(idxX, idxY)) continue;
+      const x = zIdX + sX * rX * distances[idxX];
+      const y = zIdY + sY * rY * distances[idxY];
+      traces.push({
+        name, color, dash,
+        x: wX === 0 ? [zIdX, zIdX + sX * rX * span] : [x, x],
+        y: wY === 0 ? [zIdY, zIdY + sY * rY * span] : [y, y],
+      });
+    }
+    return traces;
+  }
 
   // L1: wX * dX + wY * dY = R1 (cuadrante dX>=0, dY>=0 + reflejo ligero para mostrar rombo)
   const sol1 = solutions.L1;
@@ -593,14 +638,14 @@ export function computeIsodistanceTraces2D(
     }
   }
 
-  // L2: wX * dX^2 + wY * dY^2 = R2^2 (arco de elipse en el cuadrante factible)
+  // L2: (wX * dX)^2 + (wY * dY)^2 = R2^2 (arco de elipse en el cuadrante factible)
   const sol2 = solutions.L2;
   if (sol2 && sol2.normalized_distances.length > Math.max(idxX, idxY)) {
     const R2sq =
-      wX * sol2.normalized_distances[idxX] ** 2 + wY * sol2.normalized_distances[idxY] ** 2;
+      (wX * sol2.normalized_distances[idxX]) ** 2 + (wY * sol2.normalized_distances[idxY]) ** 2;
     if (R2sq > 1e-9) {
-      const rx = Math.sqrt(R2sq / wX);
-      const ry = Math.sqrt(R2sq / wY);
+      const rx = Math.sqrt(R2sq) / wX;
+      const ry = Math.sqrt(R2sq) / wY;
       const xs: number[] = [];
       const ys: number[] = [];
       const steps = 40;
@@ -736,10 +781,10 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
   rows.push(["MATRIZ DE PAGOS"]);
   rows.push(["Solución Óptima de:", ...result.payoff.headers]);
   result.payoff.matrix.forEach((row, idx) => {
-    rows.push([result.payoff.headers[idx], ...row.map((v) => v.toFixed(4))]);
+    rows.push([result.payoff.headers[idx], ...row.map(String)]);
   });
-  rows.push(["Punto Ideal (Z*)", ...result.payoff.ideal_point.map((v) => v.toFixed(4))]);
-  rows.push(["Punto Nadir (Anti-Ideal)", ...result.payoff.anti_ideal_point.map((v) => v.toFixed(4))]);
+  rows.push(["Punto Ideal (Z*)", ...result.payoff.ideal_point.map(String)]);
+  rows.push(["Nadir aproximado (peor observado en pagos)", ...result.payoff.anti_ideal_point.map(String)]);
   rows.push([]);
 
   // Soluciones Compromiso
@@ -760,10 +805,10 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
     rows.push([
       key,
       sol.status,
-      sol.objectives.length ? sol.aggregate_distance.toFixed(6) : "",
-      ...varNames.map((vn) => sol.variables[vn]?.toFixed(4) ?? ""),
-      ...sol.objectives.map((z) => z.toFixed(4)),
-      ...sol.achievement_pct.map((p) => `${p.toFixed(2)}%`),
+      sol.objectives.length ? String(sol.aggregate_distance) : "",
+      ...varNames.map((vn) => sol.variables[vn]?.toString() ?? ""),
+      ...sol.objectives.map(String),
+      ...sol.achievement_pct.map((p) => `${p}%`),
     ]);
   });
 
@@ -813,12 +858,15 @@ export function computeDiscreteFeasiblePoints2D(
   const minY = Math.ceil(Math.min(...poly.y) - 1e-6);
   const maxY = Math.floor(Math.max(...poly.y) + 1e-6);
 
+  const rows = model.constraints.map((constraint) => ({
+    sense: constraint.sense, values: normalizedRow2D(constraint),
+  }));
   const satisfies = (px: number, py: number): boolean => {
-    for (const c of model.constraints) {
-      const lhs = (c.coefficients[0] ?? 0) * px + (c.coefficients[1] ?? 0) * py;
-      if (c.sense === "<=" && lhs > c.rhs + 1e-6) return false;
-      if (c.sense === ">=" && lhs < c.rhs - 1e-6) return false;
-      if (c.sense === "==" && Math.abs(lhs - c.rhs) > 1e-6) return false;
+    for (const { sense, values: [a, b, rhs] } of rows) {
+      const lhs = a * px + b * py;
+      if (sense === "<=" && lhs > rhs + 1e-6) return false;
+      if (sense === ">=" && lhs < rhs - 1e-6) return false;
+      if (sense === "==" && Math.abs(lhs - rhs) > 1e-6) return false;
     }
     if (v0.lower_bound !== null && px < v0.lower_bound - 1e-6) return false;
     if (v0.upper_bound !== null && px > v0.upper_bound + 1e-6) return false;
@@ -877,7 +925,7 @@ export function computeDiscreteFeasiblePoints2D(
 
 /**
  * Exporta un libro Excel (.xlsx) profesional con múltiples hojas:
- * Matriz_de_Pagos, Soluciones_Compromiso y Frontera_Pareto.
+ * Matriz de pagos, soluciones compromiso y muestra de Pareto.
  */
 export function exportResultsExcel(model: ModelDefinition, result: SolveResponse) {
   const wb = XLSX.utils.book_new();
@@ -888,7 +936,7 @@ export function exportResultsExcel(model: ModelDefinition, result: SolveResponse
     ["Óptimo Individual", ...headers],
     ...result.payoff.matrix.map((row, i) => [headers[i], ...row]),
     ["Punto Ideal (Z*)", ...result.payoff.ideal_point],
-    ["Punto Nadir (Anti-Ideal)", ...result.payoff.anti_ideal_point],
+    ["Nadir aproximado (peor observado en pagos)", ...result.payoff.anti_ideal_point],
   ];
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payoffRows), "Matriz_de_Pagos");
 
@@ -908,9 +956,9 @@ export function exportResultsExcel(model: ModelDefinition, result: SolveResponse
 
   if (result.pareto_points?.length) {
     const paretoRows = [
-      ["#", "Métrica", ...headers, ...varNames],
+      ["#", "Métrica", "Estado del solver", ...headers, ...varNames],
       ...result.pareto_points.map((pt, i) => [
-        i + 1, pt.metric, ...pt.objectives, ...varNames.map((name) => pt.variables[name] ?? null),
+        i + 1, pt.metric, pt.status ?? "", ...pt.objectives, ...varNames.map((name) => pt.variables[name] ?? null),
       ]),
     ];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(paretoRows), "Frontera_Pareto");
@@ -1055,8 +1103,9 @@ export async function importModelFromFile(
 
   if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) {
     const buf = await file.arrayBuffer();
+    // El lector CSV debe conservar el operador de igualdad como texto.
     const wb = lower.endsWith(".csv")
-      ? XLSX.read(new TextDecoder("utf-8").decode(buf), { type: "string" })
+      ? XLSX.read(new TextDecoder("utf-8").decode(buf), { type: "string", raw: true })
       : XLSX.read(buf, { type: "array" });
 
     const sheetName =

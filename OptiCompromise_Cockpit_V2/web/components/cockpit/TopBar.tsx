@@ -97,7 +97,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/40"
           >
             <AlertOctagon className="w-3.5 h-3.5" />
-            <span>Error Solver</span>
+            <span>Error</span>
           </div>
         );
       default:

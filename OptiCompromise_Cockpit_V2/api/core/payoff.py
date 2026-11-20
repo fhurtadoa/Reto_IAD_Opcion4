@@ -1,10 +1,16 @@
 """
-Cálculo de la Matriz de Pagos, Punto Ideal y Anti-Ideal (Nadir aproximado).
+Cálculo de la Matriz de Pagos, Punto Ideal y Nadir aproximado.
 """
 import numpy as np
 from scipy.optimize import linprog
 from typing import Tuple, List, Dict, Optional
 from .schemas import ModelDefinition, PayoffMatrixData
+
+def scale_linear_objective(coefficients: np.ndarray) -> np.ndarray:
+    """Usa una escala positiva para que el solver no trate todo el costo como cero."""
+    scale = float(np.max(np.abs(coefficients), initial=0.0))
+    return coefficients / scale if scale else coefficients
+
 
 def build_linear_constraints(model: ModelDefinition) -> Tuple[
     Optional[np.ndarray], Optional[np.ndarray],
@@ -95,7 +101,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
         if len(coeffs) < n_vars:
             coeffs += [0.0] * (n_vars - len(coeffs))
         arr = np.array(coeffs[:n_vars], dtype=float)
-        obj_dirs.append(-arr if obj.sense == "maximize" else arr)
+        obj_dirs.append(scale_linear_objective(-arr if obj.sense == "maximize" else arr))
 
     for k, obj in enumerate(model.objectives):
         c_solver = obj_dirs[k]
@@ -184,12 +190,14 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             val = float(np.dot(eval_coeffs, x_opt))
             payoff_matrix[k, i] = val
 
-    # 2. Determinar Punto Ideal y Punto Anti-Ideal (Nadir aproximado)
+    # 2. Determinar punto ideal, referencia de pagos y escalas
     ideal_point = []
     anti_ideal_point = []
     degenerate_objectives: List[int] = []
     normalization_ranges = []
+    normalization_sources = []
 
+    payoff_vectors = np.abs(np.array([list(row.values()) for row in independent_solutions]))
     for i, obj in enumerate(model.objectives):
         col_vals = payoff_matrix[:, i]
         if obj.sense == "maximize":
@@ -199,12 +207,34 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             z_ideal = float(np.min(col_vals))
             z_anti = float(np.max(col_vals))
 
-        # Conservar el nadir observado. El rango auxiliar solo interviene en la normalización.
-        observed_range = abs(z_ideal - z_anti)
-        if observed_range == 0.0:
+        scale = abs(z_ideal - z_anti)
+        source = "payoff"
+        # Comparar con el redondeo de la evaluación, en unidades del criterio.
+        # Una tolerancia absoluta anularía objetivos pequeños pero válidos.
+        coefficients = np.abs(np.asarray(obj.coefficients, dtype=float))
+        magnitude = float(np.max(payoff_vectors[:, :len(coefficients)] @ coefficients))
+        roundoff = 16 * np.finfo(float).eps * magnitude
+        if scale <= roundoff:
             degenerate_objectives.append(i)
-            observed_range = abs(z_ideal) * 0.05 if z_ideal else 1.0
-        normalization_ranges.append(observed_range)
+            # La referencia de pagos se conserva. Solo se sustituye el denominador.
+            worst = linprog(
+                -obj_dirs[i], A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                bounds=bounds, integrality=integrality, method="highs",
+            )
+            if worst.success:
+                original = np.asarray(obj.coefficients, dtype=float)
+                z_worst = float(original @ worst.x[:len(original)])
+                scale = max(0.0, z_ideal - z_worst if obj.sense == "maximize" else z_worst - z_ideal)
+                worst_magnitude = float(np.abs(original) @ np.abs(worst.x[:len(original)]))
+                if scale > max(roundoff, 16 * np.finfo(float).eps * worst_magnitude):
+                    source = "feasible_range"
+                else:
+                    scale, source = 1.0, "constant"
+            else:
+                # Sin peor extremo verificable, una unidad del objetivo sirve de escala explícita.
+                scale, source = 1.0, "unit"
+        normalization_ranges.append(scale)
+        normalization_sources.append(source)
 
         ideal_point.append(z_ideal)
         anti_ideal_point.append(z_anti)
@@ -230,6 +260,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
         independent_solutions=independent_solutions,
         degenerate_objectives=degenerate_objectives,
         normalization_ranges=normalization_ranges,
+        normalization_sources=normalization_sources,
         decision_ranges_2d=decision_ranges,
         status="optimal"
     )

@@ -50,9 +50,10 @@ class PayoffMatrixData(BaseModel):
     headers: List[str]
     matrix: List[List[float]]  # Fila k: evaluación de todos los objetivos bajo la solución óptima del objetivo k
     ideal_point: List[float]   # Mejor valor encontrado para cada objetivo
-    anti_ideal_point: List[float] # Peor valor encontrado en la matriz para cada objetivo
+    anti_ideal_point: List[float] # Clave histórica del nadir aproximado basado en pagos
     independent_solutions: List[Dict[str, float]]
     normalization_ranges: List[float] = Field(default_factory=list)
+    normalization_sources: List[Literal["payoff", "feasible_range", "constant", "unit"]] = Field(default_factory=list)
     decision_ranges_2d: Optional[List[Tuple[Optional[float], Optional[float]]]] = None
     degenerate_objectives: List[int] = Field(
         default_factory=list,
@@ -74,6 +75,7 @@ class ParetoPoint(BaseModel):
     objectives: List[float]
     variables: Dict[str, float]
     metric: str
+    status: str = "optimal"
 
 class SensitivityPoint(BaseModel):
     w1: float

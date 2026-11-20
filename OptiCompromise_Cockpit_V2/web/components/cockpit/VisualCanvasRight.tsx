@@ -63,6 +63,13 @@ interface VisualCanvasRightProps {
 type ChartTab = "objectives2d" | "objectives3d" | "radar" | "decision2d" | "sensitivity";
 type PlotTrace = Record<string, unknown>;
 
+function constantAxis(payoff: SolveResponse["payoff"], index: number) {
+  if (payoff.normalization_sources?.[index] !== "constant") return {};
+  const center = payoff.ideal_point[index];
+  const margin = Math.max(1, Math.abs(center)) * 1e-4;
+  return { range: [center - margin, center + margin] };
+}
+
 export default function VisualCanvasRight({
   workspace,
   model,
@@ -154,7 +161,10 @@ export default function VisualCanvasRight({
     sensitivity: ["Efecto de los pesos", "Compara cuánto se aleja cada objetivo del ideal al variar la ponderación."],
   };
 
+  const canExportPlot = solverStatus === "optimal" || solverStatus === "partial";
+
   const handleDownloadPNG = async () => {
+    if (!canExportPlot) return;
     const container = plotContainerRef.current;
     if (!container) return;
     const plotEl = container.querySelector(".js-plotly-plot") as HTMLElement | null;
@@ -239,7 +249,7 @@ export default function VisualCanvasRight({
         y: [iy, iy, ny, ny, iy],
         mode: "lines",
         type: "scatter",
-        name: "Caja Ideal–Nadir",
+        name: "Caja de referencias de pagos",
         showlegend: false,
         line: { color: isDark ? "#475569" : "#CBD5E1", width: 1.2, dash: "dot" },
         hoverinfo: "name",
@@ -257,7 +267,7 @@ export default function VisualCanvasRight({
       const strictlyBetter = (a: number, b: number, sense: string) =>
         sense === "maximize" ? a > b + 1e-6 : a < b - 1e-6;
 
-      // En 2D puros todos los puntos pertenecen a la frontera; en 3D+ extraemos la envolvente no dominada en (X, Y)
+      // En 3D+ se filtra también por dominancia entre las muestras proyectadas.
       const curveSource = isPure2D
         ? sortedPareto
         : sortedPareto.filter((p) => {
@@ -292,7 +302,7 @@ export default function VisualCanvasRight({
           y: curvePts.map((p) => p.objectives[safeAxisY]),
           mode: "lines",
           type: "scatter",
-          name: isPure2D ? "Frontera Eficiente de Pareto" : "Envolvente Eficiente (2D)",
+          name: isPure2D ? "Unión de muestras Pareto" : "Unión de muestras proyectadas",
           line: {
             color: "#E11D48",
             width: isPure2D ? 3.5 : 2.2,
@@ -326,8 +336,8 @@ export default function VisualCanvasRight({
           },
           hoverinfo: "text",
           hovertext: pts.map((p) => {
-            const wStr = p.weights.map((w, idx) => `w${idx + 1}=${(w * 100).toFixed(0)}%`).join(", ");
-            return `<b>Frontera Pareto (${grp.key === "L_inf" ? "L∞" : grp.key})</b><br>Pesos: ${wStr}<br>${headers[safeAxisX]}: ${fmtNum(p.objectives[safeAxisX])}<br>${headers[safeAxisY]}: ${fmtNum(p.objectives[safeAxisY])}`;
+            const wStr = p.weights.map((w, idx) => `w${idx + 1}=${(w * 100).toFixed(2)}%`).join(", ");
+            return `<b>Muestra Pareto (${grp.key === "L_inf" ? "L∞" : grp.key})</b><br>Pesos: ${wStr}<br>${headers[safeAxisX]}: ${fmtNum(p.objectives[safeAxisX])}<br>${headers[safeAxisY]}: ${fmtNum(p.objectives[safeAxisY])}`;
           }),
         });
       });
@@ -349,7 +359,7 @@ export default function VisualCanvasRight({
           y: iso.y,
           mode: "lines",
           type: "scatter",
-          name: iso.name,
+          name: nObjs === 2 ? iso.name : `${iso.name} · dos ejes`,
           line: { color: iso.color, width: 1.8, dash: iso.dash },
           hoverinfo: "name",
         });
@@ -380,8 +390,8 @@ export default function VisualCanvasRight({
       y: [nadir[safeAxisY]],
       mode: "markers+text",
       type: "scatter",
-      name: "Nadir",
-      text: ["✕ Nadir"],
+      name: "Nadir aproximado",
+      text: ["✕ Nadir aprox."],
       textposition: "bottom center",
       textfont: { color: SEMANTIC_COLORS.nadir, size: 11 },
       marker: { symbol: "x", size: 12, color: SEMANTIC_COLORS.nadir, line: { width: 2.5 } },
@@ -448,8 +458,8 @@ export default function VisualCanvasRight({
         paper_bgcolor: paperBg,
         plot_bgcolor: plotBg,
         font: { color: textColor, size: 11 },
-        xaxis: { title: { text: headers[safeAxisX] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
-        yaxis: { title: { text: headers[safeAxisY] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
+        xaxis: { ...constantAxis(payoff, safeAxisX), title: { text: headers[safeAxisX] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
+        yaxis: { ...constantAxis(payoff, safeAxisY), title: { text: headers[safeAxisY] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
         legend: { orientation: "h", y: -0.25, font: { size: 10 } },
         margin: { l: 64, r: 24, t: 18, b: 78 },
       },
@@ -483,7 +493,7 @@ export default function VisualCanvasRight({
           marker: { size: 3.5, symbol: grp.symbol, color: grp.color, opacity: 0.35 },
           hoverinfo: "text",
           hovertext: pts.map((p) => {
-            const wStr = p.weights.map((w, idx) => `w${idx + 1}=${(w * 100).toFixed(0)}%`).join(", ");
+            const wStr = p.weights.map((w, idx) => `w${idx + 1}=${(w * 100).toFixed(2)}%`).join(", ");
             return `<b>Pareto (${grp.key === "L_inf" ? "L∞" : grp.key})</b><br>Pesos: ${wStr}<br>${headers[safe3DX]}: ${fmtNum(p.objectives[safe3DX])}<br>${headers[safe3DY]}: ${fmtNum(p.objectives[safe3DY])}<br>${headers[safe3DZ]}: ${fmtNum(p.objectives[safe3DZ])}`;
           }),
         });
@@ -507,8 +517,8 @@ export default function VisualCanvasRight({
       z: [nadir[safe3DZ]],
       mode: "markers+text",
       type: "scatter3d",
-      name: "Nadir",
-      text: ["✕ Nadir"],
+      name: "Nadir aproximado",
+      text: ["✕ Nadir aprox."],
       marker: { symbol: "cross", size: 7, color: SEMANTIC_COLORS.nadir },
     });
 
@@ -540,9 +550,9 @@ export default function VisualCanvasRight({
         font: { color: textColor, size: 11 },
         scene: {
           bgcolor: plotBg,
-          xaxis: { title: { text: headers[safe3DX] }, gridcolor: gridColor },
-          yaxis: { title: { text: headers[safe3DY] }, gridcolor: gridColor },
-          zaxis: { title: { text: headers[safe3DZ] }, gridcolor: gridColor },
+          xaxis: { ...constantAxis(payoff, safe3DX), title: { text: headers[safe3DX] }, gridcolor: gridColor },
+          yaxis: { ...constantAxis(payoff, safe3DY), title: { text: headers[safe3DY] }, gridcolor: gridColor },
+          zaxis: { ...constantAxis(payoff, safe3DZ), title: { text: headers[safe3DZ] }, gridcolor: gridColor },
           camera: { eye: { x: 1.85, y: 1.85, z: 1.45 } },
           domain: { y: [0.08, 1] },
         },
@@ -675,7 +685,7 @@ export default function VisualCanvasRight({
         y: [sol.variables[v1]],
         mode: "markers+text",
         type: "scatter",
-        name: `Vértice ${m.label}`,
+        name: `Solución ${m.label}`,
         text: [`${m.label} (${fmtNum(sol.variables[v0], 1)}, ${fmtNum(sol.variables[v1], 1)})`],
         textposition: m.pos,
         textfont: { color: m.color, size: 11 },
@@ -777,7 +787,7 @@ export default function VisualCanvasRight({
       {degenerateObjs.length > 0 && (
         <div className="rounded-sm border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2.5 text-[11px] text-amber-900 dark:text-amber-200">
           <b>Objetivos con rango observado nulo:</b>{" "}
-          {degenerateObjs.map((idx) => headers[idx] || `Z${idx + 1}`).join(", ")}. Los valores observados se conservan. Para calcular distancias se usa la escala auxiliar que aparece en Ver método.
+          {degenerateObjs.map((idx) => headers[idx] || `Z${idx + 1}`).join(", ")}. Los valores observados se conservan. Consulta el tratamiento de cada criterio en Ver método.
         </div>
       )}
 
@@ -938,7 +948,7 @@ export default function VisualCanvasRight({
             <button
               type="button"
               onClick={handleDownloadPNG}
-              disabled={exportingPlot || (effectiveTab === "sensitivity" && !sweep)}
+              disabled={!canExportPlot || exportingPlot || (effectiveTab === "sensitivity" && !sweep)}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors font-semibold"
               title="Descargar gráfico actual en alta resolución PNG"
             >
@@ -1030,7 +1040,7 @@ export default function VisualCanvasRight({
               >
                 <div className="flex flex-wrap items-center gap-2 text-[11px]">
                   <span className="font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                    Aproximación de la Frontera Eficiente ({allPareto.length} puntos no dominados)
+                    Aproximación de Pareto ({allPareto.length} puntos)
                   </span>
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-[#2563EB]/10 text-[#2563EB] font-mono font-semibold">
                     L₁: {countL1}
@@ -1056,7 +1066,7 @@ export default function VisualCanvasRight({
                 <div className="px-4 pb-3 pt-1 space-y-2 border-t border-slate-200/70 dark:border-slate-800">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
                     <p className="text-slate-500 dark:text-slate-400">
-                      Barrido sistemático de vectores de pesos <span className="font-mono">wᵢ</span> combinado con métricas <span className="font-semibold">L₁</span> (vértices), <span className="font-semibold">L₂</span> (compromiso suave) y <span className="font-semibold">L∞</span> (barrido uniforme).
+                      Puntos no dominados entre las soluciones del barrido de pesos. La línea conecta muestras como guía visual. El estado del solver corresponde a la métrica de cada punto.
                     </p>
                     <div className="flex items-center gap-1">
                       {(
@@ -1090,6 +1100,7 @@ export default function VisualCanvasRight({
                           <th className="py-1.5 px-2 text-left w-10">#</th>
                           <th className="py-1.5 px-2 text-left">Métrica</th>
                           <th className="py-1.5 px-2 text-left">Pesos (wᵢ)</th>
+                          <th className="py-1.5 px-2 text-left">Estado</th>
                           {headers.map((h, i) => (
                             <th key={i} className="py-1.5 px-2 max-w-[120px] truncate" title={h}>
                               Z{i + 1}
@@ -1117,8 +1128,9 @@ export default function VisualCanvasRight({
                                 </span>
                               </td>
                               <td className="py-1 px-2 text-left text-slate-600 dark:text-slate-300">
-                                [{pt.weights.map((w) => `${(w * 100).toFixed(0)}%`).join(", ")}]
+                                [{pt.weights.map((w) => `${(w * 100).toFixed(2)}%`).join(", ")}]
                               </td>
+                              <td className="py-1 px-2 text-left">{pt.status === "feasible_suboptimal" ? "Factible sin certificado" : pt.status === "optimal" ? "Óptimo de la métrica" : "—"}</td>
                               {pt.objectives.map((val, k) => (
                                 <td key={k} className="py-1 px-2 text-right font-semibold text-slate-800 dark:text-slate-100">
                                   {fmtNum(val)}
@@ -1145,13 +1157,13 @@ export default function VisualCanvasRight({
             Cómo leer el compromiso
           </span>
           {decisionProfile === "equitativo" && (
-            <>Con pesos iguales, <b>L∞</b> reduce la mayor brecha al ideal. Las brechas coinciden cuando varias restricciones minimax quedan activas.</>
+            <>Con pesos iguales, <b>L∞</b> reduce la mayor brecha al ideal. Las brechas ponderadas de los criterios con restricciones minimax activas coinciden.</>
           )}
           {decisionProfile === "compensatorio" && (
             <><b>L₁</b> minimiza la suma de brechas ponderadas. Con 70% para el primer objetivo, mejorar ese criterio tiene mayor influencia.</>
           )}
           {decisionProfile === "moderado" && (
-            <><b>L₂</b> penaliza las brechas grandes al elevarlas al cuadrado.</>
+            <><b>L₂</b> eleva al cuadrado las brechas después de multiplicarlas por sus pesos.</>
           )}
           {decisionProfile === "personalizado" && (
             <>Usa el porcentaje de logro por objetivo para identificar qué mejora y qué cede en cada solución. Cada distancia responde a la fórmula de su propia columna.</>

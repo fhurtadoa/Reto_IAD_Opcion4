@@ -43,6 +43,7 @@ export interface PayoffMatrixData {
   independent_solutions: Record<string, number>[];
   degenerate_objectives?: number[];
   normalization_ranges?: number[];
+  normalization_sources?: Array<"payoff" | "feasible_range" | "constant" | "unit">;
   decision_ranges_2d?: Array<[number | null, number | null]> | null;
   status: string;
 }
@@ -62,6 +63,7 @@ export interface ParetoPoint {
   objectives: number[];
   variables: Record<string, number>;
   metric: string;
+  status?: string;
 }
 
 export interface SensitivityPoint {

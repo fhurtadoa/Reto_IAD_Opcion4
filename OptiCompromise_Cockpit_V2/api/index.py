@@ -175,7 +175,7 @@ def solve_model(model: ModelDefinition):
         status="partial" if incomplete else "optimal",
         message=(
             f"Optimalidad sin confirmar para {', '.join(incomplete).replace('L_inf', 'L∞')}."
-            if incomplete else "Las tres métricas convergieron dentro de la tolerancia del motor."
+            if incomplete else "Optimalidad confirmada para las tres métricas dentro de las tolerancias del motor."
         ),
         payoff=payoff,
         solutions=solutions,
