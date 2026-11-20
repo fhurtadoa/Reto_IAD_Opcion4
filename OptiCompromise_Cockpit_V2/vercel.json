@@ -1,4 +1,9 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "audit/opticompromise-iad": false
+    }
+  },
   "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/.next",
   "framework": "nextjs",

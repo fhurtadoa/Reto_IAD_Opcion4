@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { ChartNoAxesCombined, FlaskConical, ListChecks } from "lucide-react";
 import TopBar from "../components/cockpit/TopBar";
 import ControlPanelLeft from "../components/cockpit/ControlPanelLeft";
 import VisualCanvasRight from "../components/cockpit/VisualCanvasRight";
@@ -44,10 +45,16 @@ function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): str
       return `El Objetivo #${i + 1} debe tener un nombre no vacío.`;
     }
   }
-  if (weightsToCheck && weightsToCheck.length === m.objectives.length) {
-    const sumW = weightsToCheck.reduce((acc, w) => acc + (Number.isFinite(w) ? w : 0), 0);
-    if (Math.abs(sumW - 1.0) > 0.01) {
-      return `Los pesos deben sumar 1.00 (actual: ${sumW.toFixed(2)}). Activa "Auto-balancear" o pulsa "1.00" en Perfil & Pesos.`;
+  if (m.pareto_seed !== undefined && (!Number.isInteger(m.pareto_seed) || m.pareto_seed < 0 || m.pareto_seed > 4294967295)) {
+    return "La semilla de Pareto debe ser un entero entre 0 y 4294967295.";
+  }
+  if (weightsToCheck) {
+    if (weightsToCheck.length !== m.objectives.length || weightsToCheck.some((w) => !Number.isFinite(w) || w < 0 || w > 1)) {
+      return "Ingresa un peso entre 0 y 1 por cada objetivo.";
+    }
+    const sumW = weightsToCheck.reduce((acc, w) => acc + w, 0);
+    if (Math.abs(sumW - 1.0) > 0.001 + 1e-12) {
+      return `Los pesos deben sumar 1 (actual: ${sumW.toFixed(3)}). Activa el balance automático o pulsa Normalizar en Preferencias.`;
     }
   }
   return null;
@@ -61,13 +68,26 @@ export default function OptiCompromiseCockpitPage() {
   const [weights, setWeights] = useState<number[]>(FALLBACK_CELDAS_MODEL.weights || [0.5, 0.5]);
   const [autoBalance, setAutoBalance] = useState<boolean>(true);
   const [decisionProfile, setDecisionProfile] = useState<DecisionProfile>("equitativo");
-  const [solveResult, setSolveResult] = useState<SolveResponse | null>(null);
+  const [completed, setCompleted] = useState<{ model: ModelDefinition; result: SolveResponse } | null>(null);
+  const [workspace, setWorkspace] = useState<"model" | "results" | "method">("results");
+  const solveResult = completed?.result ?? null;
   const [solverStatus, setSolverStatus] = useState<SolverStatus>("idle");
   const [solverMessage, setSolverMessage] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const presetRequestRef = useRef(0);
+  const cancelPending = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abortRef.current?.abort();
+  }, []);
+
+  useEffect(() => () => {
+    presetRequestRef.current++;
+    cancelPending();
+  }, [cancelPending]);
 
   // Sincronizar clase 'dark' en <html>
   useEffect(() => {
@@ -81,6 +101,7 @@ export default function OptiCompromiseCockpitPage() {
 
   // Llamada real al backend FastAPI (/api/solve)
   const executeSolve = useCallback(async (modelToSolve: ModelDefinition, weightsToUse: number[]) => {
+    cancelPending();
     const clientErr = validateModelClient(modelToSolve, weightsToUse);
     if (clientErr) {
       setValidationError(clientErr);
@@ -90,9 +111,6 @@ export default function OptiCompromiseCockpitPage() {
     }
     setValidationError(null);
 
-    if (abortRef.current) {
-      abortRef.current.abort();
-    }
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -106,6 +124,7 @@ export default function OptiCompromiseCockpitPage() {
         objectives: modelToSolve.objectives,
         constraints: modelToSolve.constraints,
         weights: weightsToUse,
+        pareto_seed: modelToSolve.pareto_seed,
       };
 
       const res = await fetch("/api/solve", {
@@ -117,7 +136,10 @@ export default function OptiCompromiseCockpitPage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-        const detail = String(errData.detail || "Error en la resolución del modelo.");
+        if (controller.signal.aborted) return;
+        const detail = Array.isArray(errData.detail)
+          ? errData.detail.map((issue: { loc: string[] }) => `Revisa el campo ${issue.loc.slice(1).join(".")}.`).join(" ")
+          : String(errData.detail || "Error en la resolución del modelo.");
         const lower = detail.toLowerCase();
         if (lower.includes("infeasible") || lower.includes("infactible")) {
           setSolverStatus("infeasible");
@@ -131,37 +153,42 @@ export default function OptiCompromiseCockpitPage() {
       }
 
       const data: SolveResponse = await res.json();
-      setSolveResult(data);
-      setSolverStatus("optimal");
+      if (controller.signal.aborted) return;
+      setCompleted({ model: modelToSolve, result: data });
+      setSolverStatus(data.status === "partial" ? "partial" : "optimal");
       setSolverMessage(data.message || "Solución óptima calculada");
     } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") return;
+      if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       setSolverStatus("error");
       setSolverMessage(
         "No se pudo conectar con el motor de optimización FastAPI (/api/solve). Verifica que el servicio backend esté activo."
       );
     }
-  }, []);
+  }, [cancelPending]);
 
   // Debounce reactivo para sliders (50ms gracias al caché LRU en backend) o edición (250ms)
   const scheduleSolve = useCallback(
     (nextModel: ModelDefinition, nextWeights: number[], delayMs = 150) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cancelPending();
+      setSolverStatus("calculating");
       debounceRef.current = setTimeout(() => {
         executeSolve(nextModel, nextWeights);
       }, delayMs);
     },
-    [executeSolve]
+    [cancelPending, executeSolve]
   );
 
   // Cargar caso precargado directamente desde /api/examples/{id}
   const handleSelectPreset = useCallback(
     async (presetId: string) => {
+      const request = ++presetRequestRef.current;
+      cancelPending();
       setSelectedPreset(presetId);
       setValidationError(null);
 
       if (presetId === "blank") {
         const w = BLANK_MODEL.weights || [0.5, 0.5];
+        setWorkspace("model");
         setModel(BLANK_MODEL);
         setModelKey((k) => k + 1);
         setWeights(w);
@@ -175,12 +202,12 @@ export default function OptiCompromiseCockpitPage() {
         const res = await fetch(`/api/examples/${presetId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: ModelDefinition = await res.json();
+        if (request !== presetRequestRef.current) return;
         const defaultW =
           data.weights && data.weights.length === data.objectives.length
             ? data.weights
-            : Array(data.objectives.length).fill(
-                parseFloat((1 / data.objectives.length).toFixed(3))
-              );
+            : Array(data.objectives.length).fill(1 / data.objectives.length);
+        setWorkspace("results");
         setModel(data);
         setModelKey((k) => k + 1);
         setWeights(defaultW);
@@ -188,6 +215,13 @@ export default function OptiCompromiseCockpitPage() {
         setDecisionProfile(allEqual ? "equitativo" : "personalizado");
         executeSolve(data, defaultW);
       } catch {
+        if (request !== presetRequestRef.current) return;
+        if (presetId !== "celdas") {
+          setSelectedPreset("");
+          setSolverStatus("error");
+          setSolverMessage("No se pudo cargar el ejemplo. El modelo abierto se conserva.");
+          return;
+        }
         setModel(FALLBACK_CELDAS_MODEL);
         setModelKey((k) => k + 1);
         const w = FALLBACK_CELDAS_MODEL.weights || [0.5, 0.5];
@@ -196,7 +230,7 @@ export default function OptiCompromiseCockpitPage() {
         executeSolve(FALLBACK_CELDAS_MODEL, w);
       }
     },
-    [executeSolve]
+    [cancelPending, executeSolve]
   );
 
   // Carga inicial
@@ -206,6 +240,7 @@ export default function OptiCompromiseCockpitPage() {
 
   // Cambios desde el Panel Izquierdo
   const handleModelChange = (updated: ModelDefinition, newWeights?: number[]) => {
+    presetRequestRef.current++;
     setModel(updated);
     const w = newWeights ?? weights;
     if (newWeights) setWeights(newWeights);
@@ -213,32 +248,34 @@ export default function OptiCompromiseCockpitPage() {
     setValidationError(clientErr);
     if (!clientErr) {
       scheduleSolve(updated, w, 250);
+    } else {
+      cancelPending();
+      setSolverStatus("error");
+      setSolverMessage(clientErr);
     }
   };
 
   // Selección rápida de Perfil del Decisor
   const handleSelectProfile = (profile: DecisionProfile) => {
+    presetRequestRef.current++;
     setDecisionProfile(profile);
     const n = model.objectives.length;
     let newW = [...weights];
     if (profile === "equitativo" || profile === "moderado") {
-      newW = Array(n).fill(parseFloat((1 / n).toFixed(3)));
+      newW = Array(n).fill(1 / n);
     } else if (profile === "compensatorio") {
-      newW = Array(n).fill(parseFloat((0.3 / Math.max(1, n - 1)).toFixed(3)));
+      newW = Array(n).fill(0.3 / (n - 1));
       newW[0] = 0.7;
     }
     const sum = newW.reduce((a, b) => a + b, 0);
-    const normalized = newW.map((w) => parseFloat((w / sum).toFixed(3)));
-    const diff = parseFloat((1.0 - normalized.reduce((a, b) => a + b, 0)).toFixed(3));
-    if (normalized.length > 0 && Math.abs(diff) > 0) {
-      normalized[0] = parseFloat((normalized[0] + diff).toFixed(3));
-    }
+    const normalized = newW.map((w) => w / sum);
     setWeights(normalized);
     executeSolve(model, normalized);
   };
 
   // Ajuste de pesos con Auto-Balance proporcional (suma estricta = 1.00) o modo libre
   const handleWeightChange = (index: number, rawValue: number) => {
+    presetRequestRef.current++;
     setDecisionProfile("personalizado");
     const val = parseFloat(Math.max(0, Math.min(1, Number.isFinite(rawValue) ? rawValue : 0)).toFixed(3));
     const n = weights.length;
@@ -286,24 +323,17 @@ export default function OptiCompromiseCockpitPage() {
     if (!clientErr) {
       scheduleSolve(model, nextW, 80);
     } else {
+      cancelPending();
       setSolverStatus("error");
       setSolverMessage(clientErr);
     }
   };
 
   const handleNormalizeWeights = () => {
+    presetRequestRef.current++;
     const sum = weights.reduce((a, b) => a + b, 0);
     const n = weights.length;
-    let normalized: number[];
-    if (sum <= 1e-6) {
-      normalized = Array(n).fill(parseFloat((1 / n).toFixed(3)));
-    } else {
-      normalized = weights.map((w) => parseFloat((w / sum).toFixed(3)));
-    }
-    const diff = parseFloat((1 - normalized.reduce((a, b) => a + b, 0)).toFixed(3));
-    if (normalized.length > 0 && Math.abs(diff) > 0) {
-      normalized[0] = parseFloat((normalized[0] + diff).toFixed(3));
-    }
+    const normalized = sum <= 1e-6 ? Array(n).fill(1 / n) : weights.map((w) => w / sum);
     setWeights(normalized);
     setValidationError(null);
     executeSolve(model, normalized);
@@ -311,15 +341,18 @@ export default function OptiCompromiseCockpitPage() {
 
   // Importar JSON / Excel (.xlsx) / CSV
   const handleImportJSON = async (file: File) => {
+    const request = ++presetRequestRef.current;
+    cancelPending();
+    setSolverStatus("calculating");
     try {
       const { model: parsed, weights: parsedWeights } = await importModelFromFile(file);
       const nextW =
         parsedWeights && parsedWeights.length === parsed.objectives.length
           ? parsedWeights
-          : Array(parsed.objectives.length).fill(
-              parseFloat((1 / parsed.objectives.length).toFixed(3))
-            );
-      setSelectedPreset("blank");
+          : Array(parsed.objectives.length).fill(1 / parsed.objectives.length);
+      if (request !== presetRequestRef.current) return;
+      setSelectedPreset("");
+      setWorkspace("model");
       setModel(parsed);
       setModelKey((k) => k + 1);
       setWeights(nextW);
@@ -327,6 +360,7 @@ export default function OptiCompromiseCockpitPage() {
       setValidationError(null);
       executeSolve(parsed, nextW);
     } catch (err: unknown) {
+      if (request !== presetRequestRef.current) return;
       setSolverStatus("error");
       setSolverMessage(
         err instanceof Error
@@ -348,40 +382,76 @@ export default function OptiCompromiseCockpitPage() {
         onImportJSON={handleImportJSON}
         onExportJSON={() => exportModelJSON(model, weights)}
         onExportCSV={() => {
-          if (solveResult) exportResultsCSV(model, solveResult);
+          if (completed) exportResultsCSV(completed.model, completed.result);
         }}
         onExportExcel={() => {
-          if (solveResult) exportResultsExcel(model, solveResult);
+          if (completed) exportResultsExcel(completed.model, completed.result);
         }}
-        canExportResults={Boolean(solveResult && solverStatus === "optimal")}
+        canExportResults={Boolean(solveResult && (solverStatus === "optimal" || solverStatus === "partial"))}
       />
 
-      <div className="flex-1 flex flex-col lg:flex-row">
-        <ControlPanelLeft
-          model={model}
-          modelKey={modelKey}
-          weights={weights}
-          autoBalance={autoBalance}
-          onToggleAutoBalance={setAutoBalance}
-          decisionProfile={decisionProfile}
-          onSelectProfile={handleSelectProfile}
-          validationError={validationError}
-          onModelChange={handleModelChange}
-          onWeightChange={handleWeightChange}
-          onNormalizeWeights={handleNormalizeWeights}
-          onManualSolve={() => executeSolve(model, weights)}
-          isCalculating={solverStatus === "calculating"}
-        />
+      <div className="workspace-shell" data-workspace={workspace}>
+        <section className="workspace-intro" aria-labelledby="workspace-title">
+          <div>
+            <h2 id="workspace-title">{model.name || "Modelo sin título"}</h2>
+            {model.description && <p>{model.description}</p>}
+          </div>
+          <dl aria-label="Dimensiones del modelo">
+            <div><dt>Variables</dt><dd>{model.variables.length}</dd></div>
+            <div><dt>Objetivos</dt><dd>{model.objectives.length}</dd></div>
+            <div><dt>Restricciones</dt><dd>{model.constraints.length}</dd></div>
+          </dl>
+        </section>
+        <nav className="workspace-navigation" aria-label="Espacio de trabajo">
+          {([
+            ["model", "Formular", ListChecks],
+            ["results", "Explorar resultados", ChartNoAxesCombined],
+            ["method", "Ver método", FlaskConical],
+          ] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" aria-current={workspace === id ? "page" : undefined}
+              onClick={() => setWorkspace(id)}>
+              <Icon aria-hidden="true" size={16} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        {workspace === "model" && !validationError && ["error", "infeasible", "unbounded"].includes(solverStatus) && (
+          <p className="workspace-feedback mb-4 text-rose-800 dark:text-rose-300" role="alert">{solverMessage}</p>
+        )}
+        <div className="workspace-body">
+          <ControlPanelLeft
+            model={model}
+            modelKey={modelKey}
+            weights={weights}
+            autoBalance={autoBalance}
+            onToggleAutoBalance={setAutoBalance}
+            decisionProfile={decisionProfile}
+            onSelectProfile={handleSelectProfile}
+            validationError={validationError}
+            onModelChange={handleModelChange}
+            onWeightChange={handleWeightChange}
+            onNormalizeWeights={handleNormalizeWeights}
+            onManualSolve={(updated, nextWeights) => {
+              presetRequestRef.current++;
+              if (updated) setModel(updated);
+              if (nextWeights) setWeights(nextWeights);
+              setWorkspace("results");
+              executeSolve(updated ?? model, nextWeights ?? weights);
+            }}
+            isCalculating={solverStatus === "calculating"}
+          />
 
-        <VisualCanvasRight
-          model={model}
-          modelKey={modelKey}
-          decisionProfile={decisionProfile}
-          solveResult={solveResult}
-          solverStatus={solverStatus}
-          solverMessage={solverMessage}
-          theme={theme}
-        />
+          <VisualCanvasRight
+            workspace={workspace}
+            model={completed?.model ?? model}
+            modelKey={modelKey}
+            decisionProfile={decisionProfile}
+            solveResult={solveResult}
+            solverStatus={solverStatus}
+            solverMessage={solverMessage}
+            theme={theme}
+          />
+        </div>
       </div>
     </div>
   );

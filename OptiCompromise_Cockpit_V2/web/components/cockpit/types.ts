@@ -31,6 +31,7 @@ export interface ModelDefinition {
   objectives: ObjectiveModel[];
   constraints: ConstraintModel[];
   weights?: number[];
+  pareto_seed?: number;
 }
 
 export interface PayoffMatrixData {
@@ -40,6 +41,8 @@ export interface PayoffMatrixData {
   anti_ideal_point: number[];
   independent_solutions: Record<string, number>[];
   degenerate_objectives?: number[];
+  normalization_ranges?: number[];
+  decision_ranges_2d?: Array<[number | null, number | null]> | null;
   status: string;
 }
 
@@ -74,7 +77,7 @@ export interface SolveResponse {
   pareto_points?: ParetoPoint[];
 }
 
-export type SolverStatus = "idle" | "calculating" | "optimal" | "infeasible" | "unbounded" | "error";
+export type SolverStatus = "idle" | "calculating" | "partial" | "optimal" | "infeasible" | "unbounded" | "error";
 
 export type ThemeMode = "dark" | "light";
 export type DecisionProfile = "equitativo" | "compensatorio" | "moderado" | "personalizado";

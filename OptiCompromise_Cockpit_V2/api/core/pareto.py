@@ -59,7 +59,7 @@ def compute_pareto_frontier(
                 weight_vectors.append(np.array([w1, w2, w3]))
     else:
         # Para > 3 objetivos: vértices puros + centro equitativo + muestreo Dirichlet reproducible
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng(model.pareto_seed)
         weight_vectors.append(np.ones(n_objs) / n_objs)
         for k in range(n_objs):
             e_k = np.zeros(n_objs)
@@ -86,7 +86,7 @@ def compute_pareto_frontier(
             )
 
     # Barrer pesos combinando métricas L1 (vértices), L2 (compromiso suave) y L_inf (barrido uniforme minimax)
-    for idx_w, w in enumerate(weight_vectors):
+    for w in weight_vectors:
         sol_l1 = solve_l1(model, payoff, alpha, beta, w)
         x0_seed = None
         if sol_l1.status == "optimal":
@@ -139,7 +139,9 @@ def compute_pareto_frontier(
 
     # Filtrar soluciones dominadas y deduplicar manteniendo diversidad entre métricas L1 / L2 / L_inf
     non_dominated: List[ParetoPoint] = []
-    seen_coords: List[List[float]] = []
+    seen_coords: List[np.ndarray] = []
+    ideal = np.array(payoff.ideal_point)
+    scales = np.array(payoff.normalization_ranges or [1.0] * n_objs)
 
     # Primero quedarnos con todos los puntos no dominados
     efficient_candidates: List[ParetoPoint] = []
@@ -149,8 +151,8 @@ def compute_pareto_frontier(
 
     # Priorizar que queden representadas todas las métricas (L1 en extremos, L2 y L_inf en interiores)
     for p in efficient_candidates:
-        obj_vals = p.objectives
-        if any(np.allclose(obj_vals, s, atol=1e-3, rtol=5e-3) for s in seen_coords):
+        obj_vals = (np.array(p.objectives) - ideal) / scales
+        if any(np.max(np.abs(obj_vals - s)) <= 1e-5 for s in seen_coords):
             continue
         non_dominated.append(p)
         seen_coords.append(obj_vals)

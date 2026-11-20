@@ -1,7 +1,7 @@
 """
 Esquemas Pydantic para definición de modelos multiobjetivo y respuestas de optimización.
 """
-from typing import List, Dict, Optional, Literal
+from typing import List, Dict, Optional, Literal, Tuple
 from pydantic import BaseModel, Field
 
 class VariableModel(BaseModel):
@@ -43,12 +43,16 @@ class ModelDefinition(BaseModel):
         default=None, description="Pesos asignados a los objetivos (si se omite, se asignan pesos iguales)"
     )
 
+    pareto_seed: int = Field(default=42, ge=0, le=2**32 - 1)
+
 class PayoffMatrixData(BaseModel):
     headers: List[str]
     matrix: List[List[float]]  # Fila k: evaluación de todos los objetivos bajo la solución óptima del objetivo k
     ideal_point: List[float]   # Mejor valor encontrado para cada objetivo
     anti_ideal_point: List[float] # Peor valor encontrado en la matriz para cada objetivo
     independent_solutions: List[Dict[str, float]]
+    normalization_ranges: List[float] = Field(default_factory=list)
+    decision_ranges_2d: Optional[List[Tuple[Optional[float], Optional[float]]]] = None
     degenerate_objectives: List[int] = Field(
         default_factory=list,
         description="Índices (0-based) de objetivos cuyo rango Ideal-Nadir fue nulo antes del ajuste numérico"

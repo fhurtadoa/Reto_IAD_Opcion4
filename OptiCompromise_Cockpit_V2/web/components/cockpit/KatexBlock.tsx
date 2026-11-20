@@ -18,9 +18,11 @@ export default function KatexBlock({ latex, displayMode = true, className = "" }
         strict: false,
       });
     } catch {
-      return `<code>${latex}</code>`;
+      return null;
     }
   }, [latex, displayMode]);
+
+  if (html === null) return <code className={className}>{latex}</code>;
 
   return (
     <div

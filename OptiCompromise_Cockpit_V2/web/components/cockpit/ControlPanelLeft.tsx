@@ -10,7 +10,6 @@ import {
   Scale,
   Play,
   AlertCircle,
-  CheckCircle2,
   Sparkles,
   ChevronDown,
   ChevronRight,
@@ -137,7 +136,7 @@ interface ControlPanelLeftProps {
   onModelChange: (updated: ModelDefinition, newWeights?: number[]) => void;
   onWeightChange: (index: number, value: number) => void;
   onNormalizeWeights: () => void;
-  onManualSolve: () => void;
+  onManualSolve: (updated?: ModelDefinition, weights?: number[]) => void;
   isCalculating: boolean;
 }
 
@@ -167,7 +166,6 @@ export default function ControlPanelLeft({
   );
   const [algebraicDirty, setAlgebraicDirty] = useState<boolean>(false);
   const [algebraicErrors, setAlgebraicErrors] = useState<string[]>([]);
-  const [algebraicAppliedMsg, setAlgebraicAppliedMsg] = useState<string | null>(null);
 
   // Al cambiar de caso/importación reiniciamos el borrador algebraico
   useEffect(() => {
@@ -188,7 +186,7 @@ export default function ControlPanelLeft({
   const latexPreview = useMemo(() => modelToLatex(model), [model]);
 
   const weightSum = weights.reduce((acc, w) => acc + (Number.isFinite(w) ? w : 0), 0);
-  const isWeightSumValid = Math.abs(weightSum - 1.0) <= 0.005;
+  const isWeightSumValid = Math.abs(weightSum - 1.0) <= 0.001 + 1e-12;
 
   const handleVarChange = (
     idx: number,
@@ -276,9 +274,7 @@ export default function ControlPanelLeft({
         coefficients: Array(model.variables.length).fill(1),
       },
     ];
-    const eqW = Array(nextObjs.length).fill(parseFloat((1 / nextObjs.length).toFixed(3)));
-    const diff = parseFloat((1 - eqW.reduce((a, b) => a + b, 0)).toFixed(3));
-    if (eqW.length > 0) eqW[0] = parseFloat((eqW[0] + diff).toFixed(3));
+    const eqW = Array(nextObjs.length).fill(1 / nextObjs.length);
     onModelChange({ ...model, objectives: nextObjs }, eqW);
   };
 
@@ -289,8 +285,8 @@ export default function ControlPanelLeft({
     const s = nextW.reduce((a, b) => a + b, 0);
     const normW =
       s > 0
-        ? nextW.map((w) => parseFloat((w / s).toFixed(3)))
-        : Array(nextObjs.length).fill(parseFloat((1 / nextObjs.length).toFixed(3)));
+        ? nextW.map((w) => w / s)
+        : Array(nextObjs.length).fill(1 / nextObjs.length);
     onModelChange({ ...model, objectives: nextObjs }, normW);
   };
 
@@ -340,7 +336,6 @@ export default function ControlPanelLeft({
     const parsed = parseAlgebraicModel(algebraicText, model);
     if (!parsed.ok || !parsed.objectives || !parsed.constraints || !parsed.detectedVariables) {
       setAlgebraicErrors(parsed.errors);
-      setAlgebraicAppliedMsg(null);
       return;
     }
 
@@ -361,17 +356,13 @@ export default function ControlPanelLeft({
     const nObjs = parsed.objectives.length;
     let nextW = weights;
     if (weights.length !== nObjs) {
-      nextW = Array(nObjs).fill(parseFloat((1 / nObjs).toFixed(3)));
-      const diff = parseFloat((1 - nextW.reduce((a, b) => a + b, 0)).toFixed(3));
-      nextW[0] = parseFloat((nextW[0] + diff).toFixed(3));
+      nextW = Array(nObjs).fill(1 / nObjs);
     }
 
     setAlgebraicDirty(false);
     setAlgebraicErrors([]);
-    setAlgebraicAppliedMsg("Ecuaciones aplicadas y enviadas al motor FastAPI.");
-    setTimeout(() => setAlgebraicAppliedMsg(null), 3000);
 
-    onModelChange(
+    onManualSolve(
       {
         ...model,
         variables: updatedVars,
@@ -383,7 +374,8 @@ export default function ControlPanelLeft({
   };
 
   return (
-    <aside className="w-full lg:w-[35%] lg:min-w-[380px] lg:max-w-[520px] lg:h-[calc(100vh-57px)] lg:overflow-y-auto cockpit-scroll border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-[#F3F4F8] dark:bg-[#0B0F1A] p-4 space-y-4">
+    <aside className="workspace-controls min-w-0 space-y-4">
+      <div className="model-form space-y-4">
       {/* Encabezado del Modelo */}
       <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
@@ -391,12 +383,13 @@ export default function ControlPanelLeft({
             type="text"
             value={model.name}
             onChange={(e) => onModelChange({ ...model, name: e.target.value })}
+            aria-label="Nombre del problema"
             placeholder="Nombre del problema"
             className="w-full text-sm font-bold bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#E11D48] rounded-sm px-1 -ml-1"
           />
           <button
             type="button"
-            onClick={onManualSolve}
+            onClick={() => editorTab === "algebraic" && algebraicDirty ? handleApplyAlgebraic() : onManualSolve()}
             disabled={isCalculating || Boolean(validationError)}
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white disabled:opacity-50 transition-colors"
           >
@@ -408,6 +401,7 @@ export default function ControlPanelLeft({
           rows={2}
           value={model.description || ""}
           onChange={(e) => onModelChange({ ...model, description: e.target.value })}
+          aria-label="Descripción del problema"
           placeholder="Descripción opcional del problema de decisión..."
           className="w-full text-[11px] leading-relaxed bg-transparent text-slate-500 dark:text-slate-400 resize-none focus:outline-none focus:ring-1 focus:ring-[#E11D48] rounded-sm px-1 -ml-1"
         />
@@ -415,7 +409,7 @@ export default function ControlPanelLeft({
 
       {/* Alerta de Validación Inmediata en Cliente */}
       {validationError && (
-        <div className="flex items-start gap-2 p-3 rounded-sm bg-rose-50 dark:bg-rose-950/40 border-2 border-[#E11D48] text-xs text-rose-900 dark:text-rose-200">
+        <div role="alert" className="flex items-start gap-2 p-3 rounded-sm bg-rose-50 dark:bg-rose-950/40 border-2 border-[#E11D48] text-xs text-rose-900 dark:text-rose-200">
           <AlertCircle className="w-4 h-4 text-[#E11D48] shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Error de Validación del Modelo:</span>
@@ -764,6 +758,7 @@ export default function ControlPanelLeft({
                     setAlgebraicText(e.target.value);
                     setAlgebraicDirty(true);
                   }}
+                  aria-label="Ecuaciones del modelo"
                   spellCheck={false}
                   className="w-full font-mono text-xs p-2.5 rounded-sm border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#E11D48]"
                 />
@@ -775,7 +770,7 @@ export default function ControlPanelLeft({
               </div>
 
               {algebraicErrors.length > 0 && (
-                <div className="p-2.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-xs text-[#E11D48] dark:text-rose-300 space-y-1">
+                <div role="alert" className="p-2.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-xs text-[#E11D48] dark:text-rose-300 space-y-1">
                   <div className="font-bold flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5" />
                     <span>Errores de sintaxis detectados:</span>
@@ -785,13 +780,6 @@ export default function ControlPanelLeft({
                       <li key={i}>{err}</li>
                     ))}
                   </ul>
-                </div>
-              )}
-
-              {algebraicAppliedMsg && (
-                <div className="p-2 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>{algebraicAppliedMsg}</span>
                 </div>
               )}
 
@@ -821,6 +809,11 @@ export default function ControlPanelLeft({
         </div>
       </section>
 
+      </div>
+
+      <a href="#grafico-resultados" className="mobile-plot-link inline-block text-xs font-semibold text-rose-800 underline underline-offset-2 dark:text-rose-300 min-[851px]:hidden">
+        Ir al gráfico
+      </a>
       {/* Ecualizador de Pesos (w_i) + Perfil del Decisor (Al final tras definir el modelo) */}
       <section
         id="cockpit-weights-panel"
@@ -830,7 +823,7 @@ export default function ControlPanelLeft({
           <div className="flex items-center gap-1.5">
             <Sliders className="w-4 h-4 text-[#E11D48]" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Perfil &amp; Pesos (wᵢ)
+              Preferencias
             </h2>
             <TooltipBadge
               title="Pesos de Preferencia (wᵢ)"
@@ -846,7 +839,7 @@ export default function ControlPanelLeft({
                   : "bg-rose-500/15 text-[#E11D48] dark:text-rose-400 border-rose-500/40 animate-pulse"
               }`}
             >
-              Σw = {weightSum.toFixed(2)}
+              Σw = {weightSum.toFixed(3)}
             </span>
             <button
               type="button"
@@ -855,7 +848,7 @@ export default function ControlPanelLeft({
               className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-[#E11D48] border border-slate-200 dark:border-slate-700 hover:border-[#E11D48] transition-colors"
             >
               <Scale className="w-3 h-3" />
-              <span>1.00</span>
+              <span>Normalizar</span>
             </button>
           </div>
         </div>
@@ -863,9 +856,9 @@ export default function ControlPanelLeft({
         {/* Selector Rápido de Actitud / Perfil del Decisor */}
         <div className="grid grid-cols-3 gap-1.5">
           {[
-            { id: "equitativo" as DecisionProfile, label: "Equitativo", sub: "L∞ · 1/q" },
-            { id: "compensatorio" as DecisionProfile, label: "Compensatorio", sub: "L₁ · 70%" },
-            { id: "moderado" as DecisionProfile, label: "Moderado", sub: "L₂ · Suave" },
+            { id: "equitativo" as DecisionProfile, label: "Iguales", sub: "Mismo peso" },
+            { id: "compensatorio" as DecisionProfile, label: "Priorizar Z₁", sub: "70% al primero" },
+            { id: "moderado" as DecisionProfile, label: "Explorar L₂", sub: "Pesos iguales" },
           ].map((p) => (
             <button
               key={p.id}
@@ -907,7 +900,7 @@ export default function ControlPanelLeft({
           <div className="flex items-center gap-2 p-2 rounded-sm bg-rose-50 dark:bg-rose-950/30 border border-[#E11D48] text-[11px] text-rose-800 dark:text-rose-200">
             <AlertCircle className="w-3.5 h-3.5 text-[#E11D48] shrink-0" />
             <span>
-              Los pesos suman <b>{weightSum.toFixed(2)}</b> (≠ 1.00). Ajusta los deslizadores o pulsa el botón <b>1.00</b> para normalizar antes de resolver.
+              Los pesos suman <b>{weightSum.toFixed(3)}</b> (≠ 1.00). Ajusta los deslizadores o pulsa el botón <b>Normalizar</b> para normalizar antes de resolver.
             </span>
           </div>
         )}
@@ -988,6 +981,24 @@ export default function ControlPanelLeft({
             />
           </div>
         </div>
+        {model.objectives.length > 3 && (
+          <label className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700 dark:text-slate-300">
+            Semilla de la frontera
+            <input
+              className="w-28 rounded border border-slate-300 bg-transparent px-2 py-1 dark:border-slate-700"
+              type="number" min={0} max={4294967295} step={1}
+              defaultValue={model.pareto_seed ?? 42} key={modelKey}
+              onBlur={(e) => {
+                const value = e.currentTarget.valueAsNumber;
+                if (Number.isInteger(value) && value >= 0 && value <= 4294967295) {
+                  if (value !== (model.pareto_seed ?? 42)) onModelChange({ ...model, pareto_seed: value });
+                } else {
+                  e.currentTarget.value = String(model.pareto_seed ?? 42);
+                }
+              }}
+            />
+          </label>
+        )}
       </section>
     </aside>
   );

@@ -1,4 +1,6 @@
 # 🧭 OptiCompromise
+
+La implementación auditada para el concurso está en [OptiCompromise Cockpit V2](OptiCompromise_Cockpit_V2/README.md). Su [documento técnico y matriz de trazabilidad](OptiCompromise_Cockpit_V2/docs/auditoria-iad.md) incluye la declaración de uso de OpenAI Codex y los resultados de validación. Las instrucciones siguientes corresponden a la versión anterior ubicada en la raíz.
 ## Herramienta de Optimización Multiobjetivo por Programación de Compromiso
 ### Asignatura: Introducción al Análisis de Decisiones (IAD) | Facultad de Minas – Universidad Nacional de Colombia (Sede Medellín)
 **Docente:** Profesora Patricia Jaramillo Álvarez, PhD  

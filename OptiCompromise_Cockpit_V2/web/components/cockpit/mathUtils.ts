@@ -370,7 +370,7 @@ export function buildLinfXRayLatex(
     const w = weights[i] ?? 1 / model.objectives.length;
     const zIdeal = payoff.ideal_point[i] ?? 0;
     const zNadir = payoff.anti_ideal_point[i] ?? 0;
-    const denom = Math.abs(zIdeal - zNadir) > 1e-9 ? Math.abs(zIdeal - zNadir) : 1;
+    const denom = payoff.normalization_ranges?.[i] || Math.abs(zIdeal - zNadir) || 1;
     const zExpr = formatLinearExpr(obj.coefficients, varNames, true);
     const zIdealStr = zIdeal < 0 ? `(${fmtLatexNum(zIdeal, 2)})` : fmtLatexNum(zIdeal, 2);
     const numLatex =
@@ -397,24 +397,24 @@ export function buildLinfXRayLatex(
  * Calcula el polígono convexo de la región factible en 2D (cuando n_vars === 2)
  * mediante intersección de semiplanos (Sutherland-Hodgman).
  */
-export function computeFeasiblePolygon2D(model: ModelDefinition): { x: number[]; y: number[] } | null {
+export function computeFeasiblePolygon2D(
+  model: ModelDefinition,
+  payoff?: PayoffMatrixData,
+): { x: number[]; y: number[] } | null {
   if (model.variables.length !== 2) return null;
 
-  const v0 = model.variables[0];
-  const v1 = model.variables[1];
-  const lb0 = v0.lower_bound ?? -1000;
-  const lb1 = v1.lower_bound ?? -1000;
-
-  // Estimar cota superior visual si upper_bound es null
-  let maxEst = 100;
-  model.constraints.forEach((c) => {
-    const a = c.coefficients[0] ?? 0;
-    const b = c.coefficients[1] ?? 0;
-    if (Math.abs(a) > 1e-9 && c.rhs / a > 0) maxEst = Math.max(maxEst, (c.rhs / a) * 1.2);
-    if (Math.abs(b) > 1e-9 && c.rhs / b > 0) maxEst = Math.max(maxEst, (c.rhs / b) * 1.2);
+  const [xBounds, yBounds] = model.variables.map((variable, idx) => {
+    const rawLower = variable.var_type === "binary" ? Math.max(0, variable.lower_bound ?? 0) : variable.lower_bound;
+    const rawUpper = variable.var_type === "binary" ? Math.min(1, variable.upper_bound ?? 1) : variable.upper_bound;
+    const [lower, upper] = payoff?.decision_ranges_2d?.[idx] ?? [rawLower, rawUpper];
+    const witnesses = payoff?.independent_solutions.map((point) => point[variable.name]) ?? [0];
+    const minWitness = Math.min(...witnesses, lower ?? Infinity, upper ?? Infinity);
+    const maxWitness = Math.max(...witnesses, lower ?? -Infinity, upper ?? -Infinity);
+    const pad = Math.max(1, maxWitness - minWitness) * 0.5;
+    return [lower ?? minWitness - pad, upper ?? maxWitness + pad];
   });
-  const ub0 = v0.upper_bound ?? maxEst;
-  const ub1 = v1.upper_bound ?? maxEst;
+  const [lb0, ub0] = xBounds;
+  const [lb1, ub1] = yBounds;
 
   type Pt = [number, number];
   let poly: Pt[] = [
@@ -459,10 +459,8 @@ export function computeFeasiblePolygon2D(model: ModelDefinition): { x: number[];
     } else if (c.sense === ">=") {
       poly = clipHalfPlane(poly, -a, -b, -c.rhs);
     } else if (c.sense === "==") {
-      // Para igualdad, damos una banda delgada visual o la línea exacta
-      const tol = Math.max(Math.abs(ub0 - lb0), Math.abs(ub1 - lb1)) * 0.005;
-      poly = clipHalfPlane(poly, a, b, c.rhs + tol);
-      poly = clipHalfPlane(poly, -a, -b, -c.rhs + tol);
+      poly = clipHalfPlane(poly, a, b, c.rhs);
+      poly = clipHalfPlane(poly, -a, -b, -c.rhs);
     }
   }
 
@@ -481,14 +479,15 @@ export function computeFeasiblePolygon2D(model: ModelDefinition): { x: number[];
 export function computeFeasibleObjectivesPolygon2D(
   model: ModelDefinition,
   idxX: number,
-  idxY: number
+  idxY: number,
+  payoff?: PayoffMatrixData,
 ): { x: number[]; y: number[] } | null {
   if (model.variables.length !== 2) return null;
   const objX = model.objectives[idxX];
   const objY = model.objectives[idxY];
   if (!objX || !objY) return null;
 
-  const decPoly = computeFeasiblePolygon2D(model);
+  const decPoly = computeFeasiblePolygon2D(model, payoff);
   if (!decPoly || decPoly.x.length < 2) return null;
 
   const evalObj = (coeffs: number[], x0: number, x1: number) =>
@@ -555,8 +554,8 @@ export function computeIsodistanceTraces2D(
   const zNadX = payoff.anti_ideal_point[idxX];
   const zNadY = payoff.anti_ideal_point[idxY];
 
-  const rX = Math.abs(zIdX - zNadX) || 1;
-  const rY = Math.abs(zIdY - zNadY) || 1;
+  const rX = payoff.normalization_ranges?.[idxX] || Math.abs(zIdX - zNadX) || 1;
+  const rY = payoff.normalization_ranges?.[idxY] || Math.abs(zIdY - zNadY) || 1;
   const sX = model.objectives[idxX]?.sense === "maximize" ? -1 : 1;
   const sY = model.objectives[idxY]?.sense === "maximize" ? -1 : 1;
 
@@ -668,7 +667,7 @@ function buildTabularModelRows(
       Seccion: "Meta",
       Nombre: model.name,
       Tipo_o_Sentido: model.description || "",
-      Min_o_RHS: "",
+      Min_o_RHS: model.pareto_seed ?? 42,
       Max_o_Peso: "",
     },
   ];
@@ -741,6 +740,7 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
   const varNames = model.variables.map((v) => v.name);
   rows.push([
     "Métrica",
+    "Estado",
     "Distancia D_p",
     ...varNames,
     ...result.payoff.headers.map((h) => `Z: ${h}`),
@@ -752,8 +752,9 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
     if (!sol) return;
     rows.push([
       key,
-      sol.aggregate_distance.toFixed(6),
-      ...varNames.map((vn) => (sol.variables[vn] ?? 0).toFixed(4)),
+      sol.status,
+      sol.objectives.length ? sol.aggregate_distance.toFixed(6) : "",
+      ...varNames.map((vn) => sol.variables[vn]?.toFixed(4) ?? ""),
       ...sol.objectives.map((z) => z.toFixed(4)),
       ...sol.achievement_pct.map((p) => `${p.toFixed(2)}%`),
     ]);
@@ -787,7 +788,8 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
  * Si ambas variables son enteras/binarias y el rango es manejable, devuelve la malla de puntos factibles.
  */
 export function computeDiscreteFeasiblePoints2D(
-  model: ModelDefinition
+  model: ModelDefinition,
+  payoff?: PayoffMatrixData,
 ): { x: number[]; y: number[] } | null {
   if (model.variables.length !== 2) return null;
   const v0 = model.variables[0];
@@ -796,7 +798,7 @@ export function computeDiscreteFeasiblePoints2D(
   const isInt1 = v1.var_type === "integer" || v1.var_type === "binary";
   if (!isInt0 && !isInt1) return null;
 
-  const poly = computeFeasiblePolygon2D(model);
+  const poly = computeFeasiblePolygon2D(model, payoff);
   if (!poly || poly.x.length === 0) return null;
 
   const minX = Math.ceil(Math.min(...poly.x) - 1e-6);
@@ -897,8 +899,9 @@ export function exportResultsExcel(model: ModelDefinition, result: SolveResponse
       if (!sol) return null;
       return {
         Métrica: key,
-        "Distancia D_p": Number(sol.aggregate_distance.toFixed(6)),
-        ...Object.fromEntries(varNames.map((vn) => [vn, Number((sol.variables[vn] ?? 0).toFixed(4))])),
+        Estado: sol.status,
+        "Distancia D_p": sol.objectives.length ? sol.aggregate_distance : null,
+        ...Object.fromEntries(varNames.map((vn) => [vn, sol.variables[vn] ?? null])),
         ...Object.fromEntries(sol.objectives.map((val, i) => [`${headers[i]} (Real)`, Number(val.toFixed(4))])),
         ...Object.fromEntries(sol.achievement_pct.map((val, i) => [`${headers[i]} (% Logro)`, `${val.toFixed(2)}%`])),
       };
@@ -942,6 +945,18 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     throw new Error("El archivo JSON debe contener un objeto de definición de modelo.");
   }
   const obj = parsed as Partial<ModelDefinition>;
+  const readNumber = (value: unknown, field: string): number => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    throw new Error(`Ingresa un número finito en ${field}.`);
+  };
+  const readCoefficients = (values: number[], count: number, field: string) => {
+    if (!Array.isArray(values) || values.length > count) {
+      throw new Error(`Revisa la cantidad de coeficientes en ${field}.`);
+    }
+    return Array.from({ length: count }, (_, i) =>
+      i < values.length ? readNumber(values[i], `${field}, coeficiente ${i + 1}`) : 0
+    );
+  };
   if (!Array.isArray(obj.variables) || obj.variables.length < 1) {
     throw new Error("El archivo JSON debe incluir al menos 1 variable válida en 'variables'.");
   }
@@ -952,6 +967,9 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     if (!v || typeof v.name !== "string" || !v.name.trim()) {
       throw new Error(`Variable #${idx + 1} inválida en el JSON (falta 'name').`);
     }
+    if (v.var_type !== undefined && !["continuous", "integer", "binary"].includes(v.var_type)) {
+      throw new Error(`Tipo de variable desconocido en «${v.name}».`);
+    }
     const vt: "continuous" | "integer" | "binary" =
       v.var_type === "integer"
         ? "integer"
@@ -961,33 +979,36 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     return {
       name: v.name.trim(),
       var_type: vt,
-      lower_bound: v.lower_bound === undefined ? 0 : v.lower_bound,
-      upper_bound: v.upper_bound === undefined ? null : v.upper_bound,
+      lower_bound: v.lower_bound === null ? null : readNumber(v.lower_bound ?? 0, `cota inferior de «${v.name}»`),
+      upper_bound: v.upper_bound == null ? null : readNumber(v.upper_bound, `cota superior de «${v.name}»`),
     };
   });
   const validObjs = obj.objectives.map((o, idx) => {
     if (!o || typeof o.name !== "string" || !o.name.trim() || !Array.isArray(o.coefficients)) {
       throw new Error(`Objetivo #${idx + 1} inválido en el JSON (requiere 'name' y 'coefficients').`);
     }
+    if (o.sense !== undefined && !["maximize", "minimize"].includes(o.sense)) {
+      throw new Error(`Sentido desconocido en el objetivo «${o.name}».`);
+    }
     return {
       name: o.name.trim(),
       sense: o.sense === "minimize" ? ("minimize" as const) : ("maximize" as const),
-      coefficients: validVars.map((_, vIdx) => {
-        const val = Number(o.coefficients[vIdx] ?? 0);
-        return Number.isFinite(val) ? val : 0;
-      }),
+      coefficients: readCoefficients(o.coefficients, validVars.length, `objetivo «${o.name}»`),
     };
   });
   const validCons = Array.isArray(obj.constraints)
-    ? obj.constraints.map((c, idx) => ({
-        name: c?.name && typeof c.name === "string" ? c.name : `Restricción ${idx + 1}`,
-        sense: c?.sense === ">=" || c?.sense === "==" ? c.sense : ("<=" as const),
-        rhs: Number.isFinite(Number(c?.rhs)) ? Number(c.rhs) : 0,
-        coefficients: validVars.map((_, vIdx) => {
-          const val = Number(c?.coefficients?.[vIdx] ?? 0);
-          return Number.isFinite(val) ? val : 0;
-        }),
-      }))
+    ? obj.constraints.map((c, idx) => {
+        if (!c || (c.sense !== undefined && !["<=", ">=", "=="].includes(c.sense))) {
+          throw new Error(`Sentido desconocido en la restricción ${idx + 1}.`);
+        }
+        const name = c.name || `Restricción ${idx + 1}`;
+        return {
+          name,
+          sense: c.sense ?? "<=",
+          rhs: readNumber(c.rhs, `lado derecho de «${name}»`),
+          coefficients: readCoefficients(c.coefficients ?? [], validVars.length, `restricción «${name}»`),
+        };
+      })
     : [];
 
   return {
@@ -997,6 +1018,7 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     objectives: validObjs,
     constraints: validCons,
     weights: Array.isArray(obj.weights) ? obj.weights : undefined,
+    pareto_seed: obj.pareto_seed,
   };
 }
 
@@ -1060,6 +1082,7 @@ export async function importModelFromFile(
     });
 
     let importedName = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
+    let importedSeed: number | undefined;
     let importedDescription = `Modelo importado desde ${file.name}.`;
     const variables: ModelDefinition["variables"] = [];
     const objRows: TabularRow[] = [];
@@ -1079,6 +1102,8 @@ export async function importModelFromFile(
       if (sec === "meta" || sec === "metadata") {
         const metaName = String(getField(row, ["nombre", "name"]) ?? "").trim();
         const metaDesc = String(getField(row, ["tipo_o_sentido", "description", "descripcion"]) ?? "").trim();
+        const seed = getField(row, ["min_o_rhs", "pareto_seed"]);
+        if (seed !== undefined && seed !== "") importedSeed = Number(seed);
         if (metaName) importedName = metaName;
         if (metaDesc) importedDescription = metaDesc;
       } else if (sec.startsWith("var")) {
@@ -1155,8 +1180,8 @@ export async function importModelFromFile(
     const wSum = importedWeights.reduce((a, b) => a + b, 0);
     const normWeights =
       wSum > 1e-6
-        ? importedWeights.map((w) => Number((w / wSum).toFixed(4)))
-        : Array(objectives.length).fill(Number((1 / objectives.length).toFixed(4)));
+        ? importedWeights.map((w) => w / wSum)
+        : Array(objectives.length).fill(1 / objectives.length);
 
     return {
       model: {
@@ -1166,6 +1191,7 @@ export async function importModelFromFile(
         objectives,
         constraints,
         weights: normWeights,
+        pareto_seed: importedSeed,
       },
       weights: normWeights,
     };

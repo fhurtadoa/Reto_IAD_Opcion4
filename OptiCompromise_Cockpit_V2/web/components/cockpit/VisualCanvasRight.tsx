@@ -38,7 +38,13 @@ import {
 import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
 
-const Plot = dynamic(() => import("react-plotly.js"), {
+const Plot = dynamic(async () => {
+  const [{ default: createPlot }, { default: plotly }] = await Promise.all([
+    import("react-plotly.js/factory"),
+    import("plotly.js-dist-min"),
+  ]);
+  return createPlot(plotly);
+}, {
   ssr: false,
   loading: () => (
     <div className="h-[380px] w-full flex items-center justify-center bg-slate-100 dark:bg-slate-900/50 text-slate-400 text-xs rounded-sm font-mono">
@@ -48,6 +54,7 @@ const Plot = dynamic(() => import("react-plotly.js"), {
 });
 
 interface VisualCanvasRightProps {
+  workspace: "model" | "results" | "method";
   model: ModelDefinition;
   modelKey: number;
   decisionProfile: DecisionProfile;
@@ -61,6 +68,7 @@ type ChartTab = "objectives2d" | "objectives3d" | "radar" | "decision2d";
 type PlotTrace = Record<string, unknown>;
 
 export default function VisualCanvasRight({
+  workspace,
   model,
   modelKey,
   decisionProfile,
@@ -70,7 +78,7 @@ export default function VisualCanvasRight({
   theme,
 }: VisualCanvasRightProps) {
   const [chartTab, setChartTab] = useState<ChartTab>("objectives2d");
-  const [showIsodistance, setShowIsodistance] = useState<boolean>(true);
+  const [showIsodistance, setShowIsodistance] = useState<boolean>(false);
   const [showPareto, setShowPareto] = useState<boolean>(true);
   const [showFeasibleObj, setShowFeasibleObj] = useState<boolean>(true);
   const [paretoExplorerOpen, setParetoExplorerOpen] = useState<boolean>(false);
@@ -82,6 +90,8 @@ export default function VisualCanvasRight({
   const [axis3DZ, setAxis3DZ] = useState<number>(2);
   const [xrayOpen, setXrayOpen] = useState<boolean>(false);
   const [showAllVars, setShowAllVars] = useState<boolean>(false);
+  const [downloadError, setDownloadError] = useState(false);
+  const [exportingPlot, setExportingPlot] = useState(false);
   const plotContainerRef = useRef<HTMLDivElement | null>(null);
 
   const isDark = theme === "dark";
@@ -130,7 +140,12 @@ export default function VisualCanvasRight({
     const container = plotContainerRef.current;
     if (!container) return;
     const plotEl = container.querySelector(".js-plotly-plot") as HTMLElement | null;
-    if (!plotEl) return;
+    if (!plotEl) {
+      setDownloadError(true);
+      return;
+    }
+    setDownloadError(false);
+    setExportingPlot(true);
     try {
       const Plotly = (await import("plotly.js-dist-min")).default;
       const dataUrl = await Plotly.toImage(plotEl, {
@@ -139,12 +154,17 @@ export default function VisualCanvasRight({
         height: 750,
         scale: 2,
       });
+      const blob = await (await fetch(dataUrl)).blob();
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = dataUrl;
+      a.href = url;
       a.download = `opticompromise_${effectiveTab}.png`;
       a.click();
-    } catch (err) {
-      console.error("Error exportando PNG:", err);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setDownloadError(true);
+    } finally {
+      setExportingPlot(false);
     }
   };
 
@@ -165,7 +185,7 @@ export default function VisualCanvasRight({
 
     // 1. Zona Factible proyectada al Espacio de Objetivos (cuando nVars === 2)
     if (showFeasibleObj && nVars === 2) {
-      const objPoly = computeFeasibleObjectivesPolygon2D(model, safeAxisX, safeAxisY);
+      const objPoly = computeFeasibleObjectivesPolygon2D(model, safeAxisX, safeAxisY, payoff);
       if (objPoly) {
         traces.push({
           x: objPoly.x,
@@ -179,7 +199,7 @@ export default function VisualCanvasRight({
             width: 1.4,
             dash: isMixedInt ? "dot" : "solid",
           },
-          name: isMixedInt ? "Zona Factible LP" : "Zona Factible",
+          name: isMixedInt ? "Relajación continua" : "Zona factible visible",
           hoverinfo: "name",
         });
       }
@@ -406,16 +426,17 @@ export default function VisualCanvasRight({
       data2D: traces,
       layout2D: {
         autosize: true,
+        uirevision: modelKey,
         paper_bgcolor: paperBg,
         plot_bgcolor: plotBg,
         font: { color: textColor, size: 11 },
-        xaxis: { title: headers[safeAxisX], gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
-        yaxis: { title: headers[safeAxisY], gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
+        xaxis: { title: { text: headers[safeAxisX] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
+        yaxis: { title: { text: headers[safeAxisY] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
         legend: { orientation: "h", y: -0.25, font: { size: 10 } },
         margin: { l: 64, r: 24, t: 18, b: 78 },
       },
     };
-  }, [solveResult, model, safeAxisX, safeAxisY, showIsodistance, showPareto, showFeasibleObj, nVars, isDark, headers, nObjs, paperBg, plotBg, gridColor, textColor]);
+  }, [solveResult, model, safeAxisX, safeAxisY, showIsodistance, showPareto, showFeasibleObj, nVars, isDark, headers, nObjs, paperBg, plotBg, gridColor, textColor, modelKey]);
 
   // --- Construcción de datos 3D ---
   const { data3D, layout3D } = useMemo(() => {
@@ -479,7 +500,7 @@ export default function VisualCanvasRight({
       { key: "L_inf", label: "L∞", color: SEMANTIC_COLORS.L_inf },
     ].forEach((m) => {
       const sol = solutions[m.key];
-      if (!sol) return;
+      if (!sol?.objectives.length) return;
       traces.push({
         x: [sol.objectives[safe3DX]],
         y: [sol.objectives[safe3DY]],
@@ -496,20 +517,22 @@ export default function VisualCanvasRight({
       data3D: traces,
       layout3D: {
         autosize: true,
+        uirevision: modelKey,
         paper_bgcolor: paperBg,
         font: { color: textColor, size: 11 },
         scene: {
           bgcolor: plotBg,
-          xaxis: { title: headers[safe3DX], gridcolor: gridColor },
-          yaxis: { title: headers[safe3DY], gridcolor: gridColor },
-          zaxis: { title: headers[safe3DZ], gridcolor: gridColor },
-          camera: { eye: { x: 1.55, y: 1.55, z: 1.25 } },
+          xaxis: { title: { text: headers[safe3DX] }, gridcolor: gridColor },
+          yaxis: { title: { text: headers[safe3DY] }, gridcolor: gridColor },
+          zaxis: { title: { text: headers[safe3DZ] }, gridcolor: gridColor },
+          camera: { eye: { x: 1.85, y: 1.85, z: 1.45 } },
+          domain: { y: [0.08, 1] },
         },
         legend: { orientation: "h", y: -0.05, font: { size: 10 } },
         margin: { l: 0, r: 0, t: 10, b: 10 },
       },
     };
-  }, [solveResult, nObjs, safe3DX, safe3DY, safe3DZ, showPareto, headers, paperBg, plotBg, gridColor, textColor]);
+  }, [solveResult, nObjs, safe3DX, safe3DY, safe3DZ, showPareto, headers, paperBg, plotBg, gridColor, textColor, modelKey]);
 
   // --- Construcción Radar (% Logro) cuando nObjs >= 3 ---
   const { dataRadar, layoutRadar } = useMemo(() => {
@@ -520,7 +543,7 @@ export default function VisualCanvasRight({
     const makeTrace = (key: string, name: string, color: string, fill: string) => {
       const sol = solutions[key];
       if (!sol || !sol.achievement_pct?.length) return null;
-      const vals = sol.achievement_pct.map((v) => Math.max(0, Math.min(100, v)));
+      const vals = sol.achievement_pct;
       return {
         type: "scatterpolar",
         r: [...vals, vals[0]],
@@ -551,13 +574,14 @@ export default function VisualCanvasRight({
       dataRadar: traces,
       layoutRadar: {
         autosize: true,
+        uirevision: modelKey,
         paper_bgcolor: paperBg,
         font: { color: textColor, size: 11 },
         polar: {
           bgcolor: plotBg,
           radialaxis: {
             visible: true,
-            range: [0, 105],
+            range: [Math.min(0, ...Object.values(solutions).flatMap((s) => s.achievement_pct)), 105],
             ticksuffix: "%",
             gridcolor: gridColor,
             linecolor: gridColor,
@@ -568,15 +592,15 @@ export default function VisualCanvasRight({
         margin: { l: 50, r: 50, t: 24, b: 56 },
       },
     };
-  }, [solveResult, nObjs, headers, paperBg, plotBg, gridColor, textColor]);
+  }, [solveResult, nObjs, headers, paperBg, plotBg, gridColor, textColor, modelKey]);
 
   // --- Construcción Espacio de Decisiones 2D ---
   const { dataDec, layoutDec } = useMemo(() => {
     if (!solveResult || nVars !== 2) return { dataDec: [], layoutDec: {} };
     const v0 = model.variables[0].name;
     const v1 = model.variables[1].name;
-    const poly = computeFeasiblePolygon2D(model);
-    const discretePts = computeDiscreteFeasiblePoints2D(model);
+    const poly = computeFeasiblePolygon2D(model, solveResult.payoff);
+    const discretePts = computeDiscreteFeasiblePoints2D(model, solveResult.payoff);
     const isMixedInt = model.variables.some((v) => v.var_type !== "continuous");
     const traces: PlotTrace[] = [];
 
@@ -587,9 +611,10 @@ export default function VisualCanvasRight({
         fill: "toself",
         fillcolor: isDark ? "rgba(15, 118, 110, 0.14)" : "rgba(15, 118, 110, 0.10)",
         line: { color: SEMANTIC_COLORS.pareto, width: isMixedInt ? 1.5 : 2, dash: isMixedInt ? "dot" : "solid" },
-        mode: "lines",
+        mode: "lines+markers",
+        marker: { size: 3, color: SEMANTIC_COLORS.pareto },
         type: "scatter",
-        name: isMixedInt ? "Relajación LP (Continua)" : "Región Factible",
+        name: isMixedInt ? "Relajación continua" : "Región factible visible",
       });
     }
 
@@ -599,7 +624,7 @@ export default function VisualCanvasRight({
         y: discretePts.y,
         mode: "markers",
         type: "scatter",
-        name: "Puntos Factibles Discretos (ℤ)",
+        name: "Muestra de puntos enteros factibles",
         marker: { size: 5.5, color: isDark ? "#38BDF8" : "#111524", opacity: 0.8 },
       });
     }
@@ -644,20 +669,21 @@ export default function VisualCanvasRight({
       dataDec: traces,
       layoutDec: {
         autosize: true,
+        uirevision: modelKey,
         paper_bgcolor: paperBg,
         plot_bgcolor: plotBg,
         font: { color: textColor, size: 11 },
-        xaxis: { title: v0, gridcolor: gridColor, zerolinecolor: gridColor },
-        yaxis: { title: v1, gridcolor: gridColor, zerolinecolor: gridColor },
+        xaxis: { title: { text: v0 }, gridcolor: gridColor, zerolinecolor: gridColor },
+        yaxis: { title: { text: v1 }, gridcolor: gridColor, zerolinecolor: gridColor },
         legend: { orientation: "h", y: -0.22, font: { size: 10 } },
         margin: { l: 55, r: 24, t: 18, b: 64 },
       },
     };
-  }, [solveResult, model, nVars, isDark, paperBg, plotBg, gridColor, textColor]);
+  }, [solveResult, model, nVars, isDark, paperBg, plotBg, gridColor, textColor, modelKey]);
 
   // --- Datos Rayos X (L_inf) ---
   const xrayData = useMemo(() => {
-    if (!solveResult) return null;
+    if (!solveResult?.solutions.L_inf.objectives.length) return null;
     return buildLinfXRayLatex(
       model,
       solveResult.payoff,
@@ -672,7 +698,7 @@ export default function VisualCanvasRight({
 
   if (hasActiveError && !solveResult) {
     return (
-      <main className="w-full lg:w-[65%] lg:h-[calc(100vh-57px)] lg:overflow-y-auto cockpit-scroll p-6 flex items-center justify-center bg-[#F3F4F8] dark:bg-[#111524]">
+      <main className="workspace-output min-w-0 flex items-start justify-center py-6">
         <div className="max-w-lg w-full rounded-sm border border-[#E11D48] bg-white dark:bg-slate-900 p-6 space-y-3 shadow-sm">
           <div className="flex items-center gap-3 text-[#E11D48]">
             <AlertOctagon className="w-7 h-7 shrink-0" />
@@ -685,7 +711,7 @@ export default function VisualCanvasRight({
                   : "Error del Motor de Optimización"}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                El backend FastAPI / HiGHS no pudo encontrar una región factible acotada.
+                Revisa el detalle del motor y ajusta el modelo.
               </p>
             </div>
           </div>
@@ -693,7 +719,7 @@ export default function VisualCanvasRight({
             {solverMessage}
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Revisa las restricciones, sentidos (≤, ≥, =) o cotas de variables en el Panel Izquierdo.
+            Revisa las restricciones, sentidos (≤, ≥, =) o cotas de variables en Formular.
           </p>
         </div>
       </main>
@@ -702,7 +728,7 @@ export default function VisualCanvasRight({
 
   if (!solveResult) {
     return (
-      <main className="w-full lg:w-[65%] lg:h-[calc(100vh-57px)] flex items-center justify-center bg-[#F3F4F8] dark:bg-[#111524]">
+      <main className="workspace-output min-w-0 flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3 text-slate-500">
           <Loader2 className="w-7 h-7 animate-spin text-[#E11D48]" />
           <span className="text-xs font-mono">Conectando con motor FastAPI (HiGHS / SLSQP)...</span>
@@ -717,7 +743,10 @@ export default function VisualCanvasRight({
   const degenerateObjs = solveResult.payoff.degenerate_objectives || [];
 
   return (
-    <main className="w-full lg:w-[65%] lg:h-[calc(100vh-57px)] lg:overflow-y-auto cockpit-scroll bg-[#F3F4F8] dark:bg-[#111524] p-4 space-y-4">
+    <main className="workspace-output min-w-0 space-y-4">
+      {solverStatus === "calculating" && (
+        <p className="workspace-feedback" role="status">Actualizando resultados para los cambios recientes. Debajo se muestra el último cálculo de «{model.name}».</p>
+      )}
       {hasActiveError && (
         <div className="rounded-sm border-2 border-[#E11D48] bg-rose-50 dark:bg-rose-950/50 px-4 py-3 flex items-start gap-3 text-xs text-rose-900 dark:text-rose-100">
           <AlertOctagon className="w-5 h-5 text-[#E11D48] shrink-0 mt-0.5" />
@@ -738,24 +767,31 @@ export default function VisualCanvasRight({
 
       {degenerateObjs.length > 0 && (
         <div className="rounded-sm border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2.5 text-[11px] text-amber-900 dark:text-amber-200">
-          <b>Aviso de objetivo sin conflicto (Ideal = Nadir):</b>{" "}
-          {degenerateObjs.map((idx) => headers[idx] || `Z${idx + 1}`).join(", ")}. El motor aplicó un rango auxiliar de ±5% para normalizar sin división por cero.
+          <b>Objetivos con rango observado nulo:</b>{" "}
+          {degenerateObjs.map((idx) => headers[idx] || `Z${idx + 1}`).join(", ")}. Los valores observados se conservan. Para calcular distancias se usa la escala auxiliar que aparece en Ver método.
         </div>
       )}
 
-      {solL2?.status === "feasible_suboptimal" && (
+      {solverStatus === "partial" && (
         <div className="rounded-sm border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2.5 text-[11px] text-amber-900 dark:text-amber-200">
-          <b>Aviso MIP (L₂):</b> El árbol Branch-and-Bound alcanzó el límite de tiempo/nodos; se muestra la mejor solución entera factible encontrada hasta el corte.
+          <b>{solverMessage}</b>
+          <ul className="mt-1">
+            {Object.values(solveResult.solutions).filter((s) => s.status !== "optimal").map((s) => (
+              <li key={s.metric}>{s.metric.replace("L_inf", "L∞")}: {s.status === "feasible_suboptimal" ? "Solución factible sin certificado de optimalidad." : "No hay una solución disponible."}</li>
+            ))}
+          </ul>
         </div>
       )}
+      <div hidden={workspace !== "results"} className="space-y-4">
       {/* 1. GRÁFICO PRINCIPAL INTERACTIVO */}
-      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden" id="grafico-resultados">
         <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
           {/* Pestañas de vista gráfica */}
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               type="button"
               onClick={() => setChartTab("objectives2d")}
+              aria-pressed={effectiveTab === "objectives2d"}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                 effectiveTab === "objectives2d"
                   ? "bg-[#E11D48] text-white"
@@ -771,6 +807,7 @@ export default function VisualCanvasRight({
                 <button
                   type="button"
                   onClick={() => setChartTab("objectives3d")}
+                  aria-pressed={effectiveTab === "objectives3d"}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                     effectiveTab === "objectives3d"
                       ? "bg-[#E11D48] text-white"
@@ -783,6 +820,7 @@ export default function VisualCanvasRight({
                 <button
                   type="button"
                   onClick={() => setChartTab("radar")}
+                  aria-pressed={effectiveTab === "radar"}
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                     effectiveTab === "radar"
                       ? "bg-[#E11D48] text-white"
@@ -799,6 +837,7 @@ export default function VisualCanvasRight({
               <button
                 type="button"
                 onClick={() => setChartTab("decision2d")}
+                aria-pressed={effectiveTab === "decision2d"}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                   effectiveTab === "decision2d"
                     ? "bg-[#E11D48] text-white"
@@ -901,53 +940,60 @@ export default function VisualCanvasRight({
             <button
               type="button"
               onClick={handleDownloadPNG}
+              disabled={exportingPlot}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors font-semibold"
               title="Descargar gráfico actual en alta resolución PNG"
             >
               <Camera className="w-3.5 h-3.5" />
-              <span>PNG</span>
+              <span>{exportingPlot ? "Generando PNG…" : "PNG"}</span>
             </button>
           </div>
         </div>
 
-        <div ref={plotContainerRef} className="p-2">
+        {(effectiveTab === "decision2d" || (effectiveTab === "objectives2d" && showFeasibleObj)) &&
+          solveResult.payoff.decision_ranges_2d?.some(([lo, hi]) => lo === null || hi === null) && (
+          <p className="px-4 pt-2 text-xs text-slate-600 dark:text-slate-300">La región se muestra recortada en los ejes sin cota finita confirmada.</p>
+        )}
+        {downloadError && <p role="alert" className="px-4 py-2 text-xs text-rose-700 dark:text-rose-300">No se pudo exportar el gráfico. Vuelve a intentarlo cuando termine de dibujarse.</p>}
+        {workspace === "results" && <div ref={plotContainerRef} className="plot-frame p-2">
+          <p className="sr-only">Consulta los valores accesibles en la tabla de comparación de soluciones.</p>
           {effectiveTab === "objectives2d" && (
             <Plot
               data={data2D}
               layout={layout2D}
-              config={{ displayModeBar: true, responsive: true, displaylogo: false }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendDataToCloud", "toImage", "select2d", "lasso2d"] }}
               useResizeHandler
-              style={{ width: "100%", height: "390px" }}
+              style={{ width: "100%", height: "clamp(320px, 46vw, 470px)" }}
             />
           )}
           {effectiveTab === "objectives3d" && (
             <Plot
               data={data3D}
               layout={layout3D}
-              config={{ displayModeBar: true, responsive: true, displaylogo: false }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendDataToCloud", "toImage", "select2d", "lasso2d"] }}
               useResizeHandler
-              style={{ width: "100%", height: "420px" }}
+              style={{ width: "100%", height: "clamp(340px, 46vw, 470px)" }}
             />
           )}
           {effectiveTab === "radar" && (
             <Plot
               data={dataRadar}
               layout={layoutRadar}
-              config={{ displayModeBar: true, responsive: true, displaylogo: false }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendDataToCloud", "toImage", "select2d", "lasso2d"] }}
               useResizeHandler
-              style={{ width: "100%", height: "410px" }}
+              style={{ width: "100%", height: "clamp(340px, 46vw, 470px)" }}
             />
           )}
           {effectiveTab === "decision2d" && (
             <Plot
               data={dataDec}
               layout={layoutDec}
-              config={{ displayModeBar: true, responsive: true, displaylogo: false }}
+              config={{ displayModeBar: true, responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendDataToCloud", "toImage", "select2d", "lasso2d"] }}
               useResizeHandler
-              style={{ width: "100%", height: "390px" }}
+              style={{ width: "100%", height: "clamp(320px, 46vw, 470px)" }}
             />
           )}
-        </div>
+        </div>}
 
         {/* Explorador de Puntos de la Frontera Eficiente (Pesos × Métricas) */}
         {(() => {
@@ -1081,19 +1127,19 @@ export default function VisualCanvasRight({
         <Target className="w-4 h-4 text-[#E11D48] shrink-0 mt-0.5" />
         <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
           <span className="font-bold text-slate-900 dark:text-white mr-1.5">
-            Recomendación ({decisionProfile.toUpperCase()}):
+            Cómo leer el compromiso
           </span>
           {decisionProfile === "equitativo" && (
-            <>Tu perfil prioriza equidad estricta: la solución sugerida es <b>L∞ (Minimax)</b> para nivelar el grado de logro sin sacrificar ningún criterio.</>
+            <>Con pesos iguales, <b>L∞</b> reduce la mayor brecha al ideal. Las brechas coinciden cuando varias restricciones minimax quedan activas.</>
           )}
           {decisionProfile === "compensatorio" && (
-            <>Tu perfil es utilitarista/compensatorio: la solución sugerida es <b>L₁ (Manhattan)</b> para maximizar el desempeño del objetivo principal.</>
+            <><b>L₁</b> minimiza la suma de brechas ponderadas. Con 70% para el primer objetivo, mejorar ese criterio tiene mayor influencia.</>
           )}
           {decisionProfile === "moderado" && (
-            <>Tu perfil busca compromiso balanceado: la solución sugerida es <b>L₂ (Euclidiana)</b> por ofrecer la menor distancia geométrica global al Ideal.</>
+            <><b>L₂</b> penaliza las brechas grandes al elevarlas al cuadrado.</>
           )}
           {decisionProfile === "personalizado" && (
-            <>Pesos calibrados manualmente. Compara en la tabla y barras qué métrica (L₁, L₂ o L∞) refleja mejor el balance deseado para tu decisión.</>
+            <>Usa el porcentaje de logro por objetivo para identificar qué mejora y qué cede en cada solución. Cada distancia responde a la fórmula de su propia columna.</>
           )}
         </p>
       </div>
@@ -1104,11 +1150,11 @@ export default function VisualCanvasRight({
           <div className="flex items-center gap-1.5">
             <Layers className="w-4 h-4 text-[#E11D48]" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Comparativa Unificada: Desempeño, % Logro (Z&apos;) y Distancia Dₚ
+              Comparación de soluciones
             </h2>
             <TooltipBadge
               title="Lectura Unificada de Métricas"
-              content="Reúne para cada criterio el valor real alcanzado Zᵢ(x*), su porcentaje de logro Z'ᵢ = 100·(1 - Dᵢ) con barra visual, y la distancia agregada Dₚ al Punto Ideal."
+              content="Reúne para cada criterio el valor real alcanzado Zᵢ(x*), su logro y la distancia al ideal. Compara los logros por criterio. Cada métrica calcula una distancia diferente."
             />
           </div>
           <span className="text-[10px] font-mono text-slate-400">
@@ -1136,13 +1182,13 @@ export default function VisualCanvasRight({
                   Σw = {(solveResult.weights.reduce((a, b) => a + b, 0)).toFixed(2)}
                 </td>
                 <td className="py-2 px-3 text-right text-[#2563EB] dark:text-blue-400 font-bold text-sm">
-                  {solL1?.aggregate_distance.toFixed(4)}
+                  {solL1.objectives.length ? solL1.aggregate_distance.toFixed(4) : "—"}
                 </td>
                 <td className="py-2 px-3 text-right text-slate-900 dark:text-slate-100 font-bold text-sm">
-                  {solL2?.aggregate_distance.toFixed(4)}
+                  {solL2.objectives.length ? solL2.aggregate_distance.toFixed(4) : "—"}
                 </td>
                 <td className="py-2 pl-3 text-right text-[#E11D48] font-bold text-sm">
-                  {solLinf?.aggregate_distance.toFixed(4)}
+                  {solLinf.objectives.length ? solLinf.aggregate_distance.toFixed(4) : "—"}
                 </td>
               </tr>
 
@@ -1169,20 +1215,20 @@ export default function VisualCanvasRight({
                       </span>
                     </td>
                     {cols.map((col, cIdx) => {
-                      const pct = Math.max(0, Math.min(100, col.sol?.achievement_pct[i] ?? 0));
+                      const pct = col.sol.achievement_pct[i];
                       return (
                         <td key={cIdx} className={`py-2.5 ${cIdx === 2 ? "pl-3" : "px-3"} text-right align-top`}>
                           <div className="font-bold text-slate-900 dark:text-slate-100">
                             {fmtNum(col.sol?.objectives[i], 2)}
                           </div>
-                          <div className="mt-1 flex items-center justify-end gap-2">
+                          {pct !== undefined && <div className="mt-1 flex items-center justify-end gap-2">
                             <div className="w-16 sm:w-20 h-1.5 bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                              <div className={`h-full ${col.bar} transition-all duration-300`} style={{ width: `${pct}%` }} />
+                              <div className={`h-full ${col.bar} transition-all duration-300`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
                             </div>
                             <span className={`text-[10px] font-bold tabular-nums w-11 text-right ${col.text}`}>
-                              {pct.toFixed(1)}%
+                              {fmtNum(pct, 1)}%
                             </span>
-                          </div>
+                          </div>}
                         </td>
                       );
                     })}
@@ -1265,6 +1311,8 @@ export default function VisualCanvasRight({
         </div>
       </section>
 
+      </div>
+      <div hidden={workspace !== "method"} className="space-y-4">
       {/* 4. MATRIZ DE PAGOS LITERAL + VECTORES IDEAL Y NADIR SEPARADOS */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1343,7 +1391,7 @@ export default function VisualCanvasRight({
                 ★ Vector Punto Ideal (Z*)
               </span>
               <span className="text-[10px] font-mono text-amber-700/80 dark:text-amber-400/80">
-                Óptimos individuales (inalcanzable en conjunto)
+                Óptimos individuales
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-xs">
@@ -1397,25 +1445,25 @@ export default function VisualCanvasRight({
           <div className="flex items-center gap-1.5">
             <Maximize2 className="w-4 h-4 text-[#E11D48]" />
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Normalización por Rango Ideal–Anti-Ideal &amp; Matriz Normalizada [0, 1]
+              Normalización por objetivo
             </h2>
             <TooltipBadge
               title="Normalización Ideal–Nadir"
-              content="Convierte cada objetivo a una escala adimensional [0, 1] dividiendo por Rᵢ = |Zᵢ* - Zᵢ,peor| para poder combinar criterios con unidades distintas sin sesgos de magnitud."
+              content="Divide la brecha al ideal por el rango de referencia. Una desviación mayor que 1 indica un resultado peor que el nadir aproximado."
             />
           </div>
           <span className="text-[10px] font-mono text-slate-400">
-            Dᵢ(x) ∈ [0, 1] · 0 = Ideal · 1 = Nadir
+            0 = Ideal · 1 = Nadir de referencia
           </span>
         </div>
 
         {/* Fórmulas Matemáticas en KaTeX antes de la matriz */}
         <div className="p-3 rounded-sm bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] space-y-2">
           <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-            Para evitar sesgos por unidades dispares (ej. dólares vs puntos o kg), cada criterio se normaliza respecto a su rango factible{" "}
+            Para evitar sesgos por unidades dispares (ej. dólares vs puntos o kg), cada criterio se normaliza respecto a su rango de referencia{" "}
             <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">Rᵢ = |Zᵢ* − Zᵢ,peor|</span>:
           </p>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-sm overflow-x-auto">
             <KatexBlock
               latex={`D_i(x) = \\begin{cases} \\dfrac{Z_i^* - Z_i(x)}{Z_i^* - Z_{i,\\text{peor}}} & \\text{(Maximizar)} \\\\[8pt] \\dfrac{Z_i(x) - Z_i^*}{Z_{i,\\text{peor}} - Z_i^*} & \\text{(Minimizar)} \\end{cases} \\qquad\\qquad Z'_i(x) = 100 \\cdot \\bigl(1 - D_i(x)\\bigr)\\%`}
               className="text-slate-900 dark:text-slate-100 text-xs"
@@ -1444,7 +1492,7 @@ export default function VisualCanvasRight({
                 {model.objectives.map((obj, i) => {
                   const zId = solveResult.payoff.ideal_point[i] ?? 0;
                   const zNad = solveResult.payoff.anti_ideal_point[i] ?? 0;
-                  const range = Math.abs(zId - zNad);
+                  const range = solveResult.payoff.normalization_ranges?.[i] ?? Math.abs(zId - zNad);
                   const w = solveResult.weights[i] ?? 0;
                   const isMin = obj.sense === "minimize";
                   return (
@@ -1459,7 +1507,7 @@ export default function VisualCanvasRight({
                         {fmtNum(zNad, 2)}
                       </td>
                       <td className="py-1.5 px-2 text-right font-bold text-slate-800 dark:text-slate-200">
-                        {fmtNum(range, 2)}
+                        {fmtNum(range, 4)}{degenerateObjs.includes(i) ? " (aux.)" : ""}
                       </td>
                       <td className="py-1.5 px-2 text-[10px] text-slate-600 dark:text-slate-300">
                         {range > 1e-9
@@ -1510,7 +1558,7 @@ export default function VisualCanvasRight({
                     {row.map((val, cIdx) => {
                       const zId = solveResult.payoff.ideal_point[cIdx] ?? 0;
                       const zNad = solveResult.payoff.anti_ideal_point[cIdx] ?? 0;
-                      const range = Math.abs(zId - zNad) || 1;
+                      const range = solveResult.payoff.normalization_ranges?.[cIdx] || Math.abs(zId - zNad) || 1;
                       const dNorm = Math.max(0, Math.abs(zId - val) / range);
                       const isZero = dNorm < 1e-4;
                       const isOne = Math.abs(dNorm - 1.0) < 1e-4;
@@ -1605,6 +1653,7 @@ export default function VisualCanvasRight({
           </div>
         )}
       </section>
+      </div>
     </main>
   );
 }

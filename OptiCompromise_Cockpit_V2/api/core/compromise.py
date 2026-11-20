@@ -5,6 +5,7 @@ Métricas L1 (Lineal), L_inf (Minimax Lineal) y L2 (Cuadrática Convexa / MIQP B
 import heapq
 import time
 import numpy as np
+from scipy.linalg import qr
 from scipy.optimize import linprog, minimize
 from typing import List, Dict, Tuple, Optional
 from .schemas import ModelDefinition, PayoffMatrixData, MetricSolution
@@ -34,8 +35,9 @@ def compute_distance_coefficients(
         z_pe = payoff.anti_ideal_point[i]
         range_i = z_id - z_pe if obj.sense == "maximize" else z_pe - z_id
         
-        if np.isclose(range_i, 0.0):
-            range_i = 1.0
+        if payoff.normalization_ranges:
+            range_i = payoff.normalization_ranges[i]
+        range_i = range_i or 1.0
             
         if obj.sense == "maximize":
             # D_i = (z_id - c_i^T x) / (z_id - z_pe)
@@ -132,13 +134,11 @@ def solve_l1(
     """
     Resuelve la métrica L1 (Manhattan) como Programación Lineal:
     Min sum(w_i * D_i(x)) = Min (sum(w_i * alpha_i))^T @ x
-    Si algún peso es cero, añade desempate aumentado (1e-6 * sum(D_i)) para evitar óptimos dominados.
+    Con pesos nulos, desempata dentro de la cara óptima sin alterar la métrica.
     """
     A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
 
-    # Desempate Pareto-fuerte cuando existen pesos nulos
-    w_eff = np.where(weights <= 1e-9, 1e-6, weights) if np.any(weights <= 1e-9) else weights
-    c_l1 = np.sum(w_eff[:, np.newaxis] * alpha, axis=0)
+    c_l1 = weights @ alpha
 
     res = linprog(
         c_l1,
@@ -162,7 +162,19 @@ def solve_l1(
             status=f"error: {res.message}"
         )
 
-    x_clean = _clean_solution_vector(res.x, bounds, integrality)
+    x = res.x
+    if np.any(weights == 0):
+        # Escalar la igualdad protege la prioridad de objetivos con coeficientes pequeños.
+        scale = np.max(np.abs(c_l1))
+        if scale > 0:
+            primary = c_l1 / scale
+            A_eq = np.vstack([A_eq, primary]) if A_eq is not None else primary[None, :]
+            b_eq = np.append(b_eq, primary @ x) if b_eq is not None else [primary @ x]
+        tie = linprog(alpha.sum(axis=0), A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                      bounds=bounds, integrality=integrality, method="highs")
+        if tie.success:
+            x = tie.x
+    x_clean = _clean_solution_vector(x, bounds, integrality)
     return format_solution("L1", x_clean, model, payoff, alpha, beta, weights, status="optimal")
 
 def solve_linf(
@@ -174,7 +186,7 @@ def solve_linf(
 ) -> MetricSolution:
     """
     Resuelve la métrica L_inf (Tchebysheff / Minimax) mediante Programación Lineal con variable auxiliar lambda:
-    Min lambda (+ término aumentado si hay pesos nulos para evitar dominancia débil)
+    Min lambda, con desempate en la cara óptima para mejorar la eficiencia.
     s.a. w_i * (alpha_i^T @ x + beta_i) <= lambda  <=>  w_i * alpha_i^T @ x - lambda <= - w_i * beta_i
          restricciones originales sobre x
     """
@@ -182,10 +194,7 @@ def solve_linf(
     n_objs = len(model.objectives)
     A_ub_orig, b_ub_orig, A_eq_orig, b_eq_orig, bounds_orig, integrality_orig = build_linear_constraints(model)
 
-    # Vector objetivo: [0, ..., 0, 1] (y pequeño término aumentado si algún w_i == 0)
     c_inf = np.zeros(n_vars + 1, dtype=float)
-    if np.any(weights <= 1e-9):
-        c_inf[:n_vars] = 1e-6 * np.sum(alpha, axis=0)
     c_inf[-1] = 1.0
 
     # Restricciones de desigualdad ampliadas
@@ -244,7 +253,18 @@ def solve_linf(
             status=f"error: {res.message}"
         )
 
-    x_opt = _clean_solution_vector(res.x[:n_vars], bounds_orig, integrality_orig)
+    tie = linprog(
+        np.append(alpha.sum(axis=0), 0.0),
+        A_ub=A_ub_total,
+        b_ub=b_ub_total,
+        A_eq=A_eq_total,
+        b_eq=b_eq_total,
+        bounds=list(bounds_orig) + [(res.x[-1], res.x[-1])],
+        integrality=integrality_total,
+        method="highs",
+    )
+    x = tie.x if tie.success else res.x
+    x_opt = _clean_solution_vector(x[:n_vars], bounds_orig, integrality_orig)
     return format_solution("L_inf", x_opt, model, payoff, alpha, beta, weights, status="optimal")
 
 def _is_feasible(
@@ -255,7 +275,7 @@ def _is_feasible(
     b_eq: Optional[np.ndarray],
     bounds: List[Tuple[Optional[float], Optional[float]]],
     integrality: Optional[List[int]] = None,
-    tol: float = 1e-4,
+    tol: float = 1e-7,
 ) -> bool:
     """Verifica estrictamente factibilidad (cotas, desigualdades, igualdades e integralidad)."""
     if x is None or len(x) != len(bounds) or not np.all(np.isfinite(x)):
@@ -275,7 +295,7 @@ def _is_feasible(
             return False
     if integrality is not None:
         for j, is_int in enumerate(integrality):
-            if is_int == 1 and abs(x[j] - round(float(x[j]))) > 1e-4:
+            if is_int == 1 and abs(x[j] - round(float(x[j]))) > 1e-7:
                 return False
     return True
 
@@ -290,7 +310,7 @@ def _solve_continuous_qp(
     b_eq: Optional[np.ndarray],
     bounds: List[Tuple[Optional[float], Optional[float]]],
     x0_candidates: List[np.ndarray],
-) -> Tuple[Optional[np.ndarray], float]:
+) -> Tuple[Optional[np.ndarray], float, bool]:
     """
     Resuelve la relajación cuadrática continua Min sum(w_i * (alpha_i^T x + beta_i)^2)
     con restricciones escaladas por fila para estabilidad numérica de SLSQP.
@@ -300,7 +320,7 @@ def _solve_continuous_qp(
     # Verificar que las cotas no sean vacías (lb > ub)
     for lb, ub in bounds:
         if lb is not None and ub is not None and lb > ub + 1e-9:
-            return None, float("inf")
+            return None, float("inf"), True
 
     def objective(x: np.ndarray) -> float:
         d = alpha @ x + beta
@@ -326,7 +346,12 @@ def _solve_continuous_qp(
             })
 
     if A_eq is not None and b_eq is not None:
-        for i in range(len(b_eq)):
+        # SLSQP requiere igualdades independientes. Se conserva el sistema
+        # completo para la comprobación de factibilidad y para HiGHS.
+        scaled_eq = A_eq / np.maximum(np.linalg.norm(A_eq, axis=1, keepdims=True), 1e-300)
+        rank = np.linalg.matrix_rank(scaled_eq)
+        _, _, pivots = qr(scaled_eq.T, mode="economic", pivoting=True)
+        for i in pivots[:rank]:
             row = A_eq[i]
             rhs = float(b_eq[i])
             scale = float(max(np.linalg.norm(row), abs(rhs), 1.0))
@@ -357,7 +382,7 @@ def _solve_continuous_qp(
 
     # Sembrar best_x con el mejor candidato factible inicial (garantiza que L2 nunca empeore a L1/L_inf)
     for x_init in starts:
-        if _is_feasible(x_init, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-4):
+        if _is_feasible(x_init, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
             val = objective(x_init)
             if val < best_val:
                 best_val = val
@@ -373,7 +398,7 @@ def _solve_continuous_qp(
             constraints=constraints,
             options={"maxiter": 400, "ftol": 1e-11},
         )
-        if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-4):
+        if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
             val = objective(res.x)
             if val < best_val:
                 best_val = val
@@ -391,7 +416,7 @@ def _solve_continuous_qp(
             method="highs",
         )
         if not feas.success or feas.x is None:
-            return None, float("inf")
+            return None, float("inf"), feas.status == 2
         best_x = np.array(feas.x, dtype=float)
         best_val = objective(best_x)
         res = minimize(
@@ -403,13 +428,26 @@ def _solve_continuous_qp(
             constraints=constraints,
             options={"maxiter": 400, "ftol": 1e-10},
         )
-        if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-4):
+        if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
             val = objective(res.x)
             if val < best_val:
                 best_val = val
                 best_x = np.array(res.x, dtype=float)
 
-    return best_x, best_val
+    # Para una cuadrática convexa, la tangente es un minorante global.
+    # Su mínimo sobre el poliedro certifica una cota inferior para la poda.
+    gradient = jacobian(best_x)
+    scale = float(np.max(np.abs(gradient)))
+    if scale == 0.0:
+        return best_x, best_val, True
+    certificate = linprog(
+        gradient / scale, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+        bounds=bounds, method="highs",
+    )
+    if not certificate.success:
+        return best_x, 0.0, False
+    gap = max(0.0, float(gradient @ (best_x - certificate.x)))
+    return best_x, max(0.0, best_val - gap), gap <= 1e-7
 
 
 def solve_l2(
@@ -428,18 +466,15 @@ def solve_l2(
     Min sum(w_i * (alpha_i^T @ x + beta_i)^2)
     s.a. restricciones originales.
     - Para LP continuo: SLSQP con restricciones normalizadas y validación estricta de factibilidad.
-    - Para MIP (variables enteras/binarias): Branch-and-Bound exacto Best-First respetando integralidad.
+    - Para MIP: Branch-and-Bound Best-First con presupuesto de tiempo y nodos.
     """
     n_vars = len(model.variables)
     var_names = [v.name for v in model.variables]
     A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
 
-    # Desempate Pareto-fuerte cuando existen pesos nulos
-    w_eff = np.where(weights <= 1e-9, 1e-6, weights) if np.any(weights <= 1e-9) else weights
-
     def objective(x: np.ndarray) -> float:
         d = alpha @ x + beta
-        return float(np.sum(w_eff * (d ** 2)))
+        return float(np.sum(weights * (d ** 2)))
 
     # Construir candidatos iniciales factibles
     x0_candidates: List[np.ndarray] = []
@@ -455,7 +490,7 @@ def solve_l2(
 
     # --- CASO 1: CONTINUO PURO ---
     if integrality is None:
-        best_x, _ = _solve_continuous_qp(alpha, beta, w_eff, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+        best_x, _, certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
         if best_x is None:
             return MetricSolution(
                 metric="L2",
@@ -467,7 +502,10 @@ def solve_l2(
                 status="error: no se encontró solución factible L2",
             )
         best_x = _clean_solution_vector(best_x, bounds, None)
-        return format_solution("L2", best_x, model, payoff, alpha, beta, weights, status="optimal")
+        return format_solution(
+            "L2", best_x, model, payoff, alpha, beta, weights,
+            status="optimal" if certified else "feasible_suboptimal",
+        )
 
     # --- CASO 2: MIP (ENTERO / BINARIO) — BRANCH AND BOUND EXACTO ---
     int_indices = [j for j, flag in enumerate(integrality) if flag == 1]
@@ -485,15 +523,15 @@ def solve_l2(
         snapped = np.array(cand, dtype=float)
         for j in int_indices:
             snapped[j] = round(float(snapped[j]))
-        if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, bounds, integrality=integrality, tol=1e-4):
+        if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, bounds, integrality=integrality, tol=1e-7):
             val = objective(snapped)
             if val < best_int_val:
                 best_int_val = val
                 best_int_x = snapped
 
     # Resolver relajación raíz
-    tree_exhausted = True
-    root_x, root_lb = _solve_continuous_qp(alpha, beta, w_eff, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+    root_x, root_lb, root_certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+    tree_exhausted = root_x is not None or root_certified
     if root_x is not None:
         # Cola de prioridad Best-First: (lower_bound, tie_breaker, node_bounds, node_x)
         heap: List[Tuple[float, int, List[Tuple[Optional[float], Optional[float]]], np.ndarray]] = []
@@ -514,7 +552,7 @@ def solve_l2(
             max_frac = 0.0
             for j in int_indices:
                 frac = abs(node_x[j] - round(float(node_x[j])))
-                if frac > 1e-4 and frac > max_frac:
+                if frac > 1e-7 and frac > max_frac:
                     max_frac = frac
                     branch_j = j
 
@@ -523,11 +561,13 @@ def solve_l2(
                 snapped = np.array(node_x, dtype=float)
                 for j in int_indices:
                     snapped[j] = round(float(snapped[j]))
-                if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, bounds, integrality=integrality, tol=1e-4):
+                if _is_feasible(snapped, A_ub, b_ub, A_eq, b_eq, bounds, integrality=integrality, tol=1e-7):
                     val = objective(snapped)
                     if val < best_int_val:
                         best_int_val = val
                         best_int_x = snapped
+                if lb_val < best_int_val - 1e-7:
+                    tree_exhausted = False
                 continue
 
             # Ramificar x_j <= floor y x_j >= ceil
@@ -540,7 +580,9 @@ def solve_l2(
                     continue
                 c_bounds = list(node_bounds)
                 c_bounds[branch_j] = (child_lb, child_ub)
-                c_x, c_lb = _solve_continuous_qp(alpha, beta, w_eff, A_ub, b_ub, A_eq, b_eq, c_bounds, [node_x])
+                c_x, c_lb, c_certified = _solve_continuous_qp(alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, c_bounds, [node_x])
+                if c_x is None and not c_certified:
+                    tree_exhausted = False
                 if c_x is not None and c_lb < best_int_val - 1e-7:
                     counter += 1
                     heapq.heappush(heap, (c_lb, counter, c_bounds, c_x))

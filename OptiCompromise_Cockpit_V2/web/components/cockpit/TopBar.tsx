@@ -57,6 +57,8 @@ export default function TopBar({
             <span>Óptimo</span>
           </div>
         );
+      case "partial":
+        return <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900" title={solverMessage}>Resultado parcial</span>;
       case "infeasible":
         return (
           <div
@@ -104,7 +106,7 @@ export default function TopBar({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-white dark:bg-[#111524] border-slate-200 dark:border-slate-800 px-4 py-2.5">
+    <header className="relative z-40 w-full border-b bg-white dark:bg-[#111524] border-slate-200 dark:border-slate-800 px-4 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Izquierda: Logo */}
         <div className="flex items-center gap-2.5">
@@ -116,9 +118,6 @@ export default function TopBar({
               <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
                 OptiCompromise
               </h1>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-rose-50 dark:bg-rose-950/60 text-[#E11D48] dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                COCKPIT V2
-              </span>
             </div>
             <p className="text-[10px] text-slate-500 dark:text-slate-400">
               Programación de Compromiso Multiobjetivo · UNAL
@@ -139,8 +138,9 @@ export default function TopBar({
               id="preset-selector"
               value={selectedPreset}
               onChange={(e) => onSelectPreset(e.target.value)}
-              className="text-xs font-medium rounded-sm px-2.5 py-1.5 border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#E11D48] max-w-[310px]"
+              className="text-xs font-medium rounded-sm px-2.5 py-1.5 border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#E11D48] max-w-[min(310px,85vw)]"
             >
+              {selectedPreset === "" && <option value="" disabled>Modelo abierto</option>}
               {PRESET_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label} ({opt.badge})
@@ -149,11 +149,11 @@ export default function TopBar({
             </select>
           </div>
 
-          {renderStatusPill()}
+          <div role="status">{renderStatusPill()}</div>
         </div>
 
         {/* Derecha: Controles Globales */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -173,7 +173,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Importar</span>
+            <span className="inline">Importar</span>
           </button>
 
           <button
@@ -183,7 +183,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">JSON</span>
+            <span className="inline">JSON</span>
           </button>
 
           <button
@@ -194,7 +194,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-[#E11D48]" />
-            <span className="hidden md:inline">Excel</span>
+            <span className="inline">Excel</span>
           </button>
 
           <button
@@ -205,7 +205,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">CSV</span>
+            <span className="inline">CSV</span>
           </button>
 
           <a
@@ -216,7 +216,7 @@ export default function TopBar({
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-semibold bg-[#111524] hover:bg-slate-800 text-white border border-slate-800 transition-colors"
           >
             <BookOpen className="w-3.5 h-3.5 text-[#E11D48]" />
-            <span className="hidden lg:inline">Manual PDF</span>
+            <span className="inline">Manual PDF</span>
           </a>
 
           <button

@@ -181,6 +181,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
     ideal_point = []
     anti_ideal_point = []
     degenerate_objectives: List[int] = []
+    normalization_ranges = []
 
     for i, obj in enumerate(model.objectives):
         col_vals = payoff_matrix[:, i]
@@ -191,17 +192,28 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             z_ideal = float(np.min(col_vals))
             z_anti = float(np.max(col_vals))
 
-        # Prevención de división por cero si ideal == peor
-        if np.isclose(z_ideal, z_anti):
+        # Conservar el nadir observado. El rango auxiliar solo interviene en la normalización.
+        observed_range = abs(z_ideal - z_anti)
+        if observed_range == 0.0:
             degenerate_objectives.append(i)
-            delta = abs(z_ideal) * 0.05 if not np.isclose(z_ideal, 0.0) else 1.0
-            if obj.sense == "maximize":
-                z_anti = z_ideal - delta
-            else:
-                z_anti = z_ideal + delta
+            observed_range = abs(z_ideal) * 0.05 if z_ideal else 1.0
+        normalization_ranges.append(observed_range)
 
         ideal_point.append(z_ideal)
         anti_ideal_point.append(z_anti)
+
+    decision_ranges = None
+    if n_vars == 2:
+        decision_ranges = []
+        for axis in np.eye(2):
+            endpoints = []
+            for direction in (1, -1):
+                projection = linprog(
+                    direction * axis, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                    bounds=bounds, method="highs",
+                )
+                endpoints.append(float(direction * projection.fun) if projection.success else None)
+            decision_ranges.append(tuple(endpoints))
 
     return PayoffMatrixData(
         headers=headers,
@@ -210,5 +222,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
         anti_ideal_point=anti_ideal_point,
         independent_solutions=independent_solutions,
         degenerate_objectives=degenerate_objectives,
+        normalization_ranges=normalization_ranges,
+        decision_ranges_2d=decision_ranges,
         status="optimal"
     )

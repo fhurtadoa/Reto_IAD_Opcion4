@@ -9,6 +9,7 @@ import os
 import json
 import hashlib
 from collections import OrderedDict
+from threading import Lock
 from typing import Dict, Any, Tuple, List
 
 try:
@@ -51,10 +52,12 @@ def health_check():
 # Al arrastrar los sliders de pesos, evita recomputar 100+ puntos Pareto en cada frame.
 _STRUCTURE_CACHE: "OrderedDict[str, Tuple[PayoffMatrixData, List[ParetoPoint]]]" = OrderedDict()
 _MAX_CACHE_SIZE = 32
+_CACHE_LOCK = Lock()
 
 
 def _model_structure_key(model: ModelDefinition) -> str:
     payload = {
+        "pareto_seed": model.pareto_seed if len(model.objectives) > 3 else None,
         "variables": [
             (v.name, v.var_type, v.lower_bound, v.upper_bound) for v in model.variables
         ],
@@ -74,6 +77,13 @@ def _validate_model(model: ModelDefinition) -> None:
         raise HTTPException(status_code=400, detail="El modelo debe contener al menos 1 variable de decisión.")
     if len(model.objectives) < 2:
         raise HTTPException(status_code=400, detail="Un problema multiobjetivo requiere al menos 2 funciones objetivo.")
+
+    if model.weights is not None and (
+        len(model.weights) != len(model.objectives)
+        or any(not math.isfinite(w) or not 0 <= w <= 1 for w in model.weights)
+        or abs(sum(model.weights) - 1.0) > 0.001 + 1e-12
+    ):
+        raise HTTPException(status_code=400, detail="Ingresa un peso entre 0 y 1 por objetivo. Los pesos deben sumar 1.")
 
     seen_names = set()
     for v in model.variables:
@@ -95,49 +105,71 @@ def _validate_model(model: ModelDefinition) -> None:
     for idx, o in enumerate(model.objectives):
         if not o.name.strip():
             raise HTTPException(status_code=400, detail=f"El objetivo #{idx + 1} debe tener un nombre no vacío.")
+        if len(o.coefficients) > len(model.variables):
+            raise HTTPException(status_code=400, detail=f"El objetivo «{o.name}» tiene más coeficientes que variables.")
+        if o.expression and not o.coefficients:
+            raise HTTPException(status_code=400, detail=f"Convierte «{o.name}» a coeficientes lineales antes de resolver.")
         if any(not math.isfinite(c) for c in o.coefficients):
             raise HTTPException(status_code=400, detail=f"Coeficientes inválidos (NaN/Inf) en objetivo '{o.name}'.")
 
     for idx, c in enumerate(model.constraints):
+        if len(c.coefficients) > len(model.variables) or (c.expression and not c.coefficients):
+            raise HTTPException(status_code=400, detail=f"Revisa los coeficientes lineales de la restricción {idx + 1}.")
         if not math.isfinite(c.rhs) or any(not math.isfinite(coef) for coef in c.coefficients):
             raise HTTPException(status_code=400, detail=f"Valores numéricos inválidos (NaN/Inf) en restricción #{idx + 1}.")
+
+
+def _require_payoff(model: ModelDefinition) -> PayoffMatrixData:
+    payoff = compute_payoff_matrix(model)
+    if "error" in payoff.status:
+        detail = payoff.status.lower()
+        if "infeasible" in detail:
+            message = "Modelo infactible. Las cotas y restricciones son incompatibles."
+        elif "unbounded" in detail:
+            message = "Modelo no acotado. Al menos un objetivo puede mejorar sin límite."
+        else:
+            message = "HiGHS no pudo resolver la matriz de pagos. Revisa las escalas y las cotas."
+        raise HTTPException(status_code=400, detail=message)
+    return payoff
 
 
 @app.post("/api/payoff", response_model=PayoffMatrixData)
 def get_payoff_matrix(model: ModelDefinition):
     _validate_model(model)
-    payoff = compute_payoff_matrix(model)
-    if "error" in payoff.status:
-        raise HTTPException(status_code=400, detail=payoff.status)
-    return payoff
+    return _require_payoff(model)
 
 @app.post("/api/solve", response_model=SolveResponse)
 def solve_model(model: ModelDefinition):
     _validate_model(model)
 
     cache_key = _model_structure_key(model)
-    cached = _STRUCTURE_CACHE.get(cache_key)
+    with _CACHE_LOCK:
+        cached = _STRUCTURE_CACHE.get(cache_key)
+        if cached is not None:
+            _STRUCTURE_CACHE.move_to_end(cache_key)
     if cached is not None:
-        _STRUCTURE_CACHE.move_to_end(cache_key)
         payoff, pareto_pts = cached
     else:
         # 1. Matriz de pagos
-        payoff = compute_payoff_matrix(model)
-        if "error" in payoff.status:
-            raise HTTPException(status_code=400, detail=payoff.status)
+        payoff = _require_payoff(model)
 
         # 3. Muestra de frontera de Pareto (independiente de los pesos actuales)
         pareto_pts = compute_pareto_frontier(model, payoff, num_samples=21)
-        _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts)
-        if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
-            _STRUCTURE_CACHE.popitem(last=False)
+        with _CACHE_LOCK:
+            _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts)
+            if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
+                _STRUCTURE_CACHE.popitem(last=False)
 
     # 2. Soluciones compromiso para los pesos actuales
     solutions, normalized_weights = solve_all_metrics(model, payoff, weights=model.weights)
 
+    incomplete = [s.metric for s in solutions.values() if s.status != "optimal"]
     return SolveResponse(
-        status="optimal",
-        message="Solución calculada exitosamente",
+        status="partial" if incomplete else "optimal",
+        message=(
+            f"Optimalidad sin confirmar para {', '.join(incomplete).replace('L_inf', 'L∞')}."
+            if incomplete else "Las tres métricas convergieron dentro de la tolerancia del motor."
+        ),
         payoff=payoff,
         solutions=solutions,
         weights=normalized_weights,
@@ -147,9 +179,7 @@ def solve_model(model: ModelDefinition):
 @app.post("/api/pareto")
 def get_pareto_frontier(model: ModelDefinition):
     _validate_model(model)
-    payoff = compute_payoff_matrix(model)
-    if "error" in payoff.status:
-        raise HTTPException(status_code=400, detail=payoff.status)
+    payoff = _require_payoff(model)
     pareto_pts = compute_pareto_frontier(model, payoff, num_samples=25)
     return {
         "pareto_points": [
