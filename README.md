@@ -47,7 +47,7 @@ La herramienta incluye pruebas automatizadas en `api/tests/` que reproducen los 
 ### Opción A: Despliegue Web en Vercel (Recomendado)
 1. Conectar este repositorio de GitHub a tu cuenta de [Vercel](https://vercel.com).
 2. Vercel detecta automáticamente el frontend de Next.js (`web/`) y las funciones serverless de Python (`api/`).
-3. La aplicación queda publicada en un enlace público fijo y seguro `https://opticompromise.vercel.app`.
+3. La entrega requiere una URL estable validada. Consulta las [instrucciones de Cockpit V2](OptiCompromise_Cockpit_V2/README.md) para la versión candidata.
 
 ### Opción B: Ejecución en Google Colab
 Abrir el cuaderno autónomo [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Colab.ipynb) en Google Colab. No requiere clonar repositorios externos ni configurar tokens; se ejecuta directamente en las celdas del notebook.

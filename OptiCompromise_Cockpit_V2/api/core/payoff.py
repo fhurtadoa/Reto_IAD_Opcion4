@@ -29,15 +29,22 @@ def build_linear_constraints(model: ModelDefinition) -> Tuple[
             coeffs += [0.0] * (n_vars - len(coeffs))
         coeffs = np.array(coeffs[:n_vars], dtype=float)
         
+        rhs = float(c.rhs)
+        # Equivalent rows should have the same numerical representation.
+        scale = np.max(np.abs(coeffs), initial=0.0)
+        if scale and np.isfinite(rhs / scale):
+            coeffs = coeffs / scale
+            rhs /= scale
+
         if c.sense == "<=":
             A_ub_list.append(coeffs)
-            b_ub_list.append(float(c.rhs))
+            b_ub_list.append(rhs)
         elif c.sense == ">=":
             A_ub_list.append(-coeffs)
-            b_ub_list.append(-float(c.rhs))
+            b_ub_list.append(-rhs)
         elif c.sense == "==":
             A_eq_list.append(coeffs)
-            b_eq_list.append(float(c.rhs))
+            b_eq_list.append(rhs)
             
     A_ub = np.array(A_ub_list) if A_ub_list else None
     b_ub = np.array(b_ub_list) if b_ub_list else None

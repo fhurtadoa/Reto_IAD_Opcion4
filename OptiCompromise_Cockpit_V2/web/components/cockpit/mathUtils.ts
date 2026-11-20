@@ -46,11 +46,11 @@ export function formatLinearExpr(
   const parts: string[] = [];
   for (let i = 0; i < varNames.length; i++) {
     const c = coeffs[i] ?? 0;
-    if (Math.abs(c) < 1e-12) continue;
+    if (asLatex ? Math.abs(c) < 1e-12 : c === 0) continue;
     const absC = Math.abs(c);
     const vRaw = varNames[i];
     const vStr = asLatex ? formatVarLatex(vRaw) : vRaw;
-    const coeffStr = Math.abs(absC - 1) < 1e-9 ? "" : `${Number(absC.toFixed(4))}${asLatex ? "\\," : "*"}`;
+    const coeffStr = (asLatex ? Math.abs(absC - 1) < 1e-9 : absC === 1) ? "" : `${asLatex ? Number(absC.toFixed(4)) : absC}${asLatex ? "\\," : "*"}`;
     if (parts.length === 0) {
       parts.push(c < 0 ? `-${coeffStr}${vStr}` : `${coeffStr}${vStr}`);
     } else {
@@ -73,8 +73,19 @@ export function formatVarLatex(name: string): string {
 /**
  * Convierte un ModelDefinition a texto algebraico editable.
  */
+function algebraicVariableTokens(model: ModelDefinition): string[] {
+  const names = model.variables.map((v) => v.name.trim().split(/\s+/)[0]);
+  const reserved = new Set(names);
+  return names.map((name, i) => {
+    if (/^[a-zA-Z][a-zA-Z0-9_]*$/.test(name) && names.indexOf(name) === names.lastIndexOf(name)) return name;
+    let token = `var_${i + 1}`;
+    while (reserved.has(token)) token += "_";
+    return token;
+  });
+}
+
 export function modelToAlgebraicText(model: ModelDefinition): string {
-  const varNames = model.variables.map((v) => v.name.split(" ")[0]);
+  const varNames = algebraicVariableTokens(model);
   const lines: string[] = [];
 
   model.objectives.forEach((obj, idx) => {
@@ -132,17 +143,12 @@ export function parseAlgebraicModel(
   // Preservar mapa token -> nombre completo (ej. "x1" -> "x1 (BYD Seal)")
   const tokenToFullName = new Map<string, string>();
   const varList: string[] = [];
-  const usedVarTokens = new Set<string>();
-  existingModel.variables.forEach((v) => {
-    const token = v.name.split(" ")[0].trim();
-    if (token && !tokenToFullName.has(token)) {
-      tokenToFullName.set(token, v.name);
-      varList.push(token);
-    }
+  algebraicVariableTokens(existingModel).forEach((token, i) => {
+    tokenToFullName.set(token, existingModel.variables[i].name);
+    varList.push(token);
   });
 
   const ensureVar = (v: string): number => {
-    usedVarTokens.add(v);
     const idx = varList.indexOf(v);
     if (idx >= 0) return idx;
     varList.push(v);
@@ -164,7 +170,7 @@ export function parseAlgebraicModel(
       return null;
     }
 
-    const coeffsMap: Record<string, number> = {};
+    const coeffsMap: Record<string, number> = Object.create(null);
     let constant = 0;
     const normalized = clean.startsWith("+") || clean.startsWith("-") ? clean : `+${clean}`;
     const termRegex = /([+-])((?:[^+-]|(?<=[0-9][eE])[+-])+)/g;
@@ -249,7 +255,9 @@ export function parseAlgebraicModel(
       const rhsExpr = mObjNamed ? mObjNamed[3] : mObjDirect![2];
 
       const parsedSide = parseLinearSide(rhsExpr, lineNo);
-      if (parsedSide) {
+      if (parsedSide?.constant) {
+        errors.push(`Línea ${lineNo}: los objetivos con término independiente requieren retirar esa constante.`);
+      } else if (parsedSide) {
         parsedObjectives.push({ name, sense, coeffsMap: parsedSide.coeffsMap });
       }
       return;
@@ -288,8 +296,7 @@ export function parseAlgebraicModel(
     errors.push("Un problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min).");
   }
 
-  // Conservar únicamente las variables realmente referenciadas en las ecuaciones
-  const finalVars = varList.filter((v) => usedVarTokens.has(v));
+  const finalVars = varList;
   if (finalVars.length < 1 && errors.length === 0) {
     errors.push("El modelo debe incluir al menos 1 variable de decisión en sus ecuaciones.");
   }
@@ -877,47 +884,36 @@ export function exportResultsExcel(model: ModelDefinition, result: SolveResponse
   const headers = result.payoff.headers;
   const varNames = model.variables.map((v) => v.name);
 
-  // Hoja 1: Matriz de Pagos
-  const payoffRows = result.payoff.matrix.map((row, idx) => ({
-    "Óptimo Individual": headers[idx],
-    ...Object.fromEntries(row.map((val, i) => [headers[i], Number(val.toFixed(4))])),
-  }));
-  payoffRows.push({
-    "Óptimo Individual": "Punto Ideal (Z*)",
-    ...Object.fromEntries(result.payoff.ideal_point.map((val, i) => [headers[i], Number(val.toFixed(4))])),
-  });
-  payoffRows.push({
-    "Óptimo Individual": "Punto Nadir (Anti-Ideal)",
-    ...Object.fromEntries(result.payoff.anti_ideal_point.map((val, i) => [headers[i], Number(val.toFixed(4))])),
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payoffRows), "Matriz_de_Pagos");
+  const payoffRows = [
+    ["Óptimo Individual", ...headers],
+    ...result.payoff.matrix.map((row, i) => [headers[i], ...row]),
+    ["Punto Ideal (Z*)", ...result.payoff.ideal_point],
+    ["Punto Nadir (Anti-Ideal)", ...result.payoff.anti_ideal_point],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payoffRows), "Matriz_de_Pagos");
 
-  // Hoja 2: Soluciones Compromiso (L1, L2, L_inf)
-  const solRows = (["L1", "L2", "L_inf"] as const)
-    .map((key) => {
+  const solRows = [
+    ["Métrica", "Estado", "Distancia D_p", ...varNames,
+      ...headers.map((name) => `${name} (Real)`), ...headers.map((name) => `${name} (% Logro)`)],
+    ...(["L1", "L2", "L_inf"] as const).flatMap((key) => {
       const sol = result.solutions[key];
-      if (!sol) return null;
-      return {
-        Métrica: key,
-        Estado: sol.status,
-        "Distancia D_p": sol.objectives.length ? sol.aggregate_distance : null,
-        ...Object.fromEntries(varNames.map((vn) => [vn, sol.variables[vn] ?? null])),
-        ...Object.fromEntries(sol.objectives.map((val, i) => [`${headers[i]} (Real)`, Number(val.toFixed(4))])),
-        ...Object.fromEntries(sol.achievement_pct.map((val, i) => [`${headers[i]} (% Logro)`, `${val.toFixed(2)}%`])),
-      };
-    })
-    .filter(Boolean);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solRows), "Soluciones_Compromiso");
+      if (!sol) return [];
+      return [[key, sol.status, sol.objectives.length ? sol.aggregate_distance : null,
+        ...varNames.map((name) => sol.variables[name] ?? null),
+        ...headers.map((_, i) => sol.objectives[i] ?? null),
+        ...headers.map((_, i) => sol.achievement_pct[i] == null ? null : `${sol.achievement_pct[i].toFixed(2)}%`)]];
+    }),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(solRows), "Soluciones_Compromiso");
 
-  // Hoja 3: Frontera de Pareto
-  if (result.pareto_points && result.pareto_points.length > 0) {
-    const paretoRows = result.pareto_points.map((pt, idx) => ({
-      "#": idx + 1,
-      Métrica: pt.metric,
-      ...Object.fromEntries(pt.objectives.map((val, i) => [headers[i], Number(val.toFixed(4))])),
-      ...Object.fromEntries(varNames.map((vn) => [vn, Number((pt.variables[vn] ?? 0).toFixed(4))])),
-    }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(paretoRows), "Frontera_Pareto");
+  if (result.pareto_points?.length) {
+    const paretoRows = [
+      ["#", "Métrica", ...headers, ...varNames],
+      ...result.pareto_points.map((pt, i) => [
+        i + 1, pt.metric, ...pt.objectives, ...varNames.map((name) => pt.variables[name] ?? null),
+      ]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(paretoRows), "Frontera_Pareto");
   }
 
   // Hoja 4: Definición tabular del Modelo (re-importable en Excel/CSV sin pérdida de cotas ni descripción)

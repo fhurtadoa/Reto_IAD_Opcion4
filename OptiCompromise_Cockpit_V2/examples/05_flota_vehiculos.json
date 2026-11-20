@@ -12,7 +12,7 @@
   "objectives": [
     {"name": "Costo Total Flota (USD)", "sense": "minimize", "coefficients": [44000.0, 46500.0, 49000.0, 48000.0, 42000.0, 43500.0]},
     {"name": "Autonomía Total (km)", "sense": "maximize", "coefficients": [570.0, 630.0, 520.0, 540.0, 480.0, 510.0]},
-    {"name": "Tiempo Promedio Carga (min)", "sense": "minimize", "coefficients": [32.0, 27.0, 18.0, 18.0, 26.0, 30.0]},
+    {"name": "Tiempo acumulado de carga (min)", "sense": "minimize", "coefficients": [32.0, 27.0, 18.0, 18.0, 26.0, 30.0]},
     {"name": "Índice Seguridad Flota (pts)", "sense": "maximize", "coefficients": [9.0, 9.5, 9.6, 9.7, 10.0, 9.3]}
   ],
   "constraints": [

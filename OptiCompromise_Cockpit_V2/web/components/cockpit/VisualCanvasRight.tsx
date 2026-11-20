@@ -250,6 +250,8 @@ export default function VisualCanvasRight({
     if (showPareto && sortedPareto.length > 0) {
       const senseX = model.objectives[safeAxisX]?.sense ?? "maximize";
       const senseY = model.objectives[safeAxisY]?.sense ?? "maximize";
+      const spanX = payoff.normalization_ranges?.[safeAxisX] || Math.abs(ix - nx) || 1;
+      const spanY = payoff.normalization_ranges?.[safeAxisY] || Math.abs(iy - ny) || 1;
       const better = (a: number, b: number, sense: string) =>
         sense === "maximize" ? a >= b - 1e-6 : a <= b + 1e-6;
       const strictlyBetter = (a: number, b: number, sense: string) =>
@@ -265,15 +267,13 @@ export default function VisualCanvasRight({
               const ox = o.objectives[safeAxisX];
               const oy = o.objectives[safeAxisY];
               return (
-                better(ox, px, senseX) &&
-                better(oy, py, senseY) &&
-                (strictlyBetter(ox, px, senseX) || strictlyBetter(oy, py, senseY))
+                better(ox / spanX, px / spanX, senseX) &&
+                better(oy / spanY, py / spanY, senseY) &&
+                (strictlyBetter(ox / spanX, px / spanX, senseX) || strictlyBetter(oy / spanY, py / spanY, senseY))
               );
             });
           });
 
-      const spanX = Math.max(1, Math.abs(ix - nx));
-      const spanY = Math.max(1, Math.abs(iy - ny));
       const curvePts: ParetoPoint[] = [];
       curveSource.forEach((p) => {
         const last = curvePts[curvePts.length - 1];
@@ -882,11 +882,12 @@ export default function VisualCanvasRight({
             )}
 
             {effectiveTab === "objectives2d" && nObjs > 2 && (
-              <div className="flex items-center gap-1">
+              <div className="grid min-w-0 w-full gap-1 sm:flex sm:flex-wrap">
                 <select
                   value={safeAxisX}
+                  aria-label="Objetivo del eje X"
                   onChange={(e) => setAxisX(parseInt(e.target.value))}
-                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
+                  className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => (
                     <option key={i} value={i}>X: {h}</option>
@@ -894,8 +895,9 @@ export default function VisualCanvasRight({
                 </select>
                 <select
                   value={safeAxisY}
+                  aria-label="Objetivo del eje Y"
                   onChange={(e) => setAxisY(parseInt(e.target.value))}
-                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
+                  className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => (
                     <option key={i} value={i}>Y: {h}</option>
@@ -905,25 +907,28 @@ export default function VisualCanvasRight({
             )}
 
             {effectiveTab === "objectives3d" && nObjs > 3 && (
-              <div className="flex items-center gap-1">
+              <div className="grid min-w-0 w-full gap-1 sm:flex sm:flex-wrap">
                 <select
                   value={safe3DX}
+                  aria-label="Objetivo del eje X"
                   onChange={(e) => setAxis3DX(parseInt(e.target.value))}
-                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
+                  className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>X: {h}</option>)}
                 </select>
                 <select
                   value={safe3DY}
+                  aria-label="Objetivo del eje Y"
                   onChange={(e) => setAxis3DY(parseInt(e.target.value))}
-                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
+                  className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>Y: {h}</option>)}
                 </select>
                 <select
                   value={safe3DZ}
+                  aria-label="Objetivo del eje Z"
                   onChange={(e) => setAxis3DZ(parseInt(e.target.value))}
-                  className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
+                  className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>Z: {h}</option>)}
                 </select>

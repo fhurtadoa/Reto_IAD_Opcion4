@@ -23,6 +23,57 @@ def example(filename):
 
 
 class TestAuditRegressions(unittest.TestCase):
+    def test_minimax_with_large_variable_bounds(self):
+        model = ModelDefinition.model_validate({
+            "name": "Escala de minimax",
+            "variables": [{"name": "x", "upper_bound": 1e9}],
+            "objectives": [
+                {"name": "Min x", "sense": "minimize", "coefficients": [1]},
+                {"name": "Max x", "sense": "maximize", "coefficients": [1]},
+            ],
+            "weights": [0.5, 0.5],
+        })
+        solutions, _ = solve_all_metrics(model, compute_payoff_matrix(model), model.weights)
+        self.assertEqual(solutions["L_inf"].status, "optimal")
+        self.assertAlmostEqual(solutions["L_inf"].variables["x"] / 1e9, 0.5)
+        self.assertAlmostEqual(solutions["L_inf"].aggregate_distance, 0.25)
+
+    def test_equivalent_constraint_row_scales(self):
+        for scale in (1e-12, 1e-10, 1.0, 1e12):
+            with self.subTest(scale=scale):
+                response = TestClient(app).post("/api/solve", json={
+                    "name": "Escala de restricción",
+                    "variables": [{"name": "x", "upper_bound": 2}],
+                    "objectives": [
+                        {"name": "Min x", "sense": "minimize", "coefficients": [1]},
+                        {"name": "Max x", "sense": "maximize", "coefficients": [1]},
+                    ],
+                    "constraints": [{"sense": ">=", "coefficients": [scale], "rhs": scale}],
+                    "weights": [0.5, 0.5],
+                })
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertEqual(data["payoff"]["ideal_point"], [1.0, 2.0])
+                self.assertEqual(data["solutions"]["L_inf"]["status"], "optimal")
+                self.assertAlmostEqual(data["solutions"]["L_inf"]["variables"]["x"], 1.5)
+                self.assertTrue(all(sol["variables"]["x"] >= 1 for sol in data["solutions"].values()))
+
+    def test_pareto_preserves_tradeoff_under_rescaling(self):
+        response = TestClient(app).post("/api/solve", json={
+            "name": "Canje",
+            "variables": [{"name": "x", "upper_bound": 1}, {"name": "y", "upper_bound": 1}],
+            "objectives": [
+                {"name": "Min x", "sense": "minimize", "coefficients": [5e-7, 0]},
+                {"name": "Min y", "sense": "minimize", "coefficients": [0, 1]},
+            ],
+            "constraints": [{"sense": ">=", "coefficients": [1, 1], "rhs": 1}],
+        })
+        self.assertEqual(response.status_code, 200)
+        points = response.json()["pareto_points"]
+        self.assertGreater(len(points), 2)
+        self.assertAlmostEqual(min(p["objectives"][1] for p in points), 0)
+        self.assertAlmostEqual(max(p["objectives"][1] for p in points), 1)
+
     def test_celdas_l2_matches_analytic_solution(self):
         model = example("01_celdas_fotovoltaicas.json")
         solutions, _ = solve_all_metrics(model, compute_payoff_matrix(model), model.weights)

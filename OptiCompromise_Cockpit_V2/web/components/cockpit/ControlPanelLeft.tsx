@@ -333,6 +333,12 @@ export default function ControlPanelLeft({
   };
 
   const handleApplyAlgebraic = () => {
+    if (algebraicText === modelToAlgebraicText(model)) {
+      setAlgebraicDirty(false);
+      setAlgebraicErrors([]);
+      onManualSolve(model, weights);
+      return;
+    }
     const parsed = parseAlgebraicModel(algebraicText, model);
     if (!parsed.ok || !parsed.objectives || !parsed.constraints || !parsed.detectedVariables) {
       setAlgebraicErrors(parsed.errors);
@@ -341,7 +347,7 @@ export default function ControlPanelLeft({
 
     const updatedVars = parsed.detectedVariables.map((vName) => {
       const existing = model.variables.find(
-        (v) => v.name === vName || v.name.split(" ")[0].trim() === vName.split(" ")[0].trim()
+        (v) => v.name === vName
       );
       return (
         existing || {

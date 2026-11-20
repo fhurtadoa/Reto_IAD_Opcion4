@@ -194,6 +194,19 @@ def solve_linf(
     n_objs = len(model.objectives)
     A_ub_orig, b_ub_orig, A_eq_orig, b_eq_orig, bounds_orig, integrality_orig = build_linear_constraints(model)
 
+    # Solve in scaled coordinates for large continuous variables. Integer
+    # coordinates stay unchanged to preserve their original lattice.
+    column_scale = np.array([
+        max(1.0, abs(lo or 0.0), abs(hi or 0.0))
+        if integrality_orig is None or not integrality_orig[j] else 1.0
+        for j, (lo, hi) in enumerate(bounds_orig)
+    ])
+    column_scale[column_scale < 1e4] = 1.0
+    scaled_bounds = [
+        tuple(None if bound is None else bound / scale for bound in bounds)
+        for bounds, scale in zip(bounds_orig, column_scale)
+    ]
+
     c_inf = np.zeros(n_vars + 1, dtype=float)
     c_inf[-1] = 1.0
 
@@ -202,12 +215,12 @@ def solve_linf(
     b_ub_list = []
 
     if A_ub_orig is not None and len(A_ub_orig) > 0:
-        A_ub_padded = np.hstack([A_ub_orig, np.zeros((len(A_ub_orig), 1))])
+        A_ub_padded = np.hstack([A_ub_orig * column_scale, np.zeros((len(A_ub_orig), 1))])
         A_ub_list.append(A_ub_padded)
         b_ub_list.append(b_ub_orig)
 
     # Restricciones auxiliares de minimax: w_i * alpha_i^T @ x - lambda <= - w_i * beta_i
-    A_minimax = np.hstack([weights[:, np.newaxis] * alpha, -np.ones((n_objs, 1))])
+    A_minimax = np.hstack([weights[:, np.newaxis] * alpha * column_scale, -np.ones((n_objs, 1))])
     b_minimax = - weights * beta
 
     A_ub_list.append(A_minimax)
@@ -220,11 +233,11 @@ def solve_linf(
     A_eq_total = None
     b_eq_total = None
     if A_eq_orig is not None and len(A_eq_orig) > 0:
-        A_eq_total = np.hstack([A_eq_orig, np.zeros((len(A_eq_orig), 1))])
+        A_eq_total = np.hstack([A_eq_orig * column_scale, np.zeros((len(A_eq_orig), 1))])
         b_eq_total = b_eq_orig
 
     # Cotas ampliadas: cotas de x y lambda >= 0
-    bounds_total = list(bounds_orig) + [(0.0, None)]
+    bounds_total = scaled_bounds + [(0.0, None)]
 
     # Integrality ampliada (lambda es continua)
     integrality_total = None
@@ -254,18 +267,24 @@ def solve_linf(
         )
 
     tie = linprog(
-        np.append(alpha.sum(axis=0), 0.0),
+        np.append(alpha.sum(axis=0) * column_scale, 0.0),
         A_ub=A_ub_total,
         b_ub=b_ub_total,
         A_eq=A_eq_total,
         b_eq=b_eq_total,
-        bounds=list(bounds_orig) + [(res.x[-1], res.x[-1])],
+        bounds=scaled_bounds + [(res.x[-1], res.x[-1])],
         integrality=integrality_total,
         method="highs",
     )
     x = tie.x if tie.success else res.x
-    x_opt = _clean_solution_vector(x[:n_vars], bounds_orig, integrality_orig)
-    return format_solution("L_inf", x_opt, model, payoff, alpha, beta, weights, status="optimal")
+    x_opt = _clean_solution_vector(x[:n_vars] * column_scale, bounds_orig, integrality_orig)
+    if not _is_feasible(x_opt, A_ub_orig, b_ub_orig, A_eq_orig, b_eq_orig, bounds_orig, integrality_orig):
+        return MetricSolution(metric="L_inf", variables={}, objectives=[], achievement_pct=[],
+                              normalized_distances=[], aggregate_distance=0.0,
+                              status="error: la solución minimax no cumple el modelo original")
+    distance = np.max(weights * (alpha @ x_opt + beta))
+    status = "optimal" if abs(distance - res.x[-1]) <= 1e-7 else "feasible_suboptimal"
+    return format_solution("L_inf", x_opt, model, payoff, alpha, beta, weights, status=status)
 
 def _is_feasible(
     x: np.ndarray,

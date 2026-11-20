@@ -145,8 +145,9 @@ def compute_pareto_frontier(
 
     # Primero quedarnos con todos los puntos no dominados
     efficient_candidates: List[ParetoPoint] = []
-    for p in raw_points:
-        if not any(is_dominated(p.objectives, other.objectives, senses) for other in raw_points):
+    normalized = [(np.array(p.objectives) - ideal) / scales for p in raw_points]
+    for p, coords in zip(raw_points, normalized):
+        if not any(is_dominated(coords, other, senses) for other in normalized):
             efficient_candidates.append(p)
 
     # Priorizar que queden representadas todas las métricas (L1 en extremos, L2 y L_inf en interiores)

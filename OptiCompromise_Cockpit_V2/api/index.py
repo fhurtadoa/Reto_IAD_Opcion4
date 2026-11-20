@@ -113,13 +113,13 @@ def _validate_model(model: ModelDefinition) -> None:
             raise HTTPException(status_code=400, detail=f"El objetivo #{idx + 1} debe tener un nombre no vacío.")
         if len(o.coefficients) > len(model.variables):
             raise HTTPException(status_code=400, detail=f"El objetivo «{o.name}» tiene más coeficientes que variables.")
-        if o.expression and not o.coefficients:
+        if o.expression:
             raise HTTPException(status_code=400, detail=f"Convierte «{o.name}» a coeficientes lineales antes de resolver.")
         if any(not math.isfinite(c) for c in o.coefficients):
             raise HTTPException(status_code=400, detail=f"Coeficientes inválidos (NaN/Inf) en objetivo '{o.name}'.")
 
     for idx, c in enumerate(model.constraints):
-        if len(c.coefficients) > len(model.variables) or (c.expression and not c.coefficients):
+        if len(c.coefficients) > len(model.variables) or c.expression:
             raise HTTPException(status_code=400, detail=f"Revisa los coeficientes lineales de la restricción {idx + 1}.")
         if not math.isfinite(c.rhs) or any(not math.isfinite(coef) for coef in c.coefficients):
             raise HTTPException(status_code=400, detail=f"Valores numéricos inválidos (NaN/Inf) en restricción #{idx + 1}.")
