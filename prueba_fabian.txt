@@ -1,0 +1,4 @@
+Prueba de conexion y sincronizacion con GitHub.
+Todo melo: trabajando directo en C:\Repos Github\Reto_IAD_Opcion4.
+Backend y Frontend corriendo sin lios.
+Saludos a Fabian.
