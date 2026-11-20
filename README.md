@@ -1,6 +1,4 @@
-# 🧭 OptiCompromise
-
-La implementación auditada para el concurso está en [OptiCompromise Cockpit V2](OptiCompromise_Cockpit_V2/README.md). Su [documento técnico y matriz de trazabilidad](OptiCompromise_Cockpit_V2/docs/auditoria-iad.md) incluye la declaración de uso de OpenAI Codex y los resultados de validación. Las instrucciones siguientes corresponden a la versión anterior ubicada en la raíz.
+# 🧭 OptiCompromise — Cockpit V2
 ## Herramienta de Optimización Multiobjetivo por Programación de Compromiso
 ### Asignatura: Introducción al Análisis de Decisiones (IAD) | Facultad de Minas – Universidad Nacional de Colombia (Sede Medellín)
 **Docente:** Profesora Patricia Jaramillo Álvarez, PhD  
@@ -17,81 +15,121 @@ La implementación auditada para el concurso está en [OptiCompromise Cockpit V2
 
 ## 🎯 Objetivo de la Herramienta (Opción 4 del Concurso IAD)
 
-OptiCompromise es una plataforma interactiva, educativa y de código abierto concebida para sustituir las herramientas comerciales privativas (como Evolver/Optimizer de Lumivero). Permite formular, analizar y resolver problemas de decisión multiobjetivo continuos, encontrando las soluciones compromiso óptimas respecto al **Punto Ideal** bajo distintas métricas de distancia:
+**OptiCompromise Cockpit V2** es una aplicación web interactiva, educativa y de código abierto diseñada para formular, analizar y resolver problemas de optimización multiobjetivo lineales (continuos y enteros mixtos), encontrando las soluciones compromiso más cercanas al **Punto Ideal ($Z^*$)** bajo tres métricas de distancia normalizada respecto al rango de la matriz de pagos:
 
-1. **Métrica $L_1$ (Manhattan):** Resuelta como Programación Lineal (LP). Modela un decisor con efecto compensatorio entre objetivos.
-2. **Métrica $L_2$ (Euclidiana):** Resuelta como Programación Cuadrática Convexa (QP) con `scipy.optimize.minimize(method='SLSQP')`. Genera un compromiso suave sin saltos abruptos.
-3. **Métrica $L_\infty$ (Tchebysheff / Minimax):** Linealizada mediante variable auxiliar $\lambda$. Garantiza equidad y equilibrio estricto entre objetivos ($Z'_1 = Z'_2 = \dots = Z'_q$ bajo pesos iguales).
-4. **Frontera Eficiente de Pareto:** Aproximación y trazado de las soluciones no dominadas en el espacio de objetivos 2D y 3D.
-5. **Módulos de Bonificación (+10 pts):**
-   * Soporte de variables enteras y binarias (MIP con HiGHS).
-   * Visualización interactiva para 3 objetivos en 3D con Plotly.
-   * Optimización bajo restricciones y funciones no lineales (SLSQP).
+1. **Métrica $L_1$ (Manhattan):** Programación Lineal (LP/MILP con **HiGHS**). Modela un decisor utilitarista/compensatorio que minimiza $\sum w_i D_i(x)$.
+2. **Métrica $L_2$ (Euclidiana):** Programación Cuadrática Convexa (QP con `SLSQP` y jacobiano analítico; y Branch-and-Bound Best-First para modelos MIP). Minimiza $\sqrt{\sum (w_i D_i(x))^2}$, según las ecuaciones de Clase 15 (pp. 9 y 19).
+3. **Métrica $L_\infty$ (Tchebysheff / Minimax):** Programación Lineal minimax mediante variable auxiliar $\lambda$ ($\min \lambda$ s.a. $w_i D_i(x) \le \lambda$), con **Modo Rayos X** que muestra las restricciones linealizadas en LaTeX. Reduce la mayor brecha ponderada. Los logros pueden coincidir cuando varias restricciones minimax quedan activas.
+4. **Frontera Eficiente de Pareto:** Aproximación combinando barridos sistemáticos de pesos sobre $L_1$, $L_2$ y $L_\infty$, con visualización 2D (curvas de isodistancia y proyección factible), 3D interactiva, Radar de % de logro y Espacio de Decisiones (para 2 variables, incluyendo malla discreta en MIP).
+5. **Módulos de Bonificación Implementados (sujetos a evaluación del jurado):**
+   * **≥ 3 Objetivos e Interactividad 3D:** Soporte completo para 3 o más criterios en editor, matriz de pagos, gráfico 3D rotatorio en Plotly y diagrama Radar.
+   * **Programación Entera y Binaria (MIP):** Variables `continuous`, `integer` y `binary` resueltas con HiGHS ($L_1, L_\infty$) y Branch-and-Bound con límite de búsqueda y estado de optimalidad ($L_2$), con frontera discreta diferenciada en 2D.
+6. **Exportación e Interoperabilidad Académica:**
+   * **Plantillas descargables (`.xlsx` y `.csv`)**: [`plantilla-ejercicio-iad.xlsx`](web/public/plantilla-ejercicio-iad.xlsx), [`plantilla-produccion-papel.xlsx`](web/public/plantilla-produccion-papel.xlsx), [`plantilla-ejercicio-iad.csv`](web/public/plantilla-ejercicio-iad.csv) y [`plantilla-produccion-papel.csv`](web/public/plantilla-produccion-papel.csv), accesibles desde la barra superior.
+   * **Libro Excel de resultados estilizado (5 hojas)**: `Resumen_Ejecutivo`, `Matriz_de_Pagos`, `Soluciones_Compromiso`, `Frontera_Pareto` (cuando aplica) y `Modelo` (100% re-importable), junto con exportación en **JSON** y **CSV** re-importable.
+
+*(Nota de alcance: El motor resuelve modelos lineales y enteros mixtos; el soporte para funciones objetivo o restricciones no lineales arbitrarias no está incluido en esta versión).*
 
 ---
 
-## 📐 Casos de Validación del Curso (Verificados al 100%)
+### Sensibilidad de pesos
 
-La herramienta incluye pruebas automatizadas en `api/tests/` que reproducen los ejercicios oficiales del curso:
+En modelos biobjetivo, **Sensibilidad de pesos** compara $L_1$, $L_2$ y $L_\infty$ en 21 pesos entre 0 y 1. La línea punteada sigue el peso seleccionado y los marcadores grandes muestran el último cálculo del motor. Se pueden exportar juntos los tres paneles como PNG. El barrido conserva las muestras repetidas y usa los pesos exactos en los extremos. Consulta el [criterio numérico y la evidencia](docs/auditoria-iad.md#sensibilidad-y-segunda-iteración).
 
-| Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Anti-Ideal ($Z^{peor}$) | Solución $L_1$ ($w=0.5$) | Solución $L_\infty$ ($w=0.5$) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Planificación Celdas (Clase 15)** | 2 | 2 (Utilidad vs Contam) | $(800.000, -200)$ | $(300.000, -600)$ | $x=[0, 200] \implies Z_1=600k, Z_2=-400$ ($Z'_1=60\%, Z'_2=50\%$) | $x=[0, 191] \implies Z_1=572.7k, Z_2=-381.8$ ($Z'_1=Z'_2=54.55\%$) |
-| **Transporte (Taller 3)** | 12 | 2 (Costo vs Riesgo) | $(16.800, 2.600)$ | $(18.500, 5.700)$ | $Z_1=17.400, Z_2=3.600$ ($Z'_1=64.7\%, Z'_2=67.7\%$) | $Z_1=17.382, Z_2=3.662$ ($Z'_1=Z'_2=65.75\%$) |
-| **Triobjetivo 3D (Bonus)** | 3 | 3 (Económico, Ambiental, Social) | Verificado en 3D | Verificado en 3D | Compromiso ponderado | Equilibrio tripartito |
+## 📐 Casos de Validación del Curso y Pruebas Automatizadas
+
+La suite en `api/tests/` (**66 pruebas automatizadas**) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
+
+| Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Nadir aproximado ($Z_{\text{peor}}$) | Solución $L_1$ | Solución $L_2$ | Solución $L_\infty$ |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Celdas Fotovoltaicas (Clase 15)** ($w=[0.5, 0.5]$) | 2 cont. | 2 (Max Utilidad, Min Contam.) | $(800.000,\; 200)$ | $(300.000,\; 600)$ | $x=[0, 200] \Rightarrow Z=(600k, 400)$ ($60.0\% / 50.0\%$) | $x=[0, 198.36] \Rightarrow Z=(595.1k, 396.7)$ ($59.0\% / 50.8\%$) | $x=[0, 190.91] \Rightarrow Z=(572.7k, 381.8)$ ($54.55\% = 54.55\%$) |
+| **Transporte (Taller 3)** ($w=[0.5, 0.5]$) | 12 cont. | 2 (Min Costo, Min Riesgo) | $(16.800,\; 2.600)$ | $(18.500,\; 5.700)$ | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17\,382.32,\; 3\,661.88)$ ($65.75\% = 65.75\%$) |
+
+Los ejemplos de **Producción de Papel (Taller 1/3)**, **Sostenibilidad 3D**, **Producción Mixta MIP** y **Flota de Vehículos Eléctricos (4Z)** cuentan con pruebas automatizadas de validación, soporte triobjetivo/cuatriobjetivo e integralidad. Consulta la [matriz de trazabilidad y validación](docs/auditoria-iad.md), la [guía de la interfaz actual](docs/guia-de-uso.md) y el [informe de estabilización](../ESTABILIZACION_FINAL_OPTICOMPROMISE.md).
 
 ---
 
 ## 🚀 Guía de Ejecución y Despliegue
 
-### Opción A: Despliegue Web en Vercel (Recomendado)
-1. Conectar este repositorio de GitHub a tu cuenta de [Vercel](https://vercel.com).
-2. Vercel detecta automáticamente el frontend de Next.js (`web/`) y las funciones serverless de Python (`api/`).
-3. La entrega requiere una URL estable validada. Consulta las [instrucciones de Cockpit V2](OptiCompromise_Cockpit_V2/README.md) para la versión candidata.
-
-### Opción B: Ejecución en Google Colab
-Abrir el cuaderno autónomo [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Colab.ipynb) en Google Colab. No requiere clonar repositorios externos ni configurar tokens; se ejecuta directamente en las celdas del notebook.
-
-### Opción C: Ejecución Local
+### Opción A: Ejecución Local (Frontend `3001` + Backend `8001`)
 ```bash
-# 1. Iniciar backend FastAPI (Python 3.10+)
-cd api
-python3 -m pip install -r requirements.txt
-uvicorn index:app --reload --port 8000
+# 1. Iniciar backend FastAPI desde la carpeta raíz del proyecto (OptiCompromise_Cockpit_V2/)
+python3 -m pip install -r api/requirements-dev.txt
+uvicorn api.index:app --reload --host 127.0.0.1 --port 8001
 
-# 2. Iniciar frontend Next.js en otra terminal
+# 2. En otra terminal, iniciar frontend Next.js (proxy /api -> 127.0.0.1:8001)
 cd web
-npm install
+npm ci
 npm run dev
-# Abrir http://localhost:3000
+# Abrir http://localhost:3001
+```
+
+### Opción B: Despliegue Web en Vercel
+1. Conectar el repositorio de GitHub a [Vercel](https://vercel.com) seleccionando como *Root Directory* la carpeta del proyecto (`OptiCompromise_Cockpit_V2` si se mantiene dentro de un monorepo, o la raíz si se promueve como repositorio principal).
+2. [`vercel.json`](vercel.json) compila `web/` con Next.js 15 (`15.5.29`), enruta `/api/(.*)` hacia la función serverless [`api/index.py`](api/index.py) e incluye `examples/**` mediante `includeFiles`.
+
+### Opción C: Ejecución Autónoma en Google Colab
+Abrir el cuaderno [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Colab.ipynb) en Google Colab y ejecutar todas las celdas en orden (*Entorno de ejecución → Ejecutar todas*). Incluye una copia del motor web y no requiere clonar repositorios externos. Para volver a incorporar el motor tras modificarlo, ejecuta `python3 colab/sync_engine.py` desde Cockpit V2.
+
+---
+
+## 🧪 Pruebas Automatizadas y Verificación de Calidad
+
+```bash
+# Pruebas unitarias y de validación matemática del motor (66 pruebas en api/tests/)
+cd api
+PYTHONPATH=. python3 -m unittest discover tests/ -v
+
+# Verificación estricta de TypeScript, ESLint y compilación de producción (Next.js 15)
+cd ../web
+npx tsc --noEmit && npm run lint && npm run build
 ```
 
 ---
 
-## 🧪 Pruebas Automatizadas del Motor
+## 📦 Entregables del Concurso (Sección 10)
 
-Para ejecutar la suite de pruebas unitarias y verificar la exactitud de los cálculos:
-```bash
-cd api
-PYTHONPATH=. python3 -m unittest discover tests/ -v
-```
+* **E3 — Herramienta final y código fuente:** Aplicación **Next.js 15 (`15.5.29`)** + **FastAPI** + **SciPy** + **openpyxl** + **SheetJS CE (`0.20.3`)**, `README.md`, `LICENSE` (MIT), **66 pruebas automatizadas** en `api/tests/` y cuaderno autónomo en Google Colab (`colab/OptiCompromise_Colab.ipynb`).
+* **E4 — Modelos de ejemplo y plantillas docentes:** Seis ejercicios en [el catálogo de modelos](examples/), plantillas descargables en [`web/public/`](web/public/) ([`plantilla-ejercicio-iad.xlsx`](web/public/plantilla-ejercicio-iad.xlsx), [`plantilla-produccion-papel.xlsx`](web/public/plantilla-produccion-papel.xlsx), [`plantilla-ejercicio-iad.csv`](web/public/plantilla-ejercicio-iad.csv), [`plantilla-produccion-papel.csv`](web/public/plantilla-produccion-papel.csv)), la guía en Markdown [`GUIA_DOCENTE_CARGA_EJERCICIOS.md`](GUIA_DOCENTE_CARGA_EJERCICIOS.md) y el manual compilado [`MANUAL_DOCENTE_OPTICOMPROMISE.pdf`](MANUAL_DOCENTE_OPTICOMPROMISE.pdf) (referencia complementaria: [`GUIA_PARA_AGREGAR_EJERCICIOS.md`](GUIA_PARA_AGREGAR_EJERCICIOS.md)).
+* **E5 — Guías y Manuales V2:** [Guía web actual](docs/guia-de-uso.md) con capturas y glosario; [`MANUAL_DE_USUARIO_Y_CASOS_DE_USO_OPTICOMPROMISE.pdf`](MANUAL_DE_USUARIO_Y_CASOS_DE_USO_OPTICOMPROMISE.pdf) actualizado a Cockpit V2 (accesible desde **Manual PDF** en la barra superior); y [`MANUAL_DOCENTE_OPTICOMPROMISE.pdf`](MANUAL_DOCENTE_OPTICOMPROMISE.pdf) (accesible desde **Guía Docente PDF** en la barra superior).
+* **E6 — Video demostrativo (5–8 min):** *Pendiente de grabación y publicación — ver checklist inferior.*
+
+---
+
+## ✅ Checklist Pendiente Antes de Entrega Final
+
+- **[Pendiente E3]:** Desplegar versión final en producción (Vercel u otro hosting con `OptiCompromise_Cockpit_V2` como raíz) y verificar permisos públicos en Google Colab.
+- **[Pendiente E6]:** Grabar el video demostrativo de **5 a 8 minutos** y pegar el enlace definitivo aquí.
+- **[Pendiente Git]:** Revisar cambios locales y hacer `git push` cuando estén listos.
 
 ---
 
 ## 🤖 Declaración de Uso de Inteligencia Artificial
 
 En cumplimiento con la Sección 12 de las Bases del Concurso:
-* Se utilizó Inteligencia Artificial (asistente Antigravity / Gemini) como soporte técnico para la estructuración de la arquitectura de software, aceleración de la interfaz gráfica y redacción de pruebas unitarias.
-* Toda la formulación matemática, relaciones de equivalencia minimax, funciones de distancia normalizada y lógica de las métricas $L_1, L_2, L_\infty$ fueron rigurosamente validadas por los autores contra los teoremas y cuadernos de clase de la profesora Patricia Jaramillo Álvarez.
-* Ambos integrantes dominan la totalidad del código y los fundamentos teóricos para la sustentación individual (E7).
+* Se utilizó Inteligencia Artificial (asistentes de programación Gemini / Antigravity y OpenAI Codex) como apoyo para la estructuración modular del frontend en React/Next.js 15, la integración de gráficos Plotly/KaTeX, la generación de plantillas y libros Excel estilizados, el diseño de las **66 pruebas automatizadas**, la auditoría frente al material de IAD y la actualización de la documentación técnica y manuales PDF. Los autores han revisado la versión entregada y están en capacidad de explicar y modificar el método durante la sustentación individual.
 
 ---
 
 ## 📜 Licencia y Créditos
 
-Este software está protegido bajo la [Licencia MIT](LICENSE), permitiendo su uso, modificación y distribución con fines académicos en la Universidad Nacional de Colombia.
+Este software se distribuye bajo la **[Licencia MIT](LICENSE)**, autorizando su uso, modificación y distribución académica en la Universidad Nacional de Colombia.
 
-* **Bibliotecas base:** SciPy (`scipy.optimize`), NumPy, FastAPI, Next.js, React, Plotly.js, KaTeX, Tailwind CSS.
-* **Bibliografía:**
-  * Romero, C. (1993). *Teoría de la decisión multicriterio: conceptos, técnicas y aplicaciones*. Alianza Editorial.
-  * Jaramillo Álvarez, P. (2026). *Material docente y diapositivas de Introducción al Análisis de Decisiones*. Universidad Nacional de Colombia.
+### Bibliotecas de Código Abierto Utilizadas y Sus Licencias (Sección 12)
+* **SciPy** (`scipy.optimize`: HiGHS & SLSQP) — Licencia **BSD-3-Clause**
+* **NumPy** — Licencia **BSD-3-Clause**
+* **FastAPI** — Licencia **MIT**
+* **Pydantic** — Licencia **MIT**
+* **Next.js (`15.5.29`)** & **React** — Licencia **MIT**
+* **Plotly.js** & **react-plotly.js** — Licencia **MIT**
+* **KaTeX** — Licencia **MIT**
+* **Tailwind CSS** — Licencia **MIT**
+* **Lucide React** — Licencia **ISC**
+* **openpyxl** — Licencia **MIT**
+* **SheetJS CE (`0.20.3`)** — Licencia **Apache-2.0**
+* **ReportLab** & **Matplotlib** (generación de manuales PDF) — Licencias **BSD** / **PSF-based**
+
+### Referencias Bibliográficas
+* Romero, C. (1993). *Teoría de la decisión multicriterio: conceptos, técnicas y aplicaciones*. Alianza Editorial.
+* Zeleny, M. (1973). *Compromise Programming*. En Cochrane, J. L. & Zeleny, M. (Eds.), *Multiple Criteria Decision Making*. University of South Carolina Press.
+* Jaramillo Álvarez, P. (2026). *Material docente, diapositivas (Clase 15) y cuadernos de taller de Introducción al Análisis de Decisiones (IAD)*. Universidad Nacional de Colombia – Sede Medellín.
