@@ -419,7 +419,11 @@ export default function OptiCompromiseCockpitPage() {
           if (completed) exportResultsCSV(completed.model, completed.result);
         }}
         onExportExcel={() => {
-          if (completed) exportResultsExcel(completed.model, completed.result);
+          if (completed) {
+            void exportResultsExcel(completed.model, completed.result).catch((err) => {
+              console.error("Error al exportar libro Excel:", err);
+            });
+          }
         }}
         canExportResults={Boolean(!hasAlgebraicDraft && solveResult && (solverStatus === "optimal" || solverStatus === "partial"))}
       />

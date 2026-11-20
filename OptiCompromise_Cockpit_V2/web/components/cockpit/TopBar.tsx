@@ -249,9 +249,12 @@ export default function TopBar({
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
-        <span className="text-slate-600 dark:text-slate-300">Abre un ejercicio o importa una copia para esta sesión.</span>
-        <a className="section-cue-link" href="/plantilla-ejercicio-iad.csv" download>Descargar plantilla CSV</a>
-        <a className="section-cue-link" href="/plantilla-produccion-papel.csv" download>Ver ejemplo diligenciado</a>
+        <span className="text-slate-600 dark:text-slate-300">Abre un ejercicio o importa una copia para esta sesión:</span>
+        <a className="section-cue-link" href="/plantilla-ejercicio-iad.xlsx" download>Plantilla Excel (.xlsx)</a>
+        <a className="section-cue-link" href="/plantilla-produccion-papel.xlsx" download>Ejemplo Excel (Papel)</a>
+        <a className="section-cue-link" href="/plantilla-ejercicio-iad.csv" download>Plantilla CSV</a>
+        <a className="section-cue-link" href="/plantilla-produccion-papel.csv" download>Ejemplo CSV (Papel)</a>
+        <a className="section-cue-link" href="/MANUAL_DOCENTE_OPTICOMPROMISE.pdf" target="_blank" rel="noopener noreferrer">Guía Docente PDF</a>
       </div>
       {catalogNotice && <p className="mt-2 text-xs text-amber-800 dark:text-amber-200" role="status">{catalogNotice}</p>}
     </header>

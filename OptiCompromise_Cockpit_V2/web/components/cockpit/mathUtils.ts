@@ -871,18 +871,44 @@ function buildTabularModelRows(
  */
 export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) {
   const rows: string[][] = [];
+  const headers = result.payoff.headers;
+  const conflictRanges = headers.map((_, i) =>
+    result.payoff.normalization_ranges?.[i] ??
+    Math.abs((result.payoff.ideal_point[i] ?? 0) - (result.payoff.anti_ideal_point[i] ?? 0))
+  );
+
   rows.push(["OptiCompromise - Reporte de Resultados Multiobjetivo"]);
   rows.push(["Modelo", model.name]);
+  rows.push(["Descripción", model.description || "—"]);
+  rows.push(["Fuente académica", model.reference || "—"]);
+  rows.push(["Estado del solver", result.status, result.message || ""]);
+  rows.push([]);
+
+  // Vector de Pesos Aplicados y Rangos de Conflicto
+  rows.push(["VECTOR DE PESOS APLICADOS"]);
+  rows.push(["Objetivo", "Sentido", "Peso (%)", "Punto Ideal (Z*)", "Nadir aproximado", "Rango de Conflicto (R_i)"]);
+  model.objectives.forEach((obj, i) => {
+    const weight = result.weights[i] ?? 1 / Math.max(model.objectives.length, 1);
+    rows.push([
+      obj.name,
+      obj.sense,
+      `${(weight * 100).toFixed(2)}%`,
+      String(result.payoff.ideal_point[i] ?? ""),
+      String(result.payoff.anti_ideal_point[i] ?? ""),
+      String(conflictRanges[i] ?? ""),
+    ]);
+  });
   rows.push([]);
 
   // Matriz de Pagos
   rows.push(["MATRIZ DE PAGOS"]);
-  rows.push(["Solución Óptima de:", ...result.payoff.headers]);
+  rows.push(["Solución Óptima de:", ...headers]);
   result.payoff.matrix.forEach((row, idx) => {
-    rows.push([result.payoff.headers[idx], ...row.map(String)]);
+    rows.push([headers[idx], ...row.map(String)]);
   });
   rows.push(["Punto Ideal (Z*)", ...result.payoff.ideal_point.map(String)]);
   rows.push(["Nadir aproximado (peor observado en pagos)", ...result.payoff.anti_ideal_point.map(String)]);
+  rows.push(["Rango de Conflicto (R_i)", ...conflictRanges.map(String)]);
   rows.push([]);
 
   // Soluciones Compromiso
@@ -893,8 +919,8 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
     "Estado",
     "Distancia D_p",
     ...varNames,
-    ...result.payoff.headers.map((h) => `Z: ${h}`),
-    ...result.payoff.headers.map((h) => `% Logro: ${h}`),
+    ...headers.map((h) => `Z: ${h}`),
+    ...headers.map((h) => `% Logro: ${h}`),
   ]);
 
   (["L1", "L2", "L_inf"] as const).forEach((key) => {
@@ -924,11 +950,12 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
     .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     .join("\n");
 
+  const safeName = model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "modelo";
   const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `resultados_${model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.csv`;
+  a.download = `resultados_${safeName}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1083,53 +1110,161 @@ export function computeDiscreteFeasiblePoints2D(
   return xs.length > 0 ? { x: xs, y: ys } : null;
 }
 
-/**
- * Exporta un libro Excel (.xlsx) profesional con múltiples hojas:
- * Matriz de pagos, soluciones compromiso y muestra de Pareto.
- */
-export function exportResultsExcel(model: ModelDefinition, result: SolveResponse) {
+function autoFitSheetCols(rows: Array<Array<unknown>>, minWidth = 12, maxWidth = 44): XLSX.ColInfo[] {
+  const maxCols = rows.reduce((acc, r) => Math.max(acc, r.length), 0);
+  return Array.from({ length: maxCols }, (_, colIdx) => {
+    let best = minWidth;
+    for (const row of rows) {
+      const val = row[colIdx];
+      if (val === null || val === undefined || val === "") continue;
+      const len = String(val).length;
+      best = Math.max(best, Math.min(maxWidth, len + 4));
+    }
+    return { wch: best };
+  });
+}
+
+function exportResultsExcelLocalFallback(model: ModelDefinition, result: SolveResponse, filename: string) {
   const wb = XLSX.utils.book_new();
   const headers = result.payoff.headers;
   const varNames = model.variables.map((v) => v.name);
+  const conflictRanges = headers.map((_, i) =>
+    result.payoff.normalization_ranges?.[i] ??
+    Math.abs((result.payoff.ideal_point[i] ?? 0) - (result.payoff.anti_ideal_point[i] ?? 0))
+  );
 
-  const payoffRows = [
+  // Hoja 1: Resumen Ejecutivo
+  const summaryRows: Array<Array<string | number | null>> = [
+    ["OptiCompromise Cockpit V2 - Resumen Ejecutivo"],
+    ["Modelo", model.name],
+    ["Descripción", model.description || "—"],
+    ["Fuente académica", model.reference || "—"],
+    [
+      "Dimensiones",
+      `${model.variables.length} variables · ${model.objectives.length} objetivos · ${model.constraints.length} restricciones`,
+    ],
+    ["Estado del solver", result.status, result.message || ""],
+    [],
+    ["Preferencias del Decisor (Pesos)"],
+    ["#", "Objetivo", "Sentido", "Peso (%)", "Punto Ideal (Z*)", "Rango de Conflicto (R_i)"],
+    ...model.objectives.map((obj, i) => [
+      i + 1,
+      obj.name,
+      obj.sense,
+      `${((result.weights[i] ?? 1 / Math.max(model.objectives.length, 1)) * 100).toFixed(2)}%`,
+      result.payoff.ideal_point[i] ?? null,
+      conflictRanges[i] ?? null,
+    ]),
+    [],
+    ["Comparativa de Métricas"],
+    ["Métrica", "Estado", "Distancia D_p"],
+    ...(["L1", "L2", "L_inf"] as const).flatMap((key) => {
+      const sol = result.solutions[key];
+      if (!sol) return [];
+      return [[key, sol.status, sol.objectives.length ? sol.aggregate_distance : null]];
+    }),
+  ];
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  wsSummary["!cols"] = autoFitSheetCols(summaryRows);
+  XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen_Ejecutivo");
+
+  // Hoja 2: Matriz de Pagos
+  const payoffRows: Array<Array<string | number | null>> = [
     ["Óptimo Individual", ...headers],
     ...result.payoff.matrix.map((row, i) => [headers[i], ...row]),
     ["Punto Ideal (Z*)", ...result.payoff.ideal_point],
     ["Nadir aproximado (peor observado en pagos)", ...result.payoff.anti_ideal_point],
+    ["Rango de Conflicto (R_i)", ...conflictRanges],
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(payoffRows), "Matriz_de_Pagos");
+  const wsPayoff = XLSX.utils.aoa_to_sheet(payoffRows);
+  wsPayoff["!cols"] = autoFitSheetCols(payoffRows);
+  XLSX.utils.book_append_sheet(wb, wsPayoff, "Matriz_de_Pagos");
 
-  const solRows = [
-    ["Métrica", "Estado", "Distancia D_p", ...varNames,
-      ...headers.map((name) => `${name} (Real)`), ...headers.map((name) => `${name} (% Logro)`)],
+  // Hoja 3: Soluciones de Compromiso
+  const solRows: Array<Array<string | number | null>> = [
+    [
+      "Métrica",
+      "Estado",
+      "Distancia D_p",
+      ...varNames,
+      ...headers.map((name) => `${name} (Real)`),
+      ...headers.map((name) => `${name} (% Logro)`),
+    ],
     ...(["L1", "L2", "L_inf"] as const).flatMap((key) => {
       const sol = result.solutions[key];
       if (!sol) return [];
-      return [[key, sol.status, sol.objectives.length ? sol.aggregate_distance : null,
+      return [[
+        key,
+        sol.status,
+        sol.objectives.length ? sol.aggregate_distance : null,
         ...varNames.map((name) => sol.variables[name] ?? null),
         ...headers.map((_, i) => sol.objectives[i] ?? null),
-        ...headers.map((_, i) => sol.achievement_pct[i] == null ? null : `${sol.achievement_pct[i].toFixed(2)}%`)]];
+        ...headers.map((_, i) => sol.achievement_pct[i] == null ? null : `${sol.achievement_pct[i].toFixed(2)}%`),
+      ]];
     }),
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(solRows), "Soluciones_Compromiso");
+  const wsSols = XLSX.utils.aoa_to_sheet(solRows);
+  wsSols["!cols"] = autoFitSheetCols(solRows);
+  XLSX.utils.book_append_sheet(wb, wsSols, "Soluciones_Compromiso");
 
+  // Hoja 4: Frontera de Pareto
   if (result.pareto_points?.length) {
-    const paretoRows = [
+    const paretoRows: Array<Array<string | number | null>> = [
       ["#", "Métrica", "Estado del solver", ...headers, ...varNames],
       ...result.pareto_points.map((pt, i) => [
-        i + 1, pt.metric, pt.status ?? "", ...pt.objectives, ...varNames.map((name) => pt.variables[name] ?? null),
+        i + 1,
+        pt.metric,
+        pt.status ?? "",
+        ...pt.objectives,
+        ...varNames.map((name) => pt.variables[name] ?? null),
       ]),
     ];
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(paretoRows), "Frontera_Pareto");
+    const wsPareto = XLSX.utils.aoa_to_sheet(paretoRows);
+    wsPareto["!cols"] = autoFitSheetCols(paretoRows);
+    XLSX.utils.book_append_sheet(wb, wsPareto, "Frontera_Pareto");
   }
 
-  // Hoja 4: Definición tabular del Modelo (re-importable en Excel/CSV sin pérdida de cotas ni descripción)
+  // Hoja 5: Definición tabular del Modelo (100% re-importable)
+  const modelHeaders = [...MODEL_COLUMNS, ...varNames.map(coefficientColumn)];
   const modelRows = buildTabularModelRows(model, result.weights);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(modelRows), "Modelo");
+  const modelAoa: Array<Array<string | number>> = [
+    modelHeaders,
+    ...modelRows.map((row) => modelHeaders.map((h) => row[h] ?? "")),
+  ];
+  const wsModel = XLSX.utils.aoa_to_sheet(modelAoa);
+  wsModel["!cols"] = autoFitSheetCols(modelAoa);
+  XLSX.utils.book_append_sheet(wb, wsModel, "Modelo");
 
-  const safeName = model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  XLSX.writeFile(wb, `OptiCompromise_${safeName}.xlsx`);
+  XLSX.writeFile(wb, filename);
+}
+
+/**
+ * Exporta un libro Excel (.xlsx) profesional con múltiples hojas.
+ * Solicita el archivo estilizado al backend (/api/export/excel) y usa SheetJS como respaldo offline.
+ */
+export async function exportResultsExcel(model: ModelDefinition, result: SolveResponse): Promise<void> {
+  const safeName = model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "modelo";
+  const filename = `OptiCompromise_${safeName}.xlsx`;
+
+  try {
+    const res = await fetch("/api/export/excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, result }),
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    exportResultsExcelLocalFallback(model, result, filename);
+  }
 }
 
 type TabularRow = Record<string, string | number | boolean | null | undefined>;

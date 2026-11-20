@@ -3,12 +3,12 @@ API Principal de OptiCompromise en FastAPI.
 Compatible con Vercel Serverless Functions y ejecución local con uvicorn.
 """
 import math
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 import re
 import json
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 import hashlib
 from collections import OrderedDict
 from concurrent.futures import Future
@@ -22,6 +22,7 @@ try:
     from .core.pareto import compute_pareto_frontier
     from .core.sensitivity import compute_weight_sensitivity
     from .core.schemas import WeightSensitivityData
+    from .excel_export import build_results_workbook
 except (ImportError, ValueError):
     from core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint, ParetoResponse
     from core.payoff import compute_payoff_matrix
@@ -29,6 +30,7 @@ except (ImportError, ValueError):
     from core.pareto import compute_pareto_frontier
     from core.sensitivity import compute_weight_sensitivity
     from core.schemas import WeightSensitivityData
+    from excel_export import build_results_workbook
 
 app = FastAPI(
     title="OptiCompromise API",
@@ -249,6 +251,24 @@ def get_pareto_frontier(model: ModelDefinition):
     response = ParetoResponse(pareto_points=pareto_pts)
     _ensure_finite(response)
     return response
+
+
+class ExcelExportRequest(BaseModel):
+    model: ModelDefinition
+    result: SolveResponse
+
+
+@app.post("/api/export/excel")
+def export_results_excel(req: ExcelExportRequest):
+    _validate_model(req.model)
+    workbook_bytes = build_results_workbook(req.model, req.result)
+    safe_name = re.sub(r"[^a-z0-9]+", "_", req.model.name.lower()).strip("_") or "modelo"
+    filename = f"OptiCompromise_{safe_name}.xlsx"
+    return Response(
+        content=workbook_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 LEGACY_EXAMPLES = {
