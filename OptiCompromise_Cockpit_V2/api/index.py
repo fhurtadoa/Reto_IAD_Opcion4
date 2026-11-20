@@ -5,12 +5,14 @@ Compatible con Vercel Serverless Functions y ejecución local con uvicorn.
 import math
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from pathlib import Path
+import re
 import json
+from pydantic import ValidationError
 import hashlib
 from collections import OrderedDict
 from threading import Lock
-from typing import Dict, Any, Tuple, List
+from typing import Tuple, List
 
 try:
     from .core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint
@@ -194,25 +196,54 @@ def get_pareto_frontier(model: ModelDefinition):
         ]
     }
 
-@app.get("/api/examples/{example_id}")
-def get_example_model(example_id: str) -> Dict[str, Any]:
-    examples_map = {
-        "flota": "05_flota_vehiculos.json",
-        "celdas": "01_celdas_fotovoltaicas.json",
-        "transporte": "02_problema_transporte.json",
-        "mip": "03_mip_produccion.json",
-        "triobjetivo": "04_triobjetivo_3d.json"
-    }
-    filename = examples_map.get(example_id)
-    if not filename:
-        raise HTTPException(status_code=404, detail="Ejemplo no encontrado")
-        
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    file_path = os.path.join(base_dir, "examples", filename)
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail=f"Archivo {filename} no encontrado")
-        
-    with open(file_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data
+EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
+LEGACY_EXAMPLES = {
+    "celdas": "01_celdas_fotovoltaicas.json",
+    "transporte": "02_problema_transporte.json",
+    "triobjetivo": "04_triobjetivo_3d.json",
+    "mip": "03_mip_produccion.json",
+    "flota": "05_flota_vehiculos.json",
+}
+
+
+def _load_example(path: Path) -> ModelDefinition:
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
+    try:
+        model = ModelDefinition.model_validate_json(path.read_text(encoding="utf-8-sig"))
+    except ValidationError as exc:
+        field = ".".join(str(part) for part in exc.errors()[0]["loc"])
+        raise HTTPException(status_code=422, detail=f"Revisa el campo «{field or 'JSON'}» en {path.name}.") from exc
+    try:
+        _validate_model(model)
+    except HTTPException as exc:
+        raise HTTPException(status_code=422, detail=f"{path.name}: {exc.detail}") from exc
+    return model
+
+
+@app.get("/api/examples")
+def list_examples():
+    files = dict(LEGACY_EXAMPLES)
+    for path in sorted(EXAMPLES_DIR.glob("*.json")):
+        if path.stem != "blank" and path.name not in LEGACY_EXAMPLES.values() and re.fullmatch(r"[a-z0-9][a-z0-9_-]*", path.stem):
+            files.setdefault(path.stem, path.name)
+
+    exercises = []
+    errors = []
+    for exercise_id, filename in files.items():
+        try:
+            model = _load_example(EXAMPLES_DIR / filename)
+            exercises.append({
+                "id": exercise_id, "label": model.name,
+                "badge": f"{len(model.variables)} variables · {len(model.objectives)} objetivos",
+            })
+        except HTTPException as exc:
+            errors.append(str(exc.detail))
+    return {"exercises": exercises, "errors": errors}
+
+
+@app.get("/api/examples/{example_id}", response_model=ModelDefinition)
+def get_example_model(example_id: str):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", example_id) or example_id in ("blank", *[Path(f).stem for f in LEGACY_EXAMPLES.values()]):
+        raise HTTPException(status_code=404, detail="Ejercicio no encontrado.")
+    return _load_example(EXAMPLES_DIR / LEGACY_EXAMPLES.get(example_id, f"{example_id}.json"))

@@ -1,0 +1,23 @@
+﻿Seccion,Nombre,Tipo_o_Sentido,Min_o_RHS,Max_o_Peso,x1_1 (M1 Prensa),x1_2 (M1 Folio),x1_3 (M1 Imprenta),x1_4 (M1 Reciclado),x2_1 (M2 Prensa),x2_2 (M2 Folio),x2_3 (M2 Imprenta),x2_4 (M2 Reciclado),x3_1 (M3 Prensa),x3_2 (M3 Folio),x3_3 (M3 Imprenta),x3_4 (M3 Reciclado)
+Meta,Producción de papel · Taller IAD,"Tres máquinas producen cuatro tipos de papel. Determina cuántas toneladas de cada tipo producir en cada máquina para minimizar el costo y maximizar la calidad total. Cumple la demanda mínima y las horas disponibles. Datos base del Taller 1; para la variante del Taller 3, ajusta la demanda de Prensa y las preferencias según el enunciado.",,"IAD · Taller de formulación de problemas multiobjetivo, «Programación de producción de papel». Variante en Taller 3 de Métodos Continuos."
+Variable,x1_1 (M1 Prensa),continuous,0,+inf
+Variable,x1_2 (M1 Folio),continuous,0,+inf
+Variable,x1_3 (M1 Imprenta),continuous,0,+inf
+Variable,x1_4 (M1 Reciclado),continuous,0,+inf
+Variable,x2_1 (M2 Prensa),continuous,0,+inf
+Variable,x2_2 (M2 Folio),continuous,0,+inf
+Variable,x2_3 (M2 Imprenta),continuous,0,+inf
+Variable,x2_4 (M2 Reciclado),continuous,0,+inf
+Variable,x3_1 (M3 Prensa),continuous,0,+inf
+Variable,x3_2 (M3 Folio),continuous,0,+inf
+Variable,x3_3 (M3 Imprenta),continuous,0,+inf
+Variable,x3_4 (M3 Reciclado),continuous,0,+inf
+Objetivo,Costo (millones de pesos),minimize,,0.5,76,82,96,72,75,70,95,71,73,78,92,70
+Objetivo,Calidad (indicador × ton),maximize,,0.5,45,76,39,45,42,64,41,42,38,70,36,38
+Restriccion,Horas disponibles · Máquina 1,<=,5,,0.018867924528301886,0.0196078431372549,0.019230769230769232,0.023809523809523808,0,0,0,0,0,0,0,0
+Restriccion,Horas disponibles · Máquina 2,<=,3,,0,0,0,0,0.019230769230769232,0.02040816326530612,0.022222222222222223,0.022727272727272728,0,0,0,0
+Restriccion,Horas disponibles · Máquina 3,<=,3,,0,0,0,0,0,0,0,0,0.02040816326530612,0.022727272727272728,0.02127659574468085,0.025
+Restriccion,Demanda mínima · Prensa,>=,77,,1,0,0,0,1,0,0,0,1,0,0,0
+Restriccion,Demanda mínima · Folio,>=,81,,0,1,0,0,0,1,0,0,0,1,0,0
+Restriccion,Demanda mínima · Imprenta,>=,99,,0,0,1,0,0,0,1,0,0,0,1,0
+Restriccion,Demanda mínima · Reciclado,>=,105,,0,0,0,1,0,0,0,1,0,0,0,1

@@ -13,6 +13,8 @@ import {
   DecisionProfile,
   BLANK_MODEL,
   FALLBACK_CELDAS_MODEL,
+  PRESET_OPTIONS,
+  PresetOption,
 } from "../components/cockpit/types";
 import {
   exportModelJSON,
@@ -61,6 +63,23 @@ function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): str
 }
 
 export default function OptiCompromiseCockpitPage() {
+  const [catalog, setCatalog] = useState<PresetOption[]>(PRESET_OPTIONS);
+  const [catalogNotice, setCatalogNotice] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/examples", { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error();
+        const data: { exercises: PresetOption[]; errors: string[] } = await response.json();
+        setCatalog([...data.exercises, ...PRESET_OPTIONS.filter(option => option.id === "blank")]);
+        setCatalogNotice(data.errors.join(" "));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setCatalogNotice("No se pudo actualizar el catálogo. Se muestran los ejemplos básicos.");
+      });
+    return () => controller.abort();
+  }, []);
+
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [selectedPreset, setSelectedPreset] = useState<string>("celdas");
   const [modelKey, setModelKey] = useState<number>(0);
@@ -349,12 +368,12 @@ export default function OptiCompromiseCockpitPage() {
     const request = ++presetRequestRef.current;
     cancelPending();
     setSolverStatus("calculating");
+    setValidationError(null);
     try {
       const { model: parsed, weights: parsedWeights } = await importModelFromFile(file);
-      const nextW =
-        parsedWeights && parsedWeights.length === parsed.objectives.length
-          ? parsedWeights
-          : Array(parsed.objectives.length).fill(1 / parsed.objectives.length);
+      const nextW = parsedWeights ?? Array(parsed.objectives.length).fill(1 / parsed.objectives.length);
+      const issue = validateModelClient(parsed, nextW);
+      if (issue) throw new Error(issue);
       if (request !== presetRequestRef.current) return;
       setSelectedPreset("");
       setWorkspace("model");
@@ -379,6 +398,8 @@ export default function OptiCompromiseCockpitPage() {
     <div className="min-h-screen flex flex-col bg-[#F3F4F8] dark:bg-[#111524] text-slate-900 dark:text-slate-100 transition-colors">
       <TopBar
         selectedPreset={selectedPreset}
+        catalog={catalog}
+        catalogNotice={catalogNotice}
         onSelectPreset={handleSelectPreset}
         solverStatus={solverStatus}
         solverMessage={solverMessage}
@@ -400,6 +421,7 @@ export default function OptiCompromiseCockpitPage() {
           <div>
             <h2 id="workspace-title">{model.name || "Modelo sin título"}</h2>
             {model.description && <p>{model.description}</p>}
+            {model.reference && <p className="academic-reference"><strong>Fuente</strong> · {model.reference}</p>}
           </div>
           <dl aria-label="Dimensiones del modelo">
             <div><dt>Variables</dt><dd>{model.variables.length}</dd></div>

@@ -153,6 +153,14 @@ export default function VisualCanvasRight({
       ? "objectives2d"
       : chartTab;
 
+  const chartGuide: Record<ChartTab, [string, string]> = {
+    objectives2d: ["Espacio de objetivos", "Ubica el ideal, la frontera aproximada y las soluciones compromiso en dos criterios."],
+    objectives3d: ["Explorar tres criterios", "Gira la figura para comparar los compromisos entre los tres ejes."],
+    radar: ["Perfil de logro", "Compara el porcentaje de logro por criterio. Cada eje representa un objetivo."],
+    decision2d: ["Región de decisiones", "Ubica las cantidades elegidas y contrástalas con la región factible."],
+    sensitivity: ["Efecto de los pesos", "Compara cuánto se aleja cada objetivo del ideal al variar la ponderación."],
+  };
+
   const handleDownloadPNG = async () => {
     const container = plotContainerRef.current;
     if (!container) return;
@@ -793,7 +801,11 @@ export default function VisualCanvasRight({
 
       <div hidden={workspace !== "results"} className="space-y-4">
       {/* 1. GRÁFICO PRINCIPAL INTERACTIVO */}
-      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden" id="grafico-resultados">
+      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden" id="grafico-resultados" aria-labelledby="grafico-titulo">
+        <div className="section-intro chart-intro px-4 py-3">
+          <h2 id="grafico-titulo">{chartGuide[effectiveTab][0]}</h2>
+          <p>{chartGuide[effectiveTab][1]}</p>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
           {/* Pestañas de vista gráfica */}
           <div className="flex flex-wrap items-center gap-1">
@@ -1205,6 +1217,7 @@ export default function VisualCanvasRight({
           </span>
         </div>
 
+        <p className="section-cue">Compara el valor y el logro de cada objetivo en las tres soluciones.</p>
         <div className="overflow-x-auto cockpit-scroll">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -1307,6 +1320,7 @@ export default function VisualCanvasRight({
           )}
         </div>
 
+        <p className="section-cue">Consulta las cantidades que tendrías que aplicar para ejecutar cada solución.</p>
         <div className="overflow-x-auto cockpit-scroll">
           <table className="w-full text-xs border-collapse">
             <thead>
@@ -1358,7 +1372,7 @@ export default function VisualCanvasRight({
       <div hidden={workspace !== "method"} className="space-y-4">
       {/* 4. MATRIZ DE PAGOS LITERAL + VECTORES IDEAL Y NADIR SEPARADOS */}
       <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-xl font-semibold">Cómo se calcula el compromiso</h2>
+        <div className="section-intro"><h2>Cómo se calcula el compromiso</h2><p>Sigue la transformación desde los óptimos individuales hasta las soluciones ponderadas.</p></div>
         <ol className="mt-3 grid gap-3 text-sm leading-relaxed md:grid-cols-3">
           <li><strong className="block">1. Optimizar cada objetivo</strong> La diagonal de la matriz de pagos da el ideal.</li>
           <li><strong className="block">2. Medir la brecha</strong> Divide la brecha por el rango entre el ideal y el nadir aproximado.</li>
@@ -1389,6 +1403,7 @@ export default function VisualCanvasRight({
           </div>
         </div>
 
+        <p className="section-cue">Cada fila optimiza un criterio por separado y evalúa los demás en esa misma solución.</p>
         {/* Matriz literal k x k */}
         <div className="overflow-x-auto cockpit-scroll">
           <table className="w-full text-xs border-collapse">
@@ -1510,6 +1525,7 @@ export default function VisualCanvasRight({
           </span>
         </div>
 
+        <p className="section-cue">Consulta la escala común que permite comparar objetivos con unidades distintas.</p>
         {/* Fórmulas Matemáticas en KaTeX antes de la matriz */}
         <div className="p-3 rounded-sm bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] space-y-2">
           <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
@@ -1643,6 +1659,7 @@ export default function VisualCanvasRight({
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] bg-white dark:bg-slate-900 overflow-hidden">
         <button
           type="button"
+          aria-expanded={xrayOpen}
           onClick={() => setXrayOpen((o) => !o)}
           className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 dark:bg-slate-900 hover:bg-rose-50/50 dark:hover:bg-slate-800 transition-colors"
         >
@@ -1651,10 +1668,6 @@ export default function VisualCanvasRight({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
               Modo Rayos X (L∞) — Linealización Minimax para Sustentación
             </span>
-            <TooltipBadge
-              title="Variable Auxiliar λ* (Minimax)"
-              content="λ* representa la máxima desviación ponderada wᵢ·Dᵢ(x) respecto al Ideal. Al minimizar λ*, se empuja hacia arriba el objetivo más rezagado."
-            />
           </div>
           <div className="flex items-center gap-2">
             {xrayData?.lambdaVal !== null && xrayData?.lambdaVal !== undefined && (
@@ -1669,6 +1682,8 @@ export default function VisualCanvasRight({
             )}
           </div>
         </button>
+
+        <p className="section-cue px-4 py-2">Revisa cómo λ limita la mayor desviación ponderada.</p>
 
         {xrayOpen && xrayData && (
           <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3 text-xs bg-slate-50/70 dark:bg-slate-950/60">

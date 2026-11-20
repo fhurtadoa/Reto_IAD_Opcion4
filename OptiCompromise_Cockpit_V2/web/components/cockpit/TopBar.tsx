@@ -14,10 +14,12 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react";
-import { PRESET_OPTIONS, SolverStatus, ThemeMode } from "./types";
+import { PresetOption, SolverStatus, ThemeMode } from "./types";
 
 interface TopBarProps {
   selectedPreset: string;
+  catalog: PresetOption[];
+  catalogNotice: string;
   onSelectPreset: (presetId: string) => void;
   solverStatus: SolverStatus;
   solverMessage: string;
@@ -32,6 +34,8 @@ interface TopBarProps {
 
 export default function TopBar({
   selectedPreset,
+  catalog,
+  catalogNotice,
   onSelectPreset,
   solverStatus,
   solverMessage,
@@ -136,12 +140,13 @@ export default function TopBar({
             </label>
             <select
               id="preset-selector"
+              aria-label="Catálogo de ejercicios"
               value={selectedPreset}
               onChange={(e) => onSelectPreset(e.target.value)}
               className="text-xs font-medium rounded-sm px-2.5 py-1.5 border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#E11D48] max-w-[min(310px,85vw)]"
             >
               {selectedPreset === "" && <option value="" disabled>Modelo abierto</option>}
-              {PRESET_OPTIONS.map((opt) => (
+              {catalog.map((opt) => (
                 <option key={opt.id} value={opt.id}>
                   {opt.label} ({opt.badge})
                 </option>
@@ -229,6 +234,12 @@ export default function TopBar({
           </button>
         </div>
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-2 text-xs dark:border-slate-800">
+        <span className="text-slate-600 dark:text-slate-300">Abre un ejercicio o importa una copia para esta sesión.</span>
+        <a className="section-cue-link" href="/plantilla-ejercicio-iad.csv" download>Descargar plantilla CSV</a>
+        <a className="section-cue-link" href="/plantilla-produccion-papel.csv" download>Ver ejemplo diligenciado</a>
+      </div>
+      {catalogNotice && <p className="mt-2 text-xs text-amber-800 dark:text-amber-200" role="status">{catalogNotice}</p>}
     </header>
   );
 }

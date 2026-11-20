@@ -1,0 +1,7 @@
+Seccion,Nombre,Tipo_o_Sentido,Min_o_RHS,Max_o_Peso,x1,x2
+Meta,,Completa el contexto y escribe la fuente en la columna Max_o_Peso.,,,,
+Variable,x1,continuous,0,,,
+Variable,x2,continuous,0,,,
+Objetivo,,minimize,,,,
+Objetivo,,maximize,,,,
+Restriccion,,<=,,,,

@@ -36,6 +36,7 @@ class ConstraintModel(BaseModel):
 class ModelDefinition(BaseModel):
     name: str = Field(default="Modelo Multiobjetivo", description="Nombre del problema de decisión")
     description: Optional[str] = Field(default="", description="Descripción del contexto del problema")
+    reference: Optional[str] = None
     variables: List[VariableModel] = Field(..., description="Lista de variables de decisión")
     objectives: List[ObjectiveModel] = Field(..., description="Lista de funciones objetivo (al menos 2 o 3)")
     constraints: List[ConstraintModel] = Field(default_factory=list, description="Lista de restricciones")

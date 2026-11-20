@@ -164,3 +164,23 @@ input[type="range"].weight-slider::-webkit-slider-thumb:hover {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.section-intro {
+  border-inline-start: 3px solid #be123c;
+  padding-inline-start: 0.85rem;
+  min-width: 0;
+}
+.section-intro h2 { font-size: 1rem; font-weight: 700; line-height: 1.35; }
+.section-intro p, .section-cue, .section-cue-link {
+  color: #9f1239;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+.section-intro p { margin-top: 0.2rem; }
+.section-cue-link { font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.dark .section-intro p, .dark .section-cue, .dark .section-cue-link { color: #fda4af; }
+.dark .section-intro { border-color: #fb7185; }
+.workspace-intro .academic-reference { margin-top: 0.4rem; font-size: 0.75rem; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .chart-intro p { min-height: 2.9em; }
+}

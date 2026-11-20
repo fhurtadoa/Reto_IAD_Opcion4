@@ -35,7 +35,7 @@ En modelos biobjetivo, **Sensibilidad de pesos** compara L₁, L₂ y L∞ en 21
 
 ## 📐 Casos de Validación del Curso y Pruebas Automatizadas
 
-La suite en `api/tests/` (25 pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
+La suite en `api/tests/` (27 pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
 
 | Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Anti-Ideal ($Z_{\text{peor}}$) | Solución $L_1$ | Solución $L_2$ | Solución $L_\infty$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -73,7 +73,7 @@ Abrir el cuaderno [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Cola
 ## 🧪 Pruebas Automatizadas y Verificación de Calidad
 
 ```bash
-# Pruebas unitarias y de validación matemática del motor (25 pruebas)
+# Pruebas unitarias y de validación matemática del motor (27 pruebas)
 cd api
 PYTHONPATH=. python3 -m unittest discover tests/ -v
 
@@ -87,7 +87,7 @@ npx tsc --noEmit && npm run lint && npm run build
 ## 📦 Entregables del Concurso (Sección 10)
 
 * **E3 — Herramienta final y código fuente:** Aplicación Next.js + FastAPI, `README.md`, `LICENSE` (MIT), pruebas automatizadas y cuaderno Colab.
-* **E4 — Modelos de ejemplo:** 5 archivos JSON en [`examples/`](examples/) accesibles desde el selector **Ejemplos** de la interfaz (`celdas`, `transporte`, `triobjetivo`, `mip`, `flota`) e importación/exportación en `.json`, `.xlsx` y `.csv` re-importable.
+* **E4 — Modelos de ejemplo:** seis ejercicios en [el catálogo de modelos](examples/), compatibles con la importación y exportación existente. La [guía para la docente](GUIA_PARA_AGREGAR_EJERCICIOS.md) explica cómo preparar una plantilla y agregar ejercicios sin editar código.
 * **E5 — Guía de usuario:** [Guía web actual](docs/guia-de-uso.md), con capturas y glosario. Referencia de casos de uso: [`MANUAL_DE_USUARIO_Y_CASOS_DE_USO_OPTICOMPROMISE.pdf`](MANUAL_DE_USUARIO_Y_CASOS_DE_USO_OPTICOMPROMISE.pdf) (disponible desde **Manual PDF** en la barra superior, con capturas de la interfaz anterior).
 * **E6 — Video demostrativo (5–8 min):** *Agregar enlace de video antes del envío final.*
 
@@ -97,7 +97,7 @@ npx tsc --noEmit && npm run lint && npm run build
 
 En cumplimiento con la Sección 12 de las Bases del Concurso:
 * Se utilizó Inteligencia Artificial (asistentes de programación Gemini / Antigravity) como apoyo para la estructuración modular del frontend en React/Next.js, la integración de gráficos Plotly/KaTeX, el diseño de pruebas automatizadas y la refactorización de validaciones.
-* Se utilizó OpenAI Codex para auditar la rúbrica, refactorizar el flujo web, ajustar la comprobación de optimalidad y estados del motor, añadir pruebas de regresión y elaborar el [documento técnico](docs/auditoria-iad.md). Los autores deben revisar la versión entregada y explicar y modificar el método durante la sustentación individual.
+* Se utilizó OpenAI Codex para revisar el material del curso, transcribir el caso de papel y validar las plantillas y el catálogo. También se usó para auditar la rúbrica, refactorizar el flujo web, ajustar la comprobación de optimalidad y estados del motor, añadir pruebas de regresión y elaborar el [documento técnico](docs/auditoria-iad.md). Los autores deben revisar la versión entregada y explicar y modificar el método durante la sustentación individual.
 
 ---
 

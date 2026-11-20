@@ -27,6 +27,7 @@ export interface ConstraintModel {
 export interface ModelDefinition {
   name: string;
   description?: string;
+  reference?: string | null;
   variables: VariableModel[];
   objectives: ObjectiveModel[];
   constraints: ConstraintModel[];
@@ -104,16 +105,15 @@ export interface PresetOption {
   id: string;
   label: string;
   badge: string;
-  source: "api" | "blank";
 }
 
 export const PRESET_OPTIONS: PresetOption[] = [
-  { id: "celdas", label: "1. Celdas 2D (Clase 15 · Curso)", badge: "2V · 2Z", source: "api" },
-  { id: "transporte", label: "2. Transporte 2D (Taller 3 · ≥4 Vars)", badge: "12V · 2Z", source: "api" },
-  { id: "triobjetivo", label: "3. Sostenibilidad 3D (Triobjetivo)", badge: "3V · 3Z", source: "api" },
-  { id: "mip", label: "4. Producción Mixta MIP (Bonus ℤ/{0,1})", badge: "3V · 2Z", source: "api" },
-  { id: "flota", label: "5. Flota Vehículos Eléctricos (4Z)", badge: "6V · 4Z", source: "api" },
-  { id: "blank", label: "+ Nuevo Modelo en Blanco", badge: "Desde cero", source: "blank" },
+  { id: "celdas", label: "1. Celdas 2D (Clase 15 · Curso)", badge: "2V · 2Z" },
+  { id: "transporte", label: "2. Transporte 2D (Taller 3 · ≥4 Vars)", badge: "12V · 2Z" },
+  { id: "triobjetivo", label: "3. Sostenibilidad 3D (Triobjetivo)", badge: "3V · 3Z" },
+  { id: "mip", label: "4. Producción Mixta MIP (Bonus ℤ/{0,1})", badge: "3V · 2Z" },
+  { id: "flota", label: "5. Flota Vehículos Eléctricos (4Z)", badge: "6V · 4Z" },
+  { id: "blank", label: "+ Nuevo Modelo en Blanco", badge: "Desde cero" },
 ];
 
 export const BLANK_MODEL: ModelDefinition = {

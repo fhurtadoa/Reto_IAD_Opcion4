@@ -668,7 +668,7 @@ function buildTabularModelRows(
       Nombre: model.name,
       Tipo_o_Sentido: model.description || "",
       Min_o_RHS: model.pareto_seed ?? 42,
-      Max_o_Peso: "",
+      Max_o_Peso: model.reference ?? "",
     },
   ];
 
@@ -930,14 +930,21 @@ export function exportResultsExcel(model: ModelDefinition, result: SolveResponse
 
 type TabularRow = Record<string, string | number | boolean | null | undefined>;
 
-function parseBoundCell(raw: unknown, fallback: number | null): number | null {
-  if (raw === undefined || raw === null) return fallback;
-  const txt = String(raw).trim().toLowerCase();
-  if (txt === "" || txt === "-inf" || txt === "+inf" || txt === "inf" || txt === "-∞" || txt === "+∞" || txt === "∞") {
-    return txt === "" ? fallback : null;
+function tabularNumber(raw: unknown, field: string, fallback?: number): number {
+  const value = typeof raw === "string" ? raw.trim().replace(",", ".") : raw;
+  if ((value === "" || value == null) && fallback !== undefined) return fallback;
+  if ((typeof value === "string" && value !== "") || typeof value === "number") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
   }
-  const num = Number(txt);
-  return Number.isFinite(num) ? num : fallback;
+  throw new Error(`Ingresa un número válido en ${field}.`);
+}
+
+function parseBoundCell(raw: unknown, fallback: number | null, field: string): number | null {
+  const value = String(raw ?? "").trim().toLowerCase();
+  if (!value) return fallback;
+  if (["-inf", "+inf", "inf", "-∞", "+∞", "∞"].includes(value)) return null;
+  return tabularNumber(value, field);
 }
 
 function validateImportedModel(parsed: unknown): ModelDefinition {
@@ -990,12 +997,19 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     if (o.sense !== undefined && !["maximize", "minimize"].includes(o.sense)) {
       throw new Error(`Sentido desconocido en el objetivo «${o.name}».`);
     }
+    if (o.expression && !o.coefficients.length) {
+      throw new Error(`Convierte «${o.name}» a coeficientes lineales antes de importar.`);
+    }
     return {
       name: o.name.trim(),
       sense: o.sense === "minimize" ? ("minimize" as const) : ("maximize" as const),
       coefficients: readCoefficients(o.coefficients, validVars.length, `objetivo «${o.name}»`),
     };
   });
+  if (obj.constraints !== undefined && !Array.isArray(obj.constraints)) {
+    throw new Error("Las restricciones deben estar en una lista.");
+  }
+  if (obj.weights != null && !Array.isArray(obj.weights)) throw new Error("Los pesos deben estar en una lista.");
   const validCons = Array.isArray(obj.constraints)
     ? obj.constraints.map((c, idx) => {
         if (!c || (c.sense !== undefined && !["<=", ">=", "=="].includes(c.sense))) {
@@ -1014,6 +1028,7 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
   return {
     name: typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : "Modelo Importado",
     description: typeof obj.description === "string" ? obj.description : "",
+    reference: typeof obj.reference === "string" ? obj.reference.trim() : undefined,
     variables: validVars,
     objectives: validObjs,
     constraints: validCons,
@@ -1083,6 +1098,7 @@ export async function importModelFromFile(
 
     let importedName = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
     let importedSeed: number | undefined;
+    let importedReference: string | undefined;
     let importedDescription = `Modelo importado desde ${file.name}.`;
     const variables: ModelDefinition["variables"] = [];
     const objRows: TabularRow[] = [];
@@ -1106,12 +1122,16 @@ export async function importModelFromFile(
         if (seed !== undefined && seed !== "") importedSeed = Number(seed);
         if (metaName) importedName = metaName;
         if (metaDesc) importedDescription = metaDesc;
+        importedReference = String(getField(row, ["referencia", "fuente", "max_o_peso"]) ?? "").trim() || undefined;
       } else if (sec.startsWith("var")) {
         const name = String(getField(row, ["nombre", "name", "variable"]) ?? "").trim();
-        if (!name) return;
+        if (!name) throw new Error("Escribe el nombre de cada variable.");
         const vtRaw = String(getField(row, ["tipo_o_sentido", "var_type", "tipo_var"]) ?? "continuous")
           .trim()
           .toLowerCase();
+        if (!["continuous", "continua", "integer", "entera", "binary", "binaria"].includes(vtRaw)) {
+          throw new Error(`Tipo de variable desconocido en «${name}». Usa continuous, integer o binary.`);
+        }
         const var_type =
           vtRaw.startsWith("int") || vtRaw.startsWith("ent")
             ? "integer"
@@ -1123,13 +1143,15 @@ export async function importModelFromFile(
         variables.push({
           name,
           var_type,
-          lower_bound: var_type === "binary" ? 0 : parseBoundCell(minRaw, 0),
-          upper_bound: var_type === "binary" ? 1 : parseBoundCell(maxRaw, null),
+          lower_bound: parseBoundCell(minRaw, 0, `cota inferior de «${name}»`),
+          upper_bound: parseBoundCell(maxRaw, var_type === "binary" ? 1 : null, `cota superior de «${name}»`),
         });
       } else if (sec.startsWith("obj")) {
         objRows.push(row);
       } else if (sec.startsWith("res")) {
         conRows.push(row);
+      } else if (sec) {
+        throw new Error(`Sección desconocida «${sec}». Usa Meta, Variable, Objetivo o Restriccion.`);
       }
     });
 
@@ -1141,52 +1163,63 @@ export async function importModelFromFile(
 
     const varNames = variables.map((v) => v.name);
     const objectives: ModelDefinition["objectives"] = [];
-    const importedWeights: number[] = [];
+    const importedWeights: Array<number | null> = [];
+    for (const name of varNames) {
+      if (headerRow.filter(header => header === name).length !== 1) {
+        throw new Error(`La variable «${name}» debe tener exactamente una columna con el mismo nombre.`);
+      }
+      if (["seccion", "nombre", "tipo_o_sentido", "min_o_rhs", "max_o_peso"].includes(name.toLowerCase())) {
+        throw new Error(`Usa otro nombre para la variable «${name}». Ese encabezado está reservado.`);
+      }
+    }
 
     objRows.forEach((row, idx) => {
       const name = String(getField(row, ["nombre", "name"]) ?? `Objetivo ${idx + 1}`).trim();
       const sRaw = String(getField(row, ["tipo_o_sentido", "sense", "sentido"]) ?? "maximize")
         .trim()
         .toLowerCase();
+      if (!name) throw new Error(`Escribe el nombre del objetivo ${idx + 1}.`);
+      if (!["minimize", "minimizar", "min", "maximize", "maximizar", "max"].includes(sRaw)) {
+        throw new Error(`Indica minimize o maximize en el objetivo «${name}».`);
+      }
       const sense = sRaw.startsWith("min") ? "minimize" : "maximize";
-      const coeffs = varNames.map((vn) => {
-        const val = row[vn];
-        const num = Number(val);
-        return Number.isFinite(num) ? num : 0;
-      });
+      const coeffs = varNames.map(vn => tabularNumber(row[vn], `«${name}», columna «${vn}»`, 0));
       objectives.push({ name, sense, coefficients: coeffs });
-      const wRaw = Number(getField(row, ["max_o_peso", "peso", "weight"]));
-      importedWeights.push(Number.isFinite(wRaw) && wRaw >= 0 ? wRaw : 1 / objRows.length);
+      const raw = getField(row, ["max_o_peso", "peso", "weight"]);
+      importedWeights.push(String(raw ?? "").trim() ? tabularNumber(raw, `peso de «${name}»`) : null);
     });
 
     const constraints: ModelDefinition["constraints"] = conRows.map((row, idx) => {
       const name = String(getField(row, ["nombre", "name"]) ?? `Restricción ${idx + 1}`).trim();
       const sRaw = String(getField(row, ["tipo_o_sentido", "sense", "operador"]) ?? "<=").trim();
+      if (!name) throw new Error(`Escribe el nombre de la restricción ${idx + 1} o elimina la fila.`);
+      if (!["<=", "≤", ">=", "≥", "==", "="].includes(sRaw)) {
+        throw new Error(`Usa <=, >= o = en la restricción «${name}».`);
+      }
       const sense = sRaw === ">=" || sRaw === "≥" ? ">=" : sRaw === "==" || sRaw === "=" ? "==" : "<=";
-      const rhsVal = Number(getField(row, ["min_o_rhs", "rhs", "ld"]));
-      const coeffs = varNames.map((vn) => {
-        const val = row[vn];
-        const num = Number(val);
-        return Number.isFinite(num) ? num : 0;
-      });
+      const rhsVal = tabularNumber(getField(row, ["min_o_rhs", "rhs", "ld"]), `lado derecho de «${name}»`);
+      const coeffs = varNames.map(vn => tabularNumber(row[vn], `«${name}», columna «${vn}»`, 0));
       return {
         name,
         coefficients: coeffs,
         sense,
-        rhs: Number.isFinite(rhsVal) ? rhsVal : 0,
+        rhs: rhsVal,
       };
     });
 
-    const wSum = importedWeights.reduce((a, b) => a + b, 0);
-    const normWeights =
-      wSum > 1e-6
-        ? importedWeights.map((w) => w / wSum)
-        : Array(objectives.length).fill(1 / objectives.length);
+    if (importedWeights.some(w => w === null) && importedWeights.some(w => w !== null)) {
+      throw new Error("Completa todos los pesos o déjalos todos vacíos para usar pesos iguales.");
+    }
+    const normWeights = importedWeights.map(w => w ?? 1 / objectives.length);
+    if (normWeights.some(w => w < 0 || w > 1) || Math.abs(normWeights.reduce((a, b) => a + b, 0) - 1) > 0.001 + 1e-12) {
+      throw new Error("Los pesos deben estar entre 0 y 1 y sumar 1.");
+    }
 
     return {
       model: {
         name: importedName,
         description: importedDescription,
+        reference: importedReference,
         variables,
         objectives,
         constraints,

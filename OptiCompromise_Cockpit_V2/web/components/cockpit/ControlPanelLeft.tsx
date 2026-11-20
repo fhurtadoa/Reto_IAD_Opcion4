@@ -376,6 +376,7 @@ export default function ControlPanelLeft({
   return (
     <aside className="workspace-controls min-w-0 space-y-4">
       <div className="model-form space-y-4">
+      <div className="section-intro"><h2>Formular el ejercicio</h2><p>Registra el contexto y define el modelo. Usa Resolver para comparar sus compromisos.</p></div>
       {/* Encabezado del Modelo */}
       <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
@@ -405,6 +406,13 @@ export default function ControlPanelLeft({
           placeholder="Descripción opcional del problema de decisión..."
           className="w-full text-[11px] leading-relaxed bg-transparent text-slate-500 dark:text-slate-400 resize-none focus:outline-none focus:ring-1 focus:ring-[#E11D48] rounded-sm px-1 -ml-1"
         />
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+          Fuente académica (opcional)
+          <input type="text" value={model.reference ?? ""}
+            onChange={e => onModelChange({ ...model, reference: e.target.value })}
+            className="mt-1 block w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 dark:border-slate-700"
+            placeholder="Curso, taller o referencia del ejercicio" />
+        </label>
       </div>
 
       {/* Alerta de Validación Inmediata en Cliente */}
@@ -464,6 +472,7 @@ export default function ControlPanelLeft({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      aria-expanded={openSections.vars}
                       onClick={() => setOpenSections((s) => ({ ...s, vars: !s.vars }))}
                       className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
                     >
@@ -472,7 +481,7 @@ export default function ControlPanelLeft({
                     </button>
                     <TooltipBadge
                       title="Variables (LP y MIP)"
-                      content="Soporta variables Continuas (ℝ), Enteras (ℤ) y Binarias ({0,1}) resueltas con HiGHS y Branch-and-Bound exacto en FastAPI."
+                      content="Soporta variables Continuas (ℝ), Enteras (ℤ) y Binarias ({0,1}) resueltas con HiGHS y ramificación y poda en el motor."
                     />
                   </div>
                   <button
@@ -487,6 +496,7 @@ export default function ControlPanelLeft({
                   </button>
                 </div>
 
+                <p className="section-cue">Define qué cantidades decidir y sus límites posibles.</p>
                 {openSections.vars && (
                 <div className="space-y-1.5">
                   <div className="grid grid-cols-[1.8fr_1.1fr_0.75fr_0.75fr_24px] gap-1.5 px-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -557,6 +567,7 @@ export default function ControlPanelLeft({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      aria-expanded={openSections.objs}
                       onClick={() => setOpenSections((s) => ({ ...s, objs: !s.objs }))}
                       className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
                     >
@@ -580,6 +591,7 @@ export default function ControlPanelLeft({
                   </button>
                 </div>
 
+                <p className="section-cue">Indica qué deseas maximizar o minimizar y cuánto aporta cada variable.</p>
                 {openSections.objs && (
                 <div className="space-y-2">
                   {model.objectives.map((obj, oIdx) => (
@@ -646,6 +658,7 @@ export default function ControlPanelLeft({
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
+                      aria-expanded={openSections.cons}
                       onClick={() => setOpenSections((s) => ({ ...s, cons: !s.cons }))}
                       className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
                     >
@@ -669,6 +682,7 @@ export default function ControlPanelLeft({
                   </button>
                 </div>
 
+                <p className="section-cue">Representa capacidades, demandas y balances mediante ecuaciones o desigualdades.</p>
                 {openSections.cons && (
                 <div className="space-y-2">
                   {model.constraints.map((c, cIdx) => (
@@ -751,6 +765,7 @@ export default function ControlPanelLeft({
                     </button>
                   )}
                 </div>
+                <p className="section-cue">Escribe las ecuaciones lineales y aplícalas para actualizar el modelo.</p>
                 <textarea
                   rows={8}
                   value={algebraicText}
@@ -800,6 +815,7 @@ export default function ControlPanelLeft({
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Vista Previa Matemática (LaTeX / KaTeX)
               </div>
+              <p className="section-cue">Comprueba las ecuaciones y dominios que recibe el motor.</p>
               <KatexBlock
                 latex={latexPreview}
                 className="text-xs text-slate-800 dark:text-slate-200"
@@ -852,6 +868,8 @@ export default function ControlPanelLeft({
             </button>
           </div>
         </div>
+
+        <p className="section-cue">Asigna importancia a cada objetivo. Mueve un peso para recalcular las soluciones.</p>
 
         {/* Selector Rápido de Actitud / Perfil del Decisor */}
         <div className="grid grid-cols-3 gap-1.5">
