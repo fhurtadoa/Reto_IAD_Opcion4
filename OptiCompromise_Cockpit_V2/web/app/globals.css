@@ -157,3 +157,10 @@ input[type="range"].weight-slider::-webkit-slider-thumb:hover {
   .workspace-intro { display: grid; gap: 0.8rem; }
   .workspace-navigation button svg { display: none; }
 }
+
+.results-status {
+  height: 1.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

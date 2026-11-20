@@ -11,9 +11,10 @@
 
 1. En **Preferencias**, mueve los deslizadores para expresar la importancia de cada objetivo. El balance automático ajusta los otros pesos para conservar la suma 1.
 2. En el gráfico, identifica el ideal, el nadir de referencia y las tres soluciones. Elige **Región factible** para dos variables o **Espacio 3D** para tres o más objetivos.
-3. En **Comparación de soluciones**, revisa qué gana y qué cede cada objetivo. Consulta la tabla de variables para traducir la solución a decisiones concretas.
-4. En **Ver método**, consulta la matriz de pagos, los rangos de normalización y la formulación minimax con λ.
-5. Guarda el modelo con **JSON**. Exporta el cálculo a **Excel** o **CSV** y descarga el gráfico visible con **PNG**.
+3. En un modelo de dos objetivos, abre **Sensibilidad de pesos** para comparar la desviación al ideal de L₁, L₂ y L∞. La línea punteada sigue el peso seleccionado. Los marcadores grandes corresponden al último cálculo del motor. **PNG** exporta los tres paneles juntos.
+4. En **Comparación de soluciones**, revisa qué gana y qué cede cada objetivo. Consulta la tabla de variables para traducir la solución a decisiones concretas.
+5. En **Ver método**, consulta la matriz de pagos, los rangos de normalización y la formulación minimax con λ.
+6. Guarda el modelo con **JSON**. Exporta el cálculo a **Excel** o **CSV** y descarga el gráfico visible con **PNG**.
 
 | Concepto | Lectura |
 |---|---|

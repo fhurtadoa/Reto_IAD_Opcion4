@@ -69,3 +69,12 @@ Con pesos 0,50/0,50. Valores en los sentidos naturales de cada problema, conserv
 ## Uso de inteligencia artificial
 
 Se utilizó OpenAI Codex para leer y contrastar las bases, inspeccionar el código y la aplicación, implementar mejoras del motor y la interfaz, añadir regresiones y documentar la evidencia. La revisión independiente de los autores y el dominio individual del método se acreditan durante la sustentación. Para explicar la implementación, se recomienda recorrer `compute_payoff_matrix`, `solve_l1`, `solve_linf` y `_solve_continuous_qp` con Celdas y reproducir el caso nuevo desde el editor.
+
+## Sensibilidad y segunda iteración
+
+- **Navegación.** El orden es Formular → Ver método → Explorar resultados. Ver método explica ideal, normalización y métricas antes de la comparación. Los ejemplos abren directamente en resultados y Resolver también lleva a resultados, para facilitar el uso repetido. Las tablas y fórmulas de normalización se abren bajo demanda.
+- **Definición.** La ordenada es 100 Dᵢ y usa el rango del motor, incluida la escala auxiliar en rangos observados nulos. Puede superar 100 %. El barrido usa w₂ = 1 − w₁ y conserva 21 resultados por métrica y estado. L∞ usa ceros exactos. Su desempate mejora la eficiencia dentro de la cara minimax óptima, incluida la mejora de objetivos con peso cero, sin perturbar el peso ni la cota primaria.
+- **Lectura.** Las líneas conectan muestras discretas. Un salto de L₁ puede ocurrir entre muestras y en un peso de empate pueden existir varios óptimos. El punto destacado proviene del solver en el peso exacto resuelto. Los fallos dejan huecos y los candidatos sin certificado se identifican.
+- **Rendimiento.** El barrido se guarda junto a la matriz y la frontera en la caché estructural del proceso. Una estructura fría requiere 21 resoluciones adicionales de las tres métricas. Las muestras enteras de L₂ consumen el presupuesto de búsqueda habitual y pueden quedar parciales. La caché se reconstruye tras reiniciar el proceso.
+- **Verificación.** Celdas y Transporte validan recuento y orden, repetición, pesos extremos y coherencia con el solver. En el navegador se midió la coordenada del gráfico antes, durante y después de ocho cambios consecutivos. Se verificaron 390 px de ancho sin desbordamiento global, el cambio a un problema triobjetivo y un PNG con los tres paneles.
+- **IA.** OpenAI Codex apoyó la implementación del barrido, la visualización, el ajuste de navegación y la verificación de esta iteración.

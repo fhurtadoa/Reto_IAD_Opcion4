@@ -149,7 +149,7 @@ export default function TopBar({
             </select>
           </div>
 
-          <div role="status">{renderStatusPill()}</div>
+          <div role="status" className="w-[8.5rem] min-h-7 shrink-0">{renderStatusPill()}</div>
         </div>
 
         {/* Derecha: Controles Globales */}

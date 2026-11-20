@@ -17,11 +17,15 @@ try:
     from .core.payoff import compute_payoff_matrix
     from .core.compromise import solve_all_metrics
     from .core.pareto import compute_pareto_frontier
+    from .core.sensitivity import compute_weight_sensitivity
+    from .core.schemas import WeightSensitivityData
 except (ImportError, ValueError):
     from core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint
     from core.payoff import compute_payoff_matrix
     from core.compromise import solve_all_metrics
     from core.pareto import compute_pareto_frontier
+    from core.sensitivity import compute_weight_sensitivity
+    from core.schemas import WeightSensitivityData
 
 app = FastAPI(
     title="OptiCompromise API",
@@ -50,7 +54,7 @@ def health_check():
 
 # Cache LRU en memoria para (payoff, pareto_points) indexado por la estructura del modelo (sin pesos).
 # Al arrastrar los sliders de pesos, evita recomputar 100+ puntos Pareto en cada frame.
-_STRUCTURE_CACHE: "OrderedDict[str, Tuple[PayoffMatrixData, List[ParetoPoint]]]" = OrderedDict()
+_STRUCTURE_CACHE: "OrderedDict[str, Tuple[PayoffMatrixData, List[ParetoPoint], WeightSensitivityData | None]]" = OrderedDict()
 _MAX_CACHE_SIZE = 32
 _CACHE_LOCK = Lock()
 
@@ -148,15 +152,16 @@ def solve_model(model: ModelDefinition):
         if cached is not None:
             _STRUCTURE_CACHE.move_to_end(cache_key)
     if cached is not None:
-        payoff, pareto_pts = cached
+        payoff, pareto_pts, sensitivity = cached
     else:
         # 1. Matriz de pagos
         payoff = _require_payoff(model)
 
         # 3. Muestra de frontera de Pareto (independiente de los pesos actuales)
         pareto_pts = compute_pareto_frontier(model, payoff, num_samples=21)
+        sensitivity = compute_weight_sensitivity(model, payoff)
         with _CACHE_LOCK:
-            _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts)
+            _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts, sensitivity)
             if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
                 _STRUCTURE_CACHE.popitem(last=False)
 
@@ -173,7 +178,8 @@ def solve_model(model: ModelDefinition):
         payoff=payoff,
         solutions=solutions,
         weights=normalized_weights,
-        pareto_points=pareto_pts
+        pareto_points=pareto_pts,
+        weight_sensitivity=sensitivity,
     )
 
 @app.post("/api/pareto")

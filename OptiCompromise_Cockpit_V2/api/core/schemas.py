@@ -74,6 +74,21 @@ class ParetoPoint(BaseModel):
     variables: Dict[str, float]
     metric: str
 
+class SensitivityPoint(BaseModel):
+    w1: float
+    weights: List[float]
+    deviations_pct: List[float]
+    objectives: List[float]
+    status: str
+
+class WeightSensitivityData(BaseModel):
+    objective_index: int
+    objective_name: str
+    objective_names: List[str]
+    l1: List[SensitivityPoint]
+    l2: List[SensitivityPoint]
+    l_inf: List[SensitivityPoint]
+
 class SolveResponse(BaseModel):
     status: str
     message: str
@@ -81,3 +96,4 @@ class SolveResponse(BaseModel):
     solutions: Dict[str, MetricSolution]  # "L1", "L2", "L_inf"
     weights: List[float]
     pareto_points: Optional[List[ParetoPoint]] = None
+    weight_sensitivity: Optional[WeightSensitivityData] = None

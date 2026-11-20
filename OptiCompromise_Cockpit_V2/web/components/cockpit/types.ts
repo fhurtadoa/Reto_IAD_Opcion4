@@ -63,6 +63,23 @@ export interface ParetoPoint {
   metric: string;
 }
 
+export interface SensitivityPoint {
+  w1: number;
+  weights: number[];
+  deviations_pct: number[];
+  objectives: number[];
+  status: string;
+}
+
+export interface WeightSensitivityData {
+  objective_index: number;
+  objective_name: string;
+  objective_names: string[];
+  l1: SensitivityPoint[];
+  l2: SensitivityPoint[];
+  l_inf: SensitivityPoint[];
+}
+
 export interface SolveResponse {
   status: string;
   message: string;
@@ -75,6 +92,7 @@ export interface SolveResponse {
   };
   weights: number[];
   pareto_points?: ParetoPoint[];
+  weight_sensitivity?: WeightSensitivityData | null;
 }
 
 export type SolverStatus = "idle" | "calculating" | "partial" | "optimal" | "infeasible" | "unbounded" | "error";

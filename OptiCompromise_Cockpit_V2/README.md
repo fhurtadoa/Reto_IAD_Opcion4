@@ -29,9 +29,13 @@
 
 ---
 
+### Sensibilidad de pesos
+
+En modelos biobjetivo, **Sensibilidad de pesos** compara L₁, L₂ y L∞ en 21 pesos entre 0 y 1. La línea punteada sigue el peso seleccionado y los marcadores grandes muestran el último cálculo del motor. Se pueden exportar juntos los tres paneles como PNG. El barrido conserva las muestras repetidas y usa los pesos exactos en los extremos. Consulta el [criterio numérico y la evidencia](docs/auditoria-iad.md#sensibilidad-y-segunda-iteración).
+
 ## 📐 Casos de Validación del Curso y Pruebas Automatizadas
 
-La suite en `api/tests/` (22 pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
+La suite en `api/tests/` (25 pruebas automatizadas) reproduce y verifica los ejercicios oficiales del curso, casos de bonificación y casos borde:
 
 | Caso de Estudio | Variables | Objetivos | Ideal ($Z^*$) | Anti-Ideal ($Z_{\text{peor}}$) | Solución $L_1$ | Solución $L_2$ | Solución $L_\infty$ |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -69,7 +73,7 @@ Abrir el cuaderno [`colab/OptiCompromise_Colab.ipynb`](colab/OptiCompromise_Cola
 ## 🧪 Pruebas Automatizadas y Verificación de Calidad
 
 ```bash
-# Pruebas unitarias y de validación matemática del motor (22 pruebas)
+# Pruebas unitarias y de validación matemática del motor (25 pruebas)
 cd api
 PYTHONPATH=. python3 -m unittest discover tests/ -v
 

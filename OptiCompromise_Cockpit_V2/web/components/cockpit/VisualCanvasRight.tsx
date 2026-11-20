@@ -35,6 +35,7 @@ import {
   computeIsodistanceTraces2D,
   buildLinfXRayLatex,
 } from "./mathUtils";
+import { sensitivityCurves, sensitivityLayout, sensitivitySelection } from "./weightSensitivity";
 import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
 
@@ -57,6 +58,7 @@ interface VisualCanvasRightProps {
   workspace: "model" | "results" | "method";
   model: ModelDefinition;
   modelKey: number;
+  selectedWeight: number | null;
   decisionProfile: DecisionProfile;
   solveResult: SolveResponse | null;
   solverStatus: SolverStatus;
@@ -64,13 +66,14 @@ interface VisualCanvasRightProps {
   theme: ThemeMode;
 }
 
-type ChartTab = "objectives2d" | "objectives3d" | "radar" | "decision2d";
+type ChartTab = "objectives2d" | "objectives3d" | "radar" | "decision2d" | "sensitivity";
 type PlotTrace = Record<string, unknown>;
 
 export default function VisualCanvasRight({
   workspace,
   model,
   modelKey,
+  selectedWeight,
   decisionProfile,
   solveResult,
   solverStatus,
@@ -129,10 +132,24 @@ export default function VisualCanvasRight({
       ? axis3DZ
       : [0, 1, 2, 3].find((i) => i < nObjs && i !== safe3DX && i !== safe3DY) ?? Math.min(2, nObjs - 1);
 
+  const [stacked, setStacked] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1150px)");
+    const update = () => setStacked(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const sweep = solveResult?.weight_sensitivity;
+  const sensitivityBase = useMemo(
+    () => sweep ? sensitivityCurves(sweep, isDark) : [],
+    [sweep, isDark],
+  );
+
   const effectiveTab: ChartTab =
     (chartTab === "objectives3d" || chartTab === "radar") && nObjs < 3
       ? "objectives2d"
-      : chartTab === "decision2d" && nVars !== 2
+      : (chartTab === "sensitivity" && nObjs !== 2) || (chartTab === "decision2d" && nVars !== 2)
       ? "objectives2d"
       : chartTab;
 
@@ -151,7 +168,7 @@ export default function VisualCanvasRight({
       const dataUrl = await Plotly.toImage(plotEl, {
         format: "png",
         width: 1200,
-        height: 750,
+        height: effectiveTab === "sensitivity" && stacked ? 1000 : 750,
         scale: 2,
       });
       const blob = await (await fetch(dataUrl)).blob();
@@ -744,9 +761,11 @@ export default function VisualCanvasRight({
 
   return (
     <main className="workspace-output min-w-0 space-y-4">
-      {solverStatus === "calculating" && (
-        <p className="workspace-feedback" role="status">Actualizando resultados para los cambios recientes. Debajo se muestra el último cálculo de «{model.name}».</p>
-      )}
+      <p className="results-status text-xs text-slate-600 dark:text-slate-300" role="status">
+        {solverStatus === "calculating"
+          ? "Calculando · Se muestra el último resultado"
+          : solverStatus === "partial" ? solverMessage : ""}
+      </p>
       {hasActiveError && (
         <div className="rounded-sm border-2 border-[#E11D48] bg-rose-50 dark:bg-rose-950/50 px-4 py-3 flex items-start gap-3 text-xs text-rose-900 dark:text-rose-100">
           <AlertOctagon className="w-5 h-5 text-[#E11D48] shrink-0 mt-0.5" />
@@ -772,16 +791,6 @@ export default function VisualCanvasRight({
         </div>
       )}
 
-      {solverStatus === "partial" && (
-        <div className="rounded-sm border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2.5 text-[11px] text-amber-900 dark:text-amber-200">
-          <b>{solverMessage}</b>
-          <ul className="mt-1">
-            {Object.values(solveResult.solutions).filter((s) => s.status !== "optimal").map((s) => (
-              <li key={s.metric}>{s.metric.replace("L_inf", "L∞")}: {s.status === "feasible_suboptimal" ? "Solución factible sin certificado de optimalidad." : "No hay una solución disponible."}</li>
-            ))}
-          </ul>
-        </div>
-      )}
       <div hidden={workspace !== "results"} className="space-y-4">
       {/* 1. GRÁFICO PRINCIPAL INTERACTIVO */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden" id="grafico-resultados">
@@ -802,6 +811,13 @@ export default function VisualCanvasRight({
               <span>Objetivos 2D</span>
             </button>
 
+            {nObjs === 2 && (
+              <button type="button" aria-pressed={effectiveTab === "sensitivity"}
+                onClick={() => setChartTab("sensitivity")}
+                className={`px-2.5 py-1 rounded-sm text-xs font-semibold ${effectiveTab === "sensitivity" ? "bg-[#be123c] text-white" : "text-slate-600 dark:text-slate-300"}`}>
+                Sensibilidad de pesos
+              </button>
+            )}
             {nObjs >= 3 && (
               <>
                 <button
@@ -940,7 +956,7 @@ export default function VisualCanvasRight({
             <button
               type="button"
               onClick={handleDownloadPNG}
-              disabled={exportingPlot}
+              disabled={exportingPlot || (effectiveTab === "sensitivity" && !sweep)}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors font-semibold"
               title="Descargar gráfico actual en alta resolución PNG"
             >
@@ -957,6 +973,23 @@ export default function VisualCanvasRight({
         {downloadError && <p role="alert" className="px-4 py-2 text-xs text-rose-700 dark:text-rose-300">No se pudo exportar el gráfico. Vuelve a intentarlo cuando termine de dibujarse.</p>}
         {workspace === "results" && <div ref={plotContainerRef} className="plot-frame p-2">
           <p className="sr-only">Consulta los valores accesibles en la tabla de comparación de soluciones.</p>
+          {effectiveTab === "sensitivity" && (sweep ? (() => {
+            const selection = sensitivitySelection(solveResult, selectedWeight, isDark);
+            const partial = [...sweep.l1, ...sweep.l2, ...sweep.l_inf].some(point => point.status !== "optimal");
+            return (
+              <div className="min-w-0">
+                <p className="px-3 py-2 text-xs leading-relaxed text-slate-700 dark:text-slate-200">
+                  Peso de {sweep.objective_name}. La línea punteada indica w₁ seleccionado. Los marcadores grandes muestran el último cálculo resuelto.
+                  Los tramos conectan muestras. En L₁ puede haber saltos y óptimos alternativos.
+                  {partial && " El barrido incluye resultados factibles sin certificado o muestras sin solución."}
+                </p>
+                <Plot data={[...sensitivityBase, ...selection.traces]}
+                  layout={{ ...sensitivityLayout(stacked, isDark), shapes: selection.shapes, uirevision: `${modelKey}-${stacked}` }}
+                  config={{ displayModeBar: false, responsive: true }} useResizeHandler
+                  style={{ width: "100%" }} />
+              </div>
+            );
+          })() : <p role="status" className="p-5 text-sm">El barrido de sensibilidad no está disponible para este cálculo.</p>)}
           {effectiveTab === "objectives2d" && (
             <Plot
               data={data2D}
@@ -996,7 +1029,7 @@ export default function VisualCanvasRight({
         </div>}
 
         {/* Explorador de Puntos de la Frontera Eficiente (Pesos × Métricas) */}
-        {(() => {
+        {effectiveTab !== "sensitivity" && (() => {
           const allPareto = solveResult.pareto_points || [];
           const countL1 = allPareto.filter((p) => p.metric === "L1").length;
           const countL2 = allPareto.filter((p) => p.metric === "L2").length;
@@ -1144,6 +1177,16 @@ export default function VisualCanvasRight({
         </p>
       </div>
 
+      {solverStatus === "partial" && (
+        <div className="rounded-sm border border-amber-400 bg-amber-50 dark:bg-amber-950/30 px-3.5 py-2.5 text-[11px] text-amber-900 dark:text-amber-200">
+          <b>{solverMessage}</b>
+          <ul className="mt-1">
+            {Object.values(solveResult.solutions).filter((s) => s.status !== "optimal").map((s) => (
+              <li key={s.metric}>{s.metric.replace("L_inf", "L∞")}: {s.status === "feasible_suboptimal" ? "Solución factible sin certificado de optimalidad." : "No hay una solución disponible."}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {/* 2. TABLA UNIFICADA: SOLUCIONES COMPROMISO (VALORES, % LOGRO Y DISTANCIA D_p) */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1314,6 +1357,14 @@ export default function VisualCanvasRight({
       </div>
       <div hidden={workspace !== "method"} className="space-y-4">
       {/* 4. MATRIZ DE PAGOS LITERAL + VECTORES IDEAL Y NADIR SEPARADOS */}
+      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-xl font-semibold">Cómo se calcula el compromiso</h2>
+        <ol className="mt-3 grid gap-3 text-sm leading-relaxed md:grid-cols-3">
+          <li><strong className="block">1. Optimizar cada objetivo</strong> La diagonal de la matriz de pagos da el ideal.</li>
+          <li><strong className="block">2. Medir la brecha</strong> Divide la brecha por el rango entre el ideal y el nadir aproximado.</li>
+          <li><strong className="block">3. Aplicar los pesos</strong> L₁ suma brechas ponderadas, L₂ penaliza sus cuadrados y L∞ minimiza la mayor brecha ponderada.</li>
+        </ol>
+      </section>
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -1440,6 +1491,8 @@ export default function VisualCanvasRight({
       </section>
 
       {/* 5. NORMALIZACIÓN POR RANGO IDEAL–ANTI-IDEAL (FÓRMULAS LATEX + MATRIZ NORMALIZADA) */}
+      <details className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Consultar fórmulas y tablas de normalización</summary>
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
@@ -1584,6 +1637,7 @@ export default function VisualCanvasRight({
           </div>
         </div>
       </section>
+      </details>
 
       {/* 4. ACORDEÓN "MODO RAYOS X (L_inf)" PARA SUSTENTACIÓN */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] bg-white dark:bg-slate-900 overflow-hidden">

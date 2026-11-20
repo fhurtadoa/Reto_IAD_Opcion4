@@ -154,7 +154,12 @@ export default function OptiCompromiseCockpitPage() {
 
       const data: SolveResponse = await res.json();
       if (controller.signal.aborted) return;
-      setCompleted({ model: modelToSolve, result: data });
+      setCompleted(previous => ({
+        model: modelToSolve,
+        result: previous?.model === modelToSolve && previous.result.weight_sensitivity
+          ? { ...data, weight_sensitivity: previous.result.weight_sensitivity }
+          : data,
+      }));
       setSolverStatus(data.status === "partial" ? "partial" : "optimal");
       setSolverMessage(data.message || "Solución óptima calculada");
     } catch (err: unknown) {
@@ -405,8 +410,8 @@ export default function OptiCompromiseCockpitPage() {
         <nav className="workspace-navigation" aria-label="Espacio de trabajo">
           {([
             ["model", "Formular", ListChecks],
-            ["results", "Explorar resultados", ChartNoAxesCombined],
             ["method", "Ver método", FlaskConical],
+            ["results", "Explorar resultados", ChartNoAxesCombined],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" aria-current={workspace === id ? "page" : undefined}
               onClick={() => setWorkspace(id)}>
@@ -443,6 +448,7 @@ export default function OptiCompromiseCockpitPage() {
 
           <VisualCanvasRight
             workspace={workspace}
+            selectedWeight={completed?.model === model && !validationError ? weights[0] : (solveResult?.weights[0] ?? null)}
             model={completed?.model ?? model}
             modelKey={modelKey}
             decisionProfile={decisionProfile}
