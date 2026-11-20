@@ -100,3 +100,7 @@ class SolveResponse(BaseModel):
     weights: List[float]
     pareto_points: Optional[List[ParetoPoint]] = None
     weight_sensitivity: Optional[WeightSensitivityData] = None
+
+
+class ParetoResponse(BaseModel):
+    pareto_points: List[ParetoPoint]

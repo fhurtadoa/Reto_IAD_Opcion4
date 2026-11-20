@@ -283,6 +283,188 @@ class TestAuditRegressions(unittest.TestCase):
         self.assertEqual(result["solutions"]["L2"]["status"], "feasible_suboptimal")
         self.assertEqual(result["solutions"]["L1"]["status"], "optimal")
 
+    def test_paper_extreme_weights_respect_1e8_primal_feasibility(self):
+        from core.payoff import build_linear_constraints, is_feasible
+
+        model = example("06_produccion_papel.json")
+        payoff = compute_payoff_matrix(model)
+        A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
+        var_names = [v.name for v in model.variables]
+        for weights in ([0.95, 0.05], [1.0, 0.0], [0.0, 1.0]):
+            solutions, _ = solve_all_metrics(model, payoff, weights)
+            for metric_name, sol in solutions.items():
+                self.assertEqual(sol.status, "optimal", f"{metric_name} con {weights}")
+                x = np.array([sol.variables[vn] for vn in var_names], dtype=float)
+                self.assertTrue(
+                    is_feasible(x, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8),
+                    f"{metric_name} con {weights} violó factibilidad primal <= 1e-8",
+                )
+                self.assertGreaterEqual(float(np.min(x)), 0.0)
+
+    def test_miqp_polish_matches_exact_continuous_slice(self):
+        model = ModelDefinition.model_validate({
+            "variables": [
+                {"name": "y", "var_type": "binary", "lower_bound": 0.0, "upper_bound": 1.0},
+                {"name": "n", "var_type": "integer", "lower_bound": 0.0, "upper_bound": 8.0},
+                {"name": "c1", "lower_bound": 0.0, "upper_bound": 20.0},
+                {"name": "c2", "lower_bound": 0.0, "upper_bound": 20.0},
+            ],
+            "objectives": [
+                {"name": "Profit", "sense": "maximize", "coefficients": [25.0, 12.0, 5.5, 3.2]},
+                {"name": "Risk", "sense": "minimize", "coefficients": [4.0, 1.5, 2.0, 0.7]},
+            ],
+            "constraints": [
+                {"coefficients": [-6.0, 2.5, 1.2, 0.9], "sense": "<=", "rhs": 14.0},
+                {"coefficients": [0.0, -1.5, 1.0, 1.0], "sense": ">=", "rhs": 2.3},
+                {"coefficients": [5.0, 1.0, 0.5, -1.0], "sense": "<=", "rhs": 8.5},
+                {"coefficients": [0.0, 0.0, 1.0, 1.0], "sense": "<=", "rhs": 15.0},
+            ],
+            "weights": [0.5, 0.5],
+        })
+        payoff = compute_payoff_matrix(model)
+        solutions, _ = solve_all_metrics(model, payoff, model.weights)
+        l2 = solutions["L2"]
+        self.assertEqual(l2.status, "optimal")
+        self.assertEqual(l2.variables["y"], 1.0)
+        self.assertEqual(l2.variables["n"], 3.0)
+        self.assertAlmostEqual(l2.variables["c1"], 0.0, places=8)
+        self.assertAlmostEqual(l2.variables["c2"], 6.8, places=8)
+
+    def test_extreme_overflow_coefficients_return_400_never_500_or_null(self):
+        payload = {
+            "name": "Overflow test",
+            "variables": [{"name": "x1", "lower_bound": 0, "upper_bound": 10}],
+            "objectives": [
+                {"name": "Z1", "sense": "maximize", "coefficients": [1e308]},
+                {"name": "Z2", "sense": "maximize", "coefficients": [1.0]},
+            ],
+            "constraints": [],
+            "weights": [0.5, 0.5],
+        }
+        with TestClient(app) as client:
+            for endpoint in ("/api/payoff", "/api/solve", "/api/pareto"):
+                res = client.post(endpoint, json=payload)
+                self.assertEqual(res.status_code, 400, f"{endpoint}: {res.text}")
+                self.assertIn("detail", res.json())
+
+    def test_mip_perturbed_integer_bound_avoids_slsqp_crash(self):
+        payload = {
+            "name": "bnb_bound_crash",
+            "variables": [
+                {"name": "x1", "var_type": "integer", "lower_bound": 1.00000000001, "upper_bound": 5.0},
+                {"name": "x2", "var_type": "integer", "lower_bound": 0.0, "upper_bound": 5.0},
+                {"name": "x3", "var_type": "integer", "lower_bound": 0.0, "upper_bound": 5.0},
+                {"name": "x4", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 10.0},
+            ],
+            "objectives": [
+                {"name": "Z1", "sense": "maximize", "coefficients": [10.0, 7.0, 5.0, 3.0]},
+                {"name": "Z2", "sense": "minimize", "coefficients": [8.0, 3.0, 9.0, 2.0]},
+                {"name": "Z3", "sense": "minimize", "coefficients": [2.0, 9.0, 3.0, 6.0]},
+            ],
+            "constraints": [
+                {"coefficients": [1.0, 1.0, 1.0, 1.0], "sense": "<=", "rhs": 8.5},
+                {"coefficients": [2.0, 1.0, 3.0, 0.5], "sense": ">=", "rhs": 4.7},
+            ],
+            "weights": [0.4, 0.3, 0.3],
+        }
+        res = TestClient(app).post("/api/solve", json=payload)
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["status"], "optimal")
+        for sol in body["solutions"].values():
+            self.assertEqual(sol["status"], "optimal")
+            self.assertGreaterEqual(sol["variables"]["x1"], 2.0)
+
+    def test_l2_zero_weight_tie_break_avoids_dominated_solution(self):
+        payload = {
+            "name": "w0_dominated_l2",
+            "variables": [
+                {"name": "x1", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 10.0},
+                {"name": "x2", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 4.0},
+                {"name": "x3", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 4.0},
+            ],
+            "objectives": [
+                {"name": "Z0", "sense": "maximize", "coefficients": [1.0, 0.0, 0.0]},
+                {"name": "Z1", "sense": "minimize", "coefficients": [0.0, 1.0, 0.0]},
+                {"name": "Z2", "sense": "minimize", "coefficients": [0.0, 0.0, 1.0]},
+            ],
+            "constraints": [
+                {"coefficients": [1.0, 2.0, 0.0], "sense": "<=", "rhs": 10.0},
+                {"coefficients": [1.0, 0.0, 2.0], "sense": "<=", "rhs": 10.0},
+                {"coefficients": [0.0, 1.0, 1.0], "sense": ">=", "rhs": 4.0},
+            ],
+            "weights": [0.0, 0.6, 0.4],
+        }
+        res = TestClient(app).post("/api/solve", json=payload)
+        self.assertEqual(res.status_code, 200)
+        l2 = res.json()["solutions"]["L2"]
+        self.assertEqual(l2["status"], "optimal")
+        self.assertAlmostEqual(l2["variables"]["x1"], 58.0 / 13.0, places=5)
+
+    def test_integer_fractional_bound_consistent_feasibility_across_metrics(self):
+        payload = {
+            "name": "tol_mismatch_5e8",
+            "variables": [
+                {"name": "x1", "var_type": "integer", "lower_bound": 1.00000005, "upper_bound": 3.0},
+                {"name": "x2", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 3.0},
+            ],
+            "objectives": [
+                {"name": "Z1", "sense": "maximize", "coefficients": [1.0, 1.0]},
+                {"name": "Z2", "sense": "minimize", "coefficients": [1.0, 0.0]},
+            ],
+            "constraints": [{"coefficients": [1.0, 1.0], "sense": "<=", "rhs": 3.5}],
+            "weights": [0.5, 0.5],
+        }
+        res = TestClient(app).post("/api/solve", json=payload)
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["status"], "optimal")
+        for metric, sol in body["solutions"].items():
+            self.assertEqual(sol["status"], "optimal", metric)
+            self.assertGreaterEqual(sol["variables"]["x1"], 2.0)
+
+    def test_unbounded_null_ray_l2_certifies_optimal(self):
+        payload = {
+            "name": "unbounded_null_ray",
+            "variables": [
+                {"name": "x1", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": None},
+                {"name": "x2", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": None},
+            ],
+            "objectives": [
+                {"name": "Z1", "sense": "maximize", "coefficients": [1.0, -2.0]},
+                {"name": "Z2", "sense": "minimize", "coefficients": [0.3, -0.6]},
+            ],
+            "constraints": [
+                {"coefficients": [1.0, -2.0], "sense": "<=", "rhs": 10.0},
+                {"coefficients": [1.0, -2.0], "sense": ">=", "rhs": 0.0},
+            ],
+            "weights": [0.7, 0.3],
+        }
+        res = TestClient(app).post("/api/solve", json=payload)
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertEqual(body["status"], "optimal")
+        self.assertEqual(body["solutions"]["L2"]["status"], "optimal")
+        self.assertAlmostEqual(body["solutions"]["L2"]["objectives"][0], 490.0 / 58.0, places=5)
+
+    def test_lexicographic_payoff_sequential_fallback_on_cancelling_objectives(self):
+        model = ModelDefinition.model_validate({
+            "name": "lex_cancel_m3",
+            "variables": [
+                {"name": "x1", "lower_bound": 0.0, "upper_bound": 10.0},
+                {"name": "x2", "lower_bound": 0.0, "upper_bound": 10.0},
+                {"name": "x3", "lower_bound": 0.0, "upper_bound": 10.0},
+            ],
+            "objectives": [
+                {"name": "Z0", "sense": "maximize", "coefficients": [1.0, 0.0, 0.0]},
+                {"name": "Z1", "sense": "maximize", "coefficients": [0.0, 1.0, 0.0]},
+                {"name": "Z2", "sense": "minimize", "coefficients": [0.0, 1.0, -1e-13]},
+            ],
+        })
+        payoff = compute_payoff_matrix(model)
+        self.assertEqual(payoff.status, "optimal")
+        self.assertEqual(payoff.independent_solutions[0]["x3"], 10.0)
+
 
 if __name__ == "__main__":
     unittest.main()

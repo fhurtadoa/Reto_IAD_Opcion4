@@ -8,7 +8,19 @@ def engine_source(core: Path) -> str:
     blocks = ["# Motor generado por colab/sync_engine.py a partir de api/core."]
     for module in modules:
         lines = (core / f"{module}.py").read_text(encoding="utf-8").splitlines()
-        blocks.append("\n".join(line for line in lines if not line.startswith("from .")).strip())
+        kept: list[str] = []
+        skip_parens = 0
+        for line in lines:
+            if skip_parens > 0:
+                skip_parens += line.count("(") - line.count(")")
+                continue
+            if line.startswith("from ."):
+                delta = line.count("(") - line.count(")")
+                if delta > 0:
+                    skip_parens = delta
+                continue
+            kept.append(line)
+        blocks.append("\n".join(kept).strip())
     blocks.append('''def resolver_opticompromise(model, weights=None, compute_pareto=True):
     definition = ModelDefinition.model_validate(model)
     payoff = compute_payoff_matrix(definition)

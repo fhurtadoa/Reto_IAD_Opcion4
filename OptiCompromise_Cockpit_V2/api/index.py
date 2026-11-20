@@ -15,14 +15,14 @@ from threading import Lock
 from typing import Tuple, List
 
 try:
-    from .core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint
+    from .core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint, ParetoResponse
     from .core.payoff import compute_payoff_matrix
     from .core.compromise import solve_all_metrics
     from .core.pareto import compute_pareto_frontier
     from .core.sensitivity import compute_weight_sensitivity
     from .core.schemas import WeightSensitivityData
 except (ImportError, ValueError):
-    from core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint
+    from core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint, ParetoResponse
     from core.payoff import compute_payoff_matrix
     from core.compromise import solve_all_metrics
     from core.pareto import compute_pareto_frontier
@@ -125,6 +125,23 @@ def _validate_model(model: ModelDefinition) -> None:
             raise HTTPException(status_code=400, detail=f"Valores numéricos inválidos (NaN/Inf) en restricción #{idx + 1}.")
 
 
+def _ensure_finite(value):
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise HTTPException(
+                status_code=400,
+                detail="Desbordamiento numérico al calcular el modelo. Revisa la magnitud de coeficientes y cotas.",
+            )
+    elif hasattr(value, "model_dump"):
+        _ensure_finite(value.model_dump())
+    elif isinstance(value, dict):
+        for v in value.values():
+            _ensure_finite(v)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            _ensure_finite(item)
+
+
 def _require_payoff(model: ModelDefinition) -> PayoffMatrixData:
     payoff = compute_payoff_matrix(model)
     if "error" in payoff.status:
@@ -133,9 +150,12 @@ def _require_payoff(model: ModelDefinition) -> PayoffMatrixData:
             message = "Modelo infactible. Las cotas y restricciones son incompatibles."
         elif "unbounded" in detail:
             message = "Modelo no acotado. Al menos un objetivo puede mejorar sin límite."
+        elif "overflow" in detail or "desbordamiento" in detail:
+            message = "Desbordamiento numérico al evaluar objetivos. Revisa la magnitud de coeficientes y cotas."
         else:
             message = "HiGHS no pudo resolver la matriz de pagos. Revisa las escalas y las cotas."
         raise HTTPException(status_code=400, detail=message)
+    _ensure_finite(payoff)
     return payoff
 
 
@@ -162,6 +182,7 @@ def solve_model(model: ModelDefinition):
         # 3. Muestra de frontera de Pareto (independiente de los pesos actuales)
         pareto_pts = compute_pareto_frontier(model, payoff, num_samples=21)
         sensitivity = compute_weight_sensitivity(model, payoff)
+        _ensure_finite((pareto_pts, sensitivity))
         with _CACHE_LOCK:
             _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts, sensitivity)
             if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
@@ -170,31 +191,44 @@ def solve_model(model: ModelDefinition):
     # 2. Soluciones compromiso para los pesos actuales
     solutions, normalized_weights = solve_all_metrics(model, payoff, weights=model.weights)
 
-    incomplete = [s.metric for s in solutions.values() if s.status != "optimal"]
-    return SolveResponse(
-        status="partial" if incomplete else "optimal",
-        message=(
-            f"Optimalidad sin confirmar para {', '.join(incomplete).replace('L_inf', 'L∞')}."
-            if incomplete else "Optimalidad confirmada para las tres métricas dentro de las tolerancias del motor."
-        ),
+    failed = [s.metric.replace("L_inf", "L∞") for s in solutions.values() if s.status.startswith("error")]
+    incomplete = [
+        s.metric.replace("L_inf", "L∞")
+        for s in solutions.values()
+        if s.status != "optimal" and not s.status.startswith("error")
+    ]
+    if failed and incomplete:
+        msg = (
+            f"No se pudo verificar solución factible para {', '.join(failed)}; "
+            f"optimalidad sin confirmar para {', '.join(incomplete)}."
+        )
+    elif failed:
+        msg = f"No se pudo verificar solución factible para {', '.join(failed)}."
+    elif incomplete:
+        msg = f"Optimalidad sin confirmar para {', '.join(incomplete)}."
+    else:
+        msg = "Optimalidad confirmada para las tres métricas dentro de las tolerancias del motor."
+
+    response = SolveResponse(
+        status="partial" if (failed or incomplete) else "optimal",
+        message=msg,
         payoff=payoff,
         solutions=solutions,
         weights=normalized_weights,
         pareto_points=pareto_pts,
         weight_sensitivity=sensitivity,
     )
+    _ensure_finite(response)
+    return response
 
-@app.post("/api/pareto")
+@app.post("/api/pareto", response_model=ParetoResponse)
 def get_pareto_frontier(model: ModelDefinition):
     _validate_model(model)
     payoff = _require_payoff(model)
     pareto_pts = compute_pareto_frontier(model, payoff, num_samples=25)
-    return {
-        "pareto_points": [
-            p.model_dump() if hasattr(p, "model_dump") else p.dict()
-            for p in pareto_pts
-        ]
-    }
+    response = ParetoResponse(pareto_points=pareto_pts)
+    _ensure_finite(response)
+    return response
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 LEGACY_EXAMPLES = {

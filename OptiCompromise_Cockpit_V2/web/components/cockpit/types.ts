@@ -115,6 +115,7 @@ export const PRESET_OPTIONS: PresetOption[] = [
   { id: "triobjetivo", label: "3. Sostenibilidad 3D (Triobjetivo)", badge: "3V · 3Z" },
   { id: "mip", label: "4. Producción Mixta MIP (Bonus ℤ/{0,1})", badge: "3V · 2Z" },
   { id: "flota", label: "5. Flota Vehículos Eléctricos (4Z)", badge: "6V · 4Z" },
+  { id: "06_produccion_papel", label: "6. Producción de Papel (Taller 1/3)", badge: "12V · 2Z" },
   { id: "blank", label: "+ Nuevo Modelo en Blanco", badge: "Desde cero" },
 ];
 

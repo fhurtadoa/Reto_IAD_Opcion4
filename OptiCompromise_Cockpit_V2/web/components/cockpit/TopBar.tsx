@@ -161,6 +161,9 @@ export default function TopBar({
         <div className="flex flex-wrap items-center gap-1.5">
           <input
             ref={fileInputRef}
+            id="import-model-file"
+            name="import-model-file"
+            aria-label="Importar archivo de modelo"
             type="file"
             accept=".json,.xlsx,.xls,.csv,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"

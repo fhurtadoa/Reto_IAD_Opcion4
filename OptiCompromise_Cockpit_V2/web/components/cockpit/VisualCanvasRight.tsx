@@ -102,6 +102,7 @@ export default function VisualCanvasRight({
   const plotBg = isDark ? "#1E293B" : "#F8FAFC";
   const gridColor = isDark ? "#334155" : "#E2E8F0";
   const textColor = isDark ? "#E2E8F0" : "#0F172A";
+  const l2Color = isDark ? "#CBD5E1" : SEMANTIC_COLORS.L2;
 
   const headers = solveResult?.payoff?.headers || model.objectives.map((o) => o.name);
   const nObjs = headers.length;
@@ -205,9 +206,14 @@ export default function VisualCanvasRight({
     const isPure2D = nObjs === 2;
     const isMixedInt = model.variables.some((v) => v.var_type !== "continuous");
 
-    const sortedPareto = [...pareto_points].sort(
-      (a, b) => a.objectives[safeAxisX] - b.objectives[safeAxisX]
-    );
+    const senseY2D = model.objectives[safeAxisY]?.sense ?? "maximize";
+    const sortedPareto = [...pareto_points].sort((a, b) => {
+      const dx = a.objectives[safeAxisX] - b.objectives[safeAxisX];
+      if (Math.abs(dx) > 1e-9) return dx;
+      return senseY2D === "maximize"
+        ? b.objectives[safeAxisY] - a.objectives[safeAxisY]
+        : a.objectives[safeAxisY] - b.objectives[safeAxisY];
+    });
 
     const traces: PlotTrace[] = [];
 
@@ -314,7 +320,7 @@ export default function VisualCanvasRight({
 
       const paretoMetricGroups = [
         { key: "L1", name: "Pareto L₁", color: SEMANTIC_COLORS.L1, symbol: "triangle-up" },
-        { key: "L2", name: "Pareto L₂", color: "#64748B", symbol: "circle" },
+        { key: "L2", name: "Pareto L₂", color: isDark ? "#94A3B8" : "#64748B", symbol: "circle" },
         { key: "L_inf", name: "Pareto L∞", color: "#E11D48", symbol: "diamond" },
       ];
 
@@ -351,7 +357,8 @@ export default function VisualCanvasRight({
         solveResult.weights,
         solutions,
         safeAxisX,
-        safeAxisY
+        safeAxisY,
+        isDark
       );
       isoTraces.forEach((iso) => {
         traces.push({
@@ -375,6 +382,7 @@ export default function VisualCanvasRight({
       name: "Ideal (Z*)",
       text: ["★ Ideal"],
       textposition: "top center",
+      cliponaxis: false,
       textfont: { color: SEMANTIC_COLORS.ideal, size: 11 },
       marker: {
         symbol: "star",
@@ -393,6 +401,7 @@ export default function VisualCanvasRight({
       name: "Nadir aproximado",
       text: ["✕ Nadir aprox."],
       textposition: "bottom center",
+      cliponaxis: false,
       textfont: { color: SEMANTIC_COLORS.nadir, size: 11 },
       marker: { symbol: "x", size: 12, color: SEMANTIC_COLORS.nadir, line: { width: 2.5 } },
     });
@@ -400,11 +409,11 @@ export default function VisualCanvasRight({
     // L1, L2, L_inf (agrupar etiquetas si coinciden en el mismo punto para evitar solapamientos)
     const metricDefs = [
       { key: "L1", label: "L₁", name: "L₁ (Compensatoria)", color: SEMANTIC_COLORS.L1, symbol: "square", pos: "top right", size: 13 },
-      { key: "L2", label: "L₂", name: "L₂ (Euclidiana)", color: SEMANTIC_COLORS.L2, symbol: "circle", pos: "bottom right", size: 12 },
+      { key: "L2", label: "L₂", name: "L₂ (Euclidiana)", color: l2Color, symbol: "circle", pos: "bottom right", size: 12 },
       { key: "L_inf", label: "L∞", name: "L∞ (Minimax)", color: SEMANTIC_COLORS.L_inf, symbol: "diamond", pos: "top left", size: 13 },
     ];
-    const coordSpanX = Math.max(1, Math.abs((ideal[safeAxisX] ?? 0) - (nadir[safeAxisX] ?? 0)));
-    const coordSpanY = Math.max(1, Math.abs((ideal[safeAxisY] ?? 0) - (nadir[safeAxisY] ?? 0)));
+    const coordSpanX = payoff.normalization_ranges?.[safeAxisX] || Math.abs((ideal[safeAxisX] ?? 0) - (nadir[safeAxisX] ?? 0)) || 1;
+    const coordSpanY = payoff.normalization_ranges?.[safeAxisY] || Math.abs((ideal[safeAxisY] ?? 0) - (nadir[safeAxisY] ?? 0)) || 1;
 
     metricDefs.forEach((m, idxM) => {
       const sol = solutions[m.key];
@@ -438,6 +447,7 @@ export default function VisualCanvasRight({
         name: m.name,
         text: dupEarlier ? undefined : [coLocated.join(" = ")],
         textposition: m.pos,
+        cliponaxis: false,
         textfont: { color: m.color, size: 12 },
         marker: {
           symbol: m.symbol,
@@ -461,10 +471,10 @@ export default function VisualCanvasRight({
         xaxis: { ...constantAxis(payoff, safeAxisX), title: { text: headers[safeAxisX] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
         yaxis: { ...constantAxis(payoff, safeAxisY), title: { text: headers[safeAxisY] }, gridcolor: gridColor, zerolinecolor: gridColor, automargin: true },
         legend: { orientation: "h", y: -0.25, font: { size: 10 } },
-        margin: { l: 64, r: 24, t: 18, b: 78 },
+        margin: { l: 64, r: 48, t: 22, b: 84 },
       },
     };
-  }, [solveResult, model, safeAxisX, safeAxisY, showIsodistance, showPareto, showFeasibleObj, nVars, isDark, headers, nObjs, paperBg, plotBg, gridColor, textColor, modelKey]);
+  }, [solveResult, model, safeAxisX, safeAxisY, showIsodistance, showPareto, showFeasibleObj, nVars, isDark, headers, nObjs, paperBg, plotBg, gridColor, textColor, l2Color, modelKey]);
 
   // --- Construcción de datos 3D ---
   const { data3D, layout3D } = useMemo(() => {
@@ -477,7 +487,7 @@ export default function VisualCanvasRight({
     if (showPareto && pareto_points.length > 0) {
       const paretoMetricGroups3D = [
         { key: "L1", name: "Pareto L₁", color: SEMANTIC_COLORS.L1, symbol: "diamond" },
-        { key: "L2", name: "Pareto L₂", color: "#64748B", symbol: "circle" },
+        { key: "L2", name: "Pareto L₂", color: isDark ? "#94A3B8" : "#64748B", symbol: "circle" },
         { key: "L_inf", name: "Pareto L∞", color: "#E11D48", symbol: "cross" },
       ];
       paretoMetricGroups3D.forEach((grp) => {
@@ -524,7 +534,7 @@ export default function VisualCanvasRight({
 
     [
       { key: "L1", label: "L₁", color: SEMANTIC_COLORS.L1 },
-      { key: "L2", label: "L₂", color: SEMANTIC_COLORS.L2 },
+      { key: "L2", label: "L₂", color: l2Color },
       { key: "L_inf", label: "L∞", color: SEMANTIC_COLORS.L_inf },
     ].forEach((m) => {
       const sol = solutions[m.key];
@@ -560,7 +570,7 @@ export default function VisualCanvasRight({
         margin: { l: 0, r: 0, t: 10, b: 10 },
       },
     };
-  }, [solveResult, nObjs, safe3DX, safe3DY, safe3DZ, showPareto, headers, paperBg, plotBg, gridColor, textColor, modelKey]);
+  }, [solveResult, nObjs, safe3DX, safe3DY, safe3DZ, showPareto, headers, isDark, paperBg, plotBg, gridColor, textColor, l2Color, modelKey]);
 
   // --- Construcción Radar (% Logro) cuando nObjs >= 3 ---
   const { dataRadar, layoutRadar } = useMemo(() => {
@@ -594,7 +604,7 @@ export default function VisualCanvasRight({
         marker: { size: 4, color: SEMANTIC_COLORS.ideal },
       },
       makeTrace("L1", "L₁ (Manhattan)", SEMANTIC_COLORS.L1, "rgba(37, 99, 235, 0.12)"),
-      makeTrace("L2", "L₂ (Euclidiana)", SEMANTIC_COLORS.L2, "rgba(51, 65, 85, 0.12)"),
+      makeTrace("L2", "L₂ (Euclidiana)", l2Color, isDark ? "rgba(203, 213, 225, 0.14)" : "rgba(51, 65, 85, 0.12)"),
       makeTrace("L_inf", "L∞ (Minimax)", SEMANTIC_COLORS.L_inf, "rgba(225, 29, 72, 0.14)"),
     ].filter(Boolean);
 
@@ -617,10 +627,10 @@ export default function VisualCanvasRight({
           angularaxis: { gridcolor: gridColor, linecolor: gridColor },
         },
         legend: { orientation: "h", y: -0.15, font: { size: 10 } },
-        margin: { l: 50, r: 50, t: 24, b: 56 },
+        margin: { l: 60, r: 60, t: 42, b: 56 },
       },
     };
-  }, [solveResult, nObjs, headers, paperBg, plotBg, gridColor, textColor, modelKey]);
+  }, [solveResult, nObjs, headers, isDark, paperBg, plotBg, gridColor, textColor, l2Color, modelKey]);
 
   // --- Construcción Espacio de Decisiones 2D ---
   const { dataDec, layoutDec } = useMemo(() => {
@@ -673,21 +683,46 @@ export default function VisualCanvasRight({
       });
     }
 
-    [
+    const decSpanX = poly && poly.x.length ? Math.max(1e-6, Math.max(...poly.x) - Math.min(...poly.x)) : 1;
+    const decSpanY = poly && poly.y.length ? Math.max(1e-6, Math.max(...poly.y) - Math.min(...poly.y)) : 1;
+    const decMetricDefs = [
       { key: "L1", label: "L₁", color: SEMANTIC_COLORS.L1, symbol: "square", pos: "top right" },
-      { key: "L2", label: "L₂", color: SEMANTIC_COLORS.L2, symbol: "circle", pos: "bottom right" },
+      { key: "L2", label: "L₂", color: l2Color, symbol: "circle", pos: "bottom right" },
       { key: "L_inf", label: "L∞", color: SEMANTIC_COLORS.L_inf, symbol: "diamond", pos: "top left" },
-    ].forEach((m) => {
+    ];
+    decMetricDefs.forEach((m, idxM) => {
       const sol = solveResult.solutions[m.key];
       if (!sol) return;
+      const sx = sol.variables[v0];
+      const sy = sol.variables[v1];
+      const dupEarlier = decMetricDefs.slice(0, idxM).some((prev) => {
+        const ps = solveResult.solutions[prev.key];
+        return (
+          ps &&
+          Math.abs(ps.variables[v0] - sx) < 1e-3 * decSpanX &&
+          Math.abs(ps.variables[v1] - sy) < 1e-3 * decSpanY
+        );
+      });
+      const coLocated = decMetricDefs
+        .filter((other) => {
+          const os = solveResult.solutions[other.key];
+          return (
+            os &&
+            Math.abs(os.variables[v0] - sx) < 1e-3 * decSpanX &&
+            Math.abs(os.variables[v1] - sy) < 1e-3 * decSpanY
+          );
+        })
+        .map((o) => o.label);
+
       traces.push({
-        x: [sol.variables[v0]],
-        y: [sol.variables[v1]],
-        mode: "markers+text",
+        x: [sx],
+        y: [sy],
+        mode: dupEarlier ? "markers" : "markers+text",
         type: "scatter",
         name: `Solución ${m.label}`,
-        text: [`${m.label} (${fmtNum(sol.variables[v0], 1)}, ${fmtNum(sol.variables[v1], 1)})`],
+        text: dupEarlier ? undefined : [`${coLocated.join(" = ")} (${fmtNum(sx, 1)}, ${fmtNum(sy, 1)})`],
         textposition: m.pos,
+        cliponaxis: false,
         textfont: { color: m.color, size: 11 },
         marker: { symbol: m.symbol, size: 13, color: m.color, line: { color: "#FFFFFF", width: 1.5 } },
       });
@@ -704,10 +739,10 @@ export default function VisualCanvasRight({
         xaxis: { title: { text: v0 }, gridcolor: gridColor, zerolinecolor: gridColor },
         yaxis: { title: { text: v1 }, gridcolor: gridColor, zerolinecolor: gridColor },
         legend: { orientation: "h", y: -0.22, font: { size: 10 } },
-        margin: { l: 55, r: 24, t: 18, b: 64 },
+        margin: { l: 58, r: 48, t: 22, b: 68 },
       },
     };
-  }, [solveResult, model, nVars, isDark, paperBg, plotBg, gridColor, textColor, modelKey]);
+  }, [solveResult, model, nVars, isDark, paperBg, plotBg, gridColor, textColor, l2Color, modelKey]);
 
   // Estado vacío o error inicial (si ya existe solveResult previo, mantenemos el contexto con banner arriba)
   const hasActiveError =
@@ -858,8 +893,10 @@ export default function VisualCanvasRight({
             {(effectiveTab === "objectives2d" || effectiveTab === "objectives3d") && (
               <>
                 {effectiveTab === "objectives2d" && nVars === 2 && (
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
+                  <label htmlFor="toggle-feasible-obj" className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
                     <input
+                      id="toggle-feasible-obj"
+                      name="toggle-feasible-obj"
                       type="checkbox"
                       checked={showFeasibleObj}
                       onChange={(e) => setShowFeasibleObj(e.target.checked)}
@@ -869,8 +906,10 @@ export default function VisualCanvasRight({
                   </label>
                 )}
                 {effectiveTab === "objectives2d" && (
-                  <label className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
+                  <label htmlFor="toggle-isodistance" className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
                     <input
+                      id="toggle-isodistance"
+                      name="toggle-isodistance"
                       type="checkbox"
                       checked={showIsodistance}
                       onChange={(e) => setShowIsodistance(e.target.checked)}
@@ -879,8 +918,10 @@ export default function VisualCanvasRight({
                     <span>Curvas Isodistancia</span>
                   </label>
                 )}
-                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
+                <label htmlFor="toggle-pareto" className="inline-flex items-center gap-1.5 cursor-pointer select-none text-slate-600 dark:text-slate-300">
                   <input
+                    id="toggle-pareto"
+                    name="toggle-pareto"
                     type="checkbox"
                     checked={showPareto}
                     onChange={(e) => setShowPareto(e.target.checked)}
@@ -894,9 +935,15 @@ export default function VisualCanvasRight({
             {effectiveTab === "objectives2d" && nObjs > 2 && (
               <div className="grid min-w-0 w-full gap-1 sm:flex sm:flex-wrap">
                 <select
+                  id="axis-x-select"
+                  name="axis-x"
                   value={safeAxisX}
                   aria-label="Objetivo del eje X"
-                  onChange={(e) => setAxisX(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10);
+                    if (next === safeAxisY) setAxisY(safeAxisX);
+                    setAxisX(next);
+                  }}
                   className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => (
@@ -904,9 +951,15 @@ export default function VisualCanvasRight({
                   ))}
                 </select>
                 <select
+                  id="axis-y-select"
+                  name="axis-y"
                   value={safeAxisY}
                   aria-label="Objetivo del eje Y"
-                  onChange={(e) => setAxisY(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10);
+                    if (next === safeAxisX) setAxisX(safeAxisY);
+                    setAxisY(next);
+                  }}
                   className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => (
@@ -919,25 +972,46 @@ export default function VisualCanvasRight({
             {effectiveTab === "objectives3d" && nObjs > 3 && (
               <div className="grid min-w-0 w-full gap-1 sm:flex sm:flex-wrap">
                 <select
+                  id="axis-3dx-select"
+                  name="axis-3dx"
                   value={safe3DX}
-                  aria-label="Objetivo del eje X"
-                  onChange={(e) => setAxis3DX(parseInt(e.target.value))}
+                  aria-label="Objetivo del eje X 3D"
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10);
+                    if (next === safe3DY) setAxis3DY(safe3DX);
+                    else if (next === safe3DZ) setAxis3DZ(safe3DX);
+                    setAxis3DX(next);
+                  }}
                   className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>X: {h}</option>)}
                 </select>
                 <select
+                  id="axis-3dy-select"
+                  name="axis-3dy"
                   value={safe3DY}
-                  aria-label="Objetivo del eje Y"
-                  onChange={(e) => setAxis3DY(parseInt(e.target.value))}
+                  aria-label="Objetivo del eje Y 3D"
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10);
+                    if (next === safe3DX) setAxis3DX(safe3DY);
+                    else if (next === safe3DZ) setAxis3DZ(safe3DY);
+                    setAxis3DY(next);
+                  }}
                   className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>Y: {h}</option>)}
                 </select>
                 <select
+                  id="axis-3dz-select"
+                  name="axis-3dz"
                   value={safe3DZ}
-                  aria-label="Objetivo del eje Z"
-                  onChange={(e) => setAxis3DZ(parseInt(e.target.value))}
+                  aria-label="Objetivo del eje Z 3D"
+                  onChange={(e) => {
+                    const next = parseInt(e.target.value, 10);
+                    if (next === safe3DX) setAxis3DX(safe3DZ);
+                    else if (next === safe3DY) setAxis3DY(safe3DZ);
+                    setAxis3DZ(next);
+                  }}
                   className="min-w-0 max-w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded px-1 py-0.5 text-[11px]"
                 >
                   {headers.map((h, i) => <option key={i} value={i}>Z: {h}</option>)}
@@ -1042,7 +1116,7 @@ export default function VisualCanvasRight({
                   <span className="font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
                     Aproximación de Pareto ({allPareto.length} puntos)
                   </span>
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-[#2563EB]/10 text-[#2563EB] font-mono font-semibold">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-[#2563EB]/10 text-[#2563EB] dark:text-blue-400 font-mono font-semibold">
                     L₁: {countL1}
                   </span>
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-semibold">
@@ -1112,7 +1186,7 @@ export default function VisualCanvasRight({
                         {filteredPts.map((pt, idx) => {
                           const badgeClass =
                             pt.metric === "L1"
-                              ? "bg-[#2563EB]/10 text-[#2563EB]"
+                              ? "bg-[#2563EB]/10 text-[#2563EB] dark:text-blue-400"
                               : pt.metric === "L_inf"
                               ? "bg-[#E11D48]/10 text-[#E11D48]"
                               : "bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300";
@@ -1191,7 +1265,7 @@ export default function VisualCanvasRight({
               <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
                 <th className="text-left py-2 pr-3 font-semibold">Criterio / Métrica</th>
                 <th className="text-center py-2 px-2 font-semibold">Peso (wᵢ)</th>
-                <th className="text-right py-2 px-3 font-bold text-[#2563EB]">L₁ (Manhattan)</th>
+                <th className="text-right py-2 px-3 font-bold text-[#2563EB] dark:text-blue-400">L₁ (Manhattan)</th>
                 <th className="text-right py-2 px-3 font-bold text-slate-800 dark:text-slate-200">L₂ (Euclidiana)</th>
                 <th className="text-right py-2 pl-3 font-bold text-[#E11D48]">L∞ (Minimax)</th>
               </tr>
@@ -1285,7 +1359,7 @@ export default function VisualCanvasRight({
               <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
                 <th className="text-left py-2 pr-3 font-semibold">Variable</th>
                 <th className="text-center py-2 px-2 font-semibold">Tipo / Dominio</th>
-                <th className="text-right py-2 px-3 font-bold text-[#2563EB]">L₁ (x*)</th>
+                <th className="text-right py-2 px-3 font-bold text-[#2563EB] dark:text-blue-400">L₁ (x*)</th>
                 <th className="text-right py-2 px-3 font-bold text-slate-800 dark:text-slate-200">L₂ (x*)</th>
                 <th className="text-right py-2 pl-3 font-bold text-[#E11D48]">L∞ (x*)</th>
               </tr>

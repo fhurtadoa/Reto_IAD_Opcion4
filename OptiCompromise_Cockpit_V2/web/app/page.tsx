@@ -23,6 +23,15 @@ import {
   importModelFromFile,
 } from "../components/cockpit/mathUtils";
 
+const RESERVED_COL_NAMES = new Set([
+  "seccion",
+  "sección",
+  "nombre",
+  "tipo_o_sentido",
+  "min_o_rhs",
+  "max_o_peso",
+]);
+
 function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): string | null {
   if (m.variables.length < 1) return "Agrega al menos 1 variable de decisión.";
   if (m.objectives.length < 2) return "Un problema multiobjetivo requiere al menos 2 objetivos.";
@@ -30,6 +39,9 @@ function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): str
   for (const v of m.variables) {
     const clean = v.name.trim();
     if (!clean) return "Todas las variables deben tener un nombre no vacío.";
+    if (RESERVED_COL_NAMES.has(clean.toLowerCase())) {
+      return `El nombre "${clean}" está reservado para exportación tabular. Usa otro identificador.`;
+    }
     if (seen.has(clean)) return `Variable duplicada: "${clean}". Cambia el nombre para que sea único.`;
     seen.add(clean);
     if (
@@ -267,7 +279,11 @@ export default function OptiCompromiseCockpitPage() {
     presetRequestRef.current++;
     setModel(updated);
     const w = newWeights ?? weights;
-    if (newWeights) setWeights(newWeights);
+    if (newWeights) {
+      setWeights(newWeights);
+      const allEqual = newWeights.every((val) => Math.abs(val - newWeights[0]) < 0.02);
+      setDecisionProfile(allEqual ? "equitativo" : "personalizado");
+    }
     const clientErr = validateModelClient(updated, w);
     setValidationError(clientErr);
     if (!clientErr) {
@@ -359,6 +375,8 @@ export default function OptiCompromiseCockpitPage() {
     const n = weights.length;
     const normalized = sum <= 1e-6 ? Array(n).fill(1 / n) : weights.map((w) => w / sum);
     setWeights(normalized);
+    const allEqual = normalized.every((val) => Math.abs(val - normalized[0]) < 0.02);
+    setDecisionProfile(allEqual ? "equitativo" : "personalizado");
     setValidationError(null);
     executeSolve(model, normalized);
   };
@@ -460,10 +478,18 @@ export default function OptiCompromiseCockpitPage() {
             onNormalizeWeights={handleNormalizeWeights}
             onManualSolve={(updated, nextWeights) => {
               presetRequestRef.current++;
+              const targetModel = updated ?? model;
+              const targetWeights = nextWeights ?? weights;
               if (updated) setModel(updated);
-              if (nextWeights) setWeights(nextWeights);
-              setWorkspace("results");
-              executeSolve(updated ?? model, nextWeights ?? weights);
+              if (nextWeights) {
+                setWeights(nextWeights);
+                const allEqual = nextWeights.every((val) => Math.abs(val - nextWeights[0]) < 0.02);
+                setDecisionProfile(allEqual ? "equitativo" : "personalizado");
+              }
+              if (!validateModelClient(targetModel, targetWeights)) {
+                setWorkspace("results");
+              }
+              executeSolve(targetModel, targetWeights);
             }}
             isCalculating={solverStatus === "calculating"}
           />

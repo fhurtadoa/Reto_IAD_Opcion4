@@ -30,6 +30,9 @@ import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
 
 interface NumericInputProps {
+  id?: string;
+  name?: string;
+  ariaLabel?: string;
   value: number | null | undefined;
   onCommit: (val: number | null) => void;
   allowNull?: boolean;
@@ -46,6 +49,9 @@ interface NumericInputProps {
  * permite borrar dígitos o empezar a escribir "-" sin forzar 0 en cada tecla.
  */
 function NumericInput({
+  id,
+  name,
+  ariaLabel,
   value,
   onCommit,
   allowNull = false,
@@ -90,7 +96,7 @@ function NumericInput({
   const handleBlur = () => {
     setFocused(false);
     const trimmed = draft.trim();
-    if (trimmed === "" || trimmed === "-" || trimmed === "." || trimmed === "-.") {
+    if (trimmed === "" || trimmed === "-" || trimmed === "." || trimmed === "-." || /[eE][+-]?$/.test(trimmed)) {
       const fallback = allowNull ? null : 0;
       onCommit(fallback);
       setDraft(formatProp(fallback));
@@ -110,6 +116,9 @@ function NumericInput({
 
   return (
     <input
+      id={id}
+      name={name}
+      aria-label={ariaLabel || title}
       type="text"
       inputMode="decimal"
       value={draft}
@@ -332,23 +341,20 @@ export default function ControlPanelLeft({
     onModelChange({ ...model, constraints: nextCons });
   };
 
-  const handleApplyAlgebraic = () => {
+  const parseDraftIntoModel = (): { updated: ModelDefinition; nextWeights?: number[] } | null => {
     if (algebraicText === modelToAlgebraicText(model)) {
       setAlgebraicDirty(false);
       setAlgebraicErrors([]);
-      onManualSolve(model, weights);
-      return;
+      return { updated: model };
     }
     const parsed = parseAlgebraicModel(algebraicText, model);
     if (!parsed.ok || !parsed.objectives || !parsed.constraints || !parsed.detectedVariables) {
       setAlgebraicErrors(parsed.errors);
-      return;
+      return null;
     }
 
     const updatedVars = parsed.detectedVariables.map((vName) => {
-      const existing = model.variables.find(
-        (v) => v.name === vName
-      );
+      const existing = model.variables.find((v) => v.name === vName);
       return (
         existing || {
           name: vName,
@@ -360,23 +366,35 @@ export default function ControlPanelLeft({
     });
 
     const nObjs = parsed.objectives.length;
-    let nextW = weights;
-    if (weights.length !== nObjs) {
-      nextW = Array(nObjs).fill(1 / nObjs);
-    }
+    const nextW = weights.length !== nObjs ? Array(nObjs).fill(1 / nObjs) : undefined;
 
     setAlgebraicDirty(false);
     setAlgebraicErrors([]);
 
-    onManualSolve(
-      {
+    return {
+      updated: {
         ...model,
         variables: updatedVars,
         objectives: parsed.objectives,
         constraints: parsed.constraints,
       },
-      nextW
-    );
+      nextWeights: nextW,
+    };
+  };
+
+  const handleApplyAlgebraic = () => {
+    const applied = parseDraftIntoModel();
+    if (!applied) return;
+    onManualSolve(applied.updated, applied.nextWeights ?? weights);
+  };
+
+  const handleSwitchToTable = () => {
+    if (editorTab === "algebraic" && algebraicDirty) {
+      const applied = parseDraftIntoModel();
+      if (!applied) return;
+      onModelChange(applied.updated, applied.nextWeights);
+    }
+    setEditorTab("table");
   };
 
   return (
@@ -387,6 +405,8 @@ export default function ControlPanelLeft({
       <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
           <input
+            id="model-name-input"
+            name="model-name"
             type="text"
             value={model.name}
             onChange={(e) => onModelChange({ ...model, name: e.target.value })}
@@ -397,7 +417,7 @@ export default function ControlPanelLeft({
           <button
             type="button"
             onClick={() => editorTab === "algebraic" && algebraicDirty ? handleApplyAlgebraic() : onManualSolve()}
-            disabled={isCalculating || Boolean(validationError)}
+            disabled={isCalculating || (Boolean(validationError) && !(editorTab === "algebraic" && algebraicDirty))}
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white disabled:opacity-50 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
@@ -405,6 +425,8 @@ export default function ControlPanelLeft({
           </button>
         </div>
         <textarea
+          id="model-description-input"
+          name="model-description"
           rows={2}
           value={model.description || ""}
           onChange={(e) => onModelChange({ ...model, description: e.target.value })}
@@ -414,7 +436,7 @@ export default function ControlPanelLeft({
         />
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
           Fuente académica (opcional)
-          <input type="text" value={model.reference ?? ""}
+          <input id="model-reference-input" name="model-reference" type="text" value={model.reference ?? ""}
             onChange={e => onModelChange({ ...model, reference: e.target.value })}
             className="mt-1 block w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 dark:border-slate-700"
             placeholder="Curso, taller o referencia del ejercicio" />
@@ -425,9 +447,21 @@ export default function ControlPanelLeft({
       {validationError && (
         <div role="alert" className="flex items-start gap-2 p-3 rounded-sm bg-rose-50 dark:bg-rose-950/40 border-2 border-[#E11D48] text-xs text-rose-900 dark:text-rose-200">
           <AlertCircle className="w-4 h-4 text-[#E11D48] shrink-0 mt-0.5" />
-          <div>
-            <span className="font-bold block">Error de Validación del Modelo:</span>
-            <span>{validationError}</span>
+          <div className="space-y-1.5">
+            <div>
+              <span className="font-bold block">Error de Validación del Modelo:</span>
+              <span>{validationError}</span>
+            </div>
+            {!isWeightSumValid && (
+              <button
+                type="button"
+                onClick={onNormalizeWeights}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors"
+              >
+                <Scale className="w-3 h-3" />
+                <span>Normalizar pesos (1.00)</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -441,7 +475,7 @@ export default function ControlPanelLeft({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setEditorTab("table")}
+              onClick={handleSwitchToTable}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                 editorTab === "table"
                   ? "bg-[#E11D48] text-white"
@@ -518,6 +552,9 @@ export default function ControlPanelLeft({
                       className="grid grid-cols-[1.8fr_1.1fr_0.75fr_0.75fr_24px] gap-1.5 items-center bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-sm border border-slate-200 dark:border-slate-700/60"
                     >
                       <input
+                        id={`var-name-${idx}`}
+                        name={`var-name-${idx}`}
+                        aria-label={`Nombre de variable ${idx + 1}`}
                         type="text"
                         value={v.name}
                         title={v.name}
@@ -526,6 +563,9 @@ export default function ControlPanelLeft({
                         placeholder="x1 (Nombre)"
                       />
                       <select
+                        id={`var-type-${idx}`}
+                        name={`var-type-${idx}`}
+                        aria-label={`Tipo de variable ${v.name || idx + 1}`}
                         value={v.var_type}
                         onChange={(e) => handleVarChange(idx, "var_type", e.target.value)}
                         className="text-[11px] px-1 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-[#E11D48] min-w-0"
@@ -535,6 +575,9 @@ export default function ControlPanelLeft({
                         <option value="binary">Binaria</option>
                       </select>
                       <NumericInput
+                        id={`var-lb-${idx}`}
+                        name={`var-lb-${idx}`}
+                        ariaLabel={`Cota inferior de ${v.name || `variable ${idx + 1}`}`}
                         value={v.lower_bound}
                         allowNull={true}
                         onCommit={(val) => handleVarBound(idx, "lower_bound", val)}
@@ -544,6 +587,9 @@ export default function ControlPanelLeft({
                         className="text-xs font-mono text-right px-1 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50 focus:outline-[#E11D48] min-w-0"
                       />
                       <NumericInput
+                        id={`var-ub-${idx}`}
+                        name={`var-ub-${idx}`}
+                        ariaLabel={`Cota superior de ${v.name || `variable ${idx + 1}`}`}
                         value={v.upper_bound}
                         allowNull={true}
                         onCommit={(val) => handleVarBound(idx, "upper_bound", val)}
@@ -558,6 +604,7 @@ export default function ControlPanelLeft({
                         disabled={model.variables.length <= 1}
                         className="flex justify-center text-slate-400 hover:text-[#E11D48] disabled:opacity-30 cursor-pointer"
                         title="Eliminar variable"
+                        aria-label={`Eliminar variable ${v.name || idx + 1}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -607,6 +654,9 @@ export default function ControlPanelLeft({
                     >
                       <div className="flex items-center gap-1.5">
                         <select
+                          id={`obj-sense-${oIdx}`}
+                          name={`obj-sense-${oIdx}`}
+                          aria-label={`Sentido del objetivo ${oIdx + 1}`}
                           value={obj.sense}
                           onChange={(e) => handleObjField(oIdx, "sense", e.target.value)}
                           className={`text-[11px] font-bold px-1.5 py-1 rounded-sm border ${
@@ -619,6 +669,9 @@ export default function ControlPanelLeft({
                           <option value="minimize">Min</option>
                         </select>
                         <input
+                          id={`obj-name-${oIdx}`}
+                          name={`obj-name-${oIdx}`}
+                          aria-label={`Nombre del objetivo ${oIdx + 1}`}
                           type="text"
                           value={obj.name}
                           onChange={(e) => handleObjField(oIdx, "name", e.target.value)}
@@ -630,6 +683,7 @@ export default function ControlPanelLeft({
                           disabled={model.objectives.length <= 2}
                           className="text-slate-400 hover:text-[#E11D48] disabled:opacity-30 cursor-pointer"
                           title="Eliminar objetivo"
+                          aria-label={`Eliminar objetivo ${obj.name || oIdx + 1}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -639,12 +693,16 @@ export default function ControlPanelLeft({
                         {model.variables.map((v, vIdx) => (
                           <label
                             key={vIdx}
+                            htmlFor={`obj-${oIdx}-var-${vIdx}`}
                             className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm px-1.5 py-0.5"
                           >
                             <span className="text-[10px] font-mono text-slate-400">
                               {v.name.split(" ")[0]}:
                             </span>
                             <NumericInput
+                              id={`obj-${oIdx}-var-${vIdx}`}
+                              name={`obj-${oIdx}-var-${vIdx}`}
+                              ariaLabel={`Coeficiente de ${v.name} en objetivo ${obj.name || oIdx + 1}`}
                               value={obj.coefficients[vIdx] ?? 0}
                               onCommit={(val) => handleObjCoeff(oIdx, vIdx, val ?? 0)}
                               className="w-14 text-right font-mono text-[11px] bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none"
@@ -698,12 +756,18 @@ export default function ControlPanelLeft({
                     >
                       <div className="flex items-center gap-1.5">
                         <input
+                          id={`con-name-${cIdx}`}
+                          name={`con-name-${cIdx}`}
+                          aria-label={`Nombre de restricción ${cIdx + 1}`}
                           type="text"
                           value={c.name}
                           onChange={(e) => handleConField(cIdx, "name", e.target.value)}
                           className="flex-1 text-xs font-medium px-2 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
                         />
                         <select
+                          id={`con-sense-${cIdx}`}
+                          name={`con-sense-${cIdx}`}
+                          aria-label={`Operador de restricción ${c.name || cIdx + 1}`}
                           value={c.sense}
                           onChange={(e) => handleConField(cIdx, "sense", e.target.value)}
                           className="text-xs font-mono font-bold px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[#E11D48]"
@@ -713,6 +777,9 @@ export default function ControlPanelLeft({
                           <option value="==">=</option>
                         </select>
                         <NumericInput
+                          id={`con-rhs-${cIdx}`}
+                          name={`con-rhs-${cIdx}`}
+                          ariaLabel={`Lado derecho de restricción ${c.name || cIdx + 1}`}
                           value={c.rhs}
                           onCommit={(val) => handleConField(cIdx, "rhs", val ?? 0)}
                           className="w-20 text-right font-mono text-xs px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
@@ -722,6 +789,7 @@ export default function ControlPanelLeft({
                           onClick={() => handleRemoveConstraint(cIdx)}
                           className="text-slate-400 hover:text-[#E11D48]"
                           title="Eliminar restricción"
+                          aria-label={`Eliminar restricción ${c.name || cIdx + 1}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -731,12 +799,16 @@ export default function ControlPanelLeft({
                         {model.variables.map((v, vIdx) => (
                           <label
                             key={vIdx}
+                            htmlFor={`con-${cIdx}-var-${vIdx}`}
                             className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm px-1.5 py-0.5"
                           >
                             <span className="text-[10px] font-mono text-slate-400">
                               {v.name.split(" ")[0]}:
                             </span>
                             <NumericInput
+                              id={`con-${cIdx}-var-${vIdx}`}
+                              name={`con-${cIdx}-var-${vIdx}`}
+                              ariaLabel={`Coeficiente de ${v.name} en restricción ${c.name || cIdx + 1}`}
                               value={c.coefficients[vIdx] ?? 0}
                               onCommit={(val) => handleConCoeff(cIdx, vIdx, val ?? 0)}
                               className="w-12 text-right font-mono text-[11px] bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none"
@@ -754,7 +826,7 @@ export default function ControlPanelLeft({
             <div className="space-y-3">
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                  <label htmlFor="algebraic-model-textarea" className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
                     Ecuaciones del modelo (Max/Min Z = ..., s.a., ≤ / ≥ / =)
                   </label>
                   {algebraicDirty && (
@@ -773,6 +845,8 @@ export default function ControlPanelLeft({
                 </div>
                 <p className="section-cue">Escribe las ecuaciones lineales y aplícalas para actualizar el modelo.</p>
                 <textarea
+                  id="algebraic-model-textarea"
+                  name="algebraic-model"
                   rows={8}
                   value={algebraicText}
                   onChange={(e) => {
@@ -894,8 +968,10 @@ export default function ControlPanelLeft({
 
         {/* Switch Auto-Balanceo */}
         <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+          <label htmlFor="weights-auto-balance" className="inline-flex items-center gap-1.5 cursor-pointer select-none">
             <input
+              id="weights-auto-balance"
+              name="weights-auto-balance"
               type="checkbox"
               checked={autoBalance}
               onChange={(e) => onToggleAutoBalance(e.target.checked)}
@@ -939,20 +1015,21 @@ export default function ControlPanelLeft({
                     <span className="text-[10px] font-mono text-slate-400">
                       ({pct.toFixed(0)}%)
                     </span>
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0"
-                      max="1"
-                      aria-label={`Valor numérico peso ${obj.name}`}
+                    <NumericInput
+                      id={`weight-input-${idx}`}
+                      name={`weight-input-${idx}`}
+                      ariaLabel={`Valor numérico peso ${obj.name}`}
+                      min={0}
+                      max={1}
                       value={Number(wVal.toFixed(3))}
-                      onChange={(e) => onWeightChange(idx, parseFloat(e.target.value) || 0)}
+                      onCommit={(val) => onWeightChange(idx, val ?? 0)}
                       className="w-16 text-right font-mono text-xs px-1.5 py-0.5 rounded-sm border bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-[#E11D48]"
                     />
                   </div>
                 </div>
                 <input
                   id={`weight-slider-${idx}`}
+                  name={`weight-slider-${idx}`}
                   type="range"
                   min={0}
                   max={1}
@@ -996,20 +1073,27 @@ export default function ControlPanelLeft({
           </div>
         </div>
         {model.objectives.length > 3 && (
-          <label className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700 dark:text-slate-300">
+          <label htmlFor="pareto-seed-input" className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700 dark:text-slate-300">
             Semilla de la frontera
-            <input
-              className="w-28 rounded border border-slate-300 bg-transparent px-2 py-1 dark:border-slate-700"
-              type="number" min={0} max={4294967295} step={1}
-              defaultValue={model.pareto_seed ?? 42} key={modelKey}
-              onBlur={(e) => {
-                const value = e.currentTarget.valueAsNumber;
-                if (Number.isInteger(value) && value >= 0 && value <= 4294967295) {
-                  if (value !== (model.pareto_seed ?? 42)) onModelChange({ ...model, pareto_seed: value });
-                } else {
-                  e.currentTarget.value = String(model.pareto_seed ?? 42);
+            <NumericInput
+              id="pareto-seed-input"
+              name="pareto-seed"
+              ariaLabel="Semilla de la frontera"
+              min={0}
+              max={4294967295}
+              value={model.pareto_seed ?? 42}
+              onCommit={(val) => {
+                const nextSeed = val === null ? 42 : Math.round(val);
+                if (
+                  Number.isInteger(nextSeed) &&
+                  nextSeed >= 0 &&
+                  nextSeed <= 4294967295 &&
+                  nextSeed !== (model.pareto_seed ?? 42)
+                ) {
+                  onModelChange({ ...model, pareto_seed: nextSeed });
                 }
               }}
+              className="w-28 rounded border border-slate-300 bg-transparent px-2 py-1 dark:border-slate-700"
             />
           </label>
         )}

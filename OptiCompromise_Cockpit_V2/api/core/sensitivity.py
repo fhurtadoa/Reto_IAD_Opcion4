@@ -13,10 +13,17 @@ def compute_weight_sensitivity(
     if num_samples < 2:
         raise ValueError("El barrido requiere al menos dos muestras.")
 
+    has_integer = any(v.var_type in ("integer", "binary") for v in model.variables)
     curves = {"L1": [], "L2": [], "L_inf": []}
     for sample in np.linspace(0, 1, num_samples):
         weights = [float(sample), float(1 - sample)]
-        solutions, _ = solve_all_metrics(model, payoff, weights=weights)
+        solutions, _ = solve_all_metrics(
+            model,
+            payoff,
+            weights=weights,
+            l2_max_nodes=120 if has_integer else 800,
+            l2_max_seconds=0.08 if has_integer else 1.0,
+        )
         for metric, points in curves.items():
             solution = solutions[metric]
             points.append(SensitivityPoint(

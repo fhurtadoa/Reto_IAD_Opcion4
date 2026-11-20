@@ -1,6 +1,6 @@
 {
   "name": "Adquisición de Flota de Vehículos Eléctricos (Caso Taller IAD)",
-  "description": "Evaluación multicriterio para adquisición de flota entre 6 alternativas de vehículos 100% eléctricos: BYD Seal, Tesla Model 3, Hyundai Ioniq 5, Kia EV6, Volvo EX30 y Chevrolet Equinox EV.",
+  "description": "Formulación continua adaptada para dimensionamiento de flota de 50 vehículos entre 6 alternativas 100% eléctricas (inspirada en el caso discreto de vehículos del curso IAD): BYD Seal, Tesla Model 3, Hyundai Ioniq 5, Kia EV6, Volvo EX30 y Chevrolet Equinox EV.",
   "variables": [
     {"name": "x1 (BYD Seal)", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 50.0},
     {"name": "x2 (Tesla Model 3)", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": 50.0},

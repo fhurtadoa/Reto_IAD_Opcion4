@@ -15,13 +15,15 @@ import {
  */
 export function fmtNum(val: number | undefined | null, decimals = 2): string {
   if (val === undefined || val === null || Number.isNaN(val)) return "—";
+  if (Math.abs(val) < 1e-11) return "0";
   if (Math.abs(val) >= 10000) {
     return val.toLocaleString("es-CO", { maximumFractionDigits: Math.min(decimals, 1) });
   }
   if (val !== 0 && Number(val.toFixed(decimals)) === 0) {
     return val.toLocaleString("es-CO", { notation: "scientific", maximumSignificantDigits: 4 });
   }
-  return val.toLocaleString("es-CO", { maximumFractionDigits: decimals });
+  const rounded = Number(val.toFixed(decimals));
+  return (Object.is(rounded, -0) ? 0 : val).toLocaleString("es-CO", { maximumFractionDigits: decimals });
 }
 
 /**
@@ -29,7 +31,7 @@ export function fmtNum(val: number | undefined | null, decimals = 2): string {
  * evitando la coma española que genera espacios extra en modo matemático).
  */
 export function fmtLatexNum(val: number | undefined | null, decimals = 2): string {
-  if (val === undefined || val === null || Number.isNaN(val)) return "0";
+  if (val === undefined || val === null || Number.isNaN(val) || Math.abs(val) < 1e-11) return "0";
   const rounded = Number(val.toFixed(Math.abs(val) >= 10000 ? Math.min(decimals, 1) : decimals));
   if ((rounded === 0 && val !== 0) || Math.abs(val) >= 1e21) {
     const [mantissa, exponent] = val.toExponential(decimals).split("e");
@@ -42,6 +44,15 @@ export function fmtLatexNum(val: number | undefined | null, decimals = 2): strin
   return decPart ? `${sign}${withSep}.${decPart}` : `${sign}${withSep}`;
 }
 
+function duplicateVarPrefixes(varNames: string[]): Set<string> {
+  const counts = new Map<string, number>();
+  varNames.forEach((raw) => {
+    const head = raw.trim().split(/\s+/)[0];
+    counts.set(head, (counts.get(head) ?? 0) + 1);
+  });
+  return new Set(Array.from(counts.entries()).filter(([, c]) => c > 1).map(([k]) => k));
+}
+
 /**
  * Formatea una combinación lineal en texto plano o LaTeX.
  */
@@ -50,13 +61,15 @@ export function formatLinearExpr(
   varNames: string[],
   asLatex = false
 ): string {
+  const dupPrefixes = asLatex ? duplicateVarPrefixes(varNames) : new Set<string>();
   const parts: string[] = [];
   for (let i = 0; i < varNames.length; i++) {
     const c = coeffs[i] ?? 0;
     if (c === 0) continue;
     const absC = Math.abs(c);
     const vRaw = varNames[i];
-    const vStr = asLatex ? formatVarLatex(vRaw) : vRaw;
+    const head = vRaw.trim().split(/\s+/)[0];
+    const vStr = asLatex ? formatVarLatex(vRaw, dupPrefixes.has(head)) : vRaw;
     const coeffStr = absC === 1 ? "" : `${asLatex ? fmtLatexNum(absC, 4) : absC}${asLatex ? "\\," : "*"}`;
     if (parts.length === 0) {
       parts.push(c < 0 ? `-${coeffStr}${vStr}` : `${coeffStr}${vStr}`);
@@ -67,14 +80,26 @@ export function formatLinearExpr(
   return parts.length > 0 ? parts.join("") : "0";
 }
 
-export function formatVarLatex(name: string): string {
+function escapeLatexText(text: string): string {
+  return text
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/\^/g, "\\textasciicircum{}")
+    .replace(/~/g, "\\textasciitilde{}")
+    .replace(/([_{}%$&#])/g, "\\$1");
+}
+
+export function formatVarLatex(name: string, disambiguate = false): string {
   // Convierte x1 -> x_{1}, x_1_2 -> x_{1,2}
-  const clean = name.split(" ")[0].trim();
-  const match = clean.match(/^([a-zA-Z]+)_?([0-9_]+)$/);
-  if (match) {
-    return `${match[1]}_{${match[2].replace(/_/g, ",")}}`;
-  }
-  return `\\text{${clean.replace(/[_]/g, "\\_")}}`;
+  const trimmed = name.trim();
+  const spaceIdx = trimmed.search(/\s/);
+  const clean = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+  const tail = spaceIdx === -1 ? "" : trimmed.slice(spaceIdx).trim();
+  const match = clean.match(/^([a-zA-Z]+)_?([0-9]+(?:_[0-9]+)*)$/);
+  const base = match
+    ? `${match[1]}_{${match[2].replace(/_/g, ",")}}`
+    : `\\text{${escapeLatexText(clean)}}`;
+  if (!disambiguate || !tail) return base;
+  return `${base}\\,\\text{${escapeLatexText(tail)}}`;
 }
 
 /**
@@ -147,19 +172,19 @@ export function parseAlgebraicModel(
     return { ok: false, errors: ["El editor algebraico está vacío. Ingresa al menos 2 objetivos."] };
   }
 
-  // Preservar mapa token -> nombre completo (ej. "x1" -> "x1 (BYD Seal)")
+  // Preservar mapa token -> nombre completo (ej. "x1" -> "x1 (BYD Seal)") solo para variables presentes
+  const existingTokenToFullName = new Map<string, string>();
+  algebraicVariableTokens(existingModel).forEach((token, i) => {
+    existingTokenToFullName.set(token, existingModel.variables[i].name);
+  });
   const tokenToFullName = new Map<string, string>();
   const varList: string[] = [];
-  algebraicVariableTokens(existingModel).forEach((token, i) => {
-    tokenToFullName.set(token, existingModel.variables[i].name);
-    varList.push(token);
-  });
 
   const ensureVar = (v: string): number => {
     const idx = varList.indexOf(v);
     if (idx >= 0) return idx;
     varList.push(v);
-    tokenToFullName.set(v, v);
+    tokenToFullName.set(v, existingTokenToFullName.get(v) || v);
     return varList.length - 1;
   };
 
@@ -167,7 +192,12 @@ export function parseAlgebraicModel(
     expr: string,
     lineNo: number
   ): { coeffsMap: Record<string, number>; constant: number } | null => {
-    const clean = expr.replace(/\s+/g, "");
+    const trimmedExpr = expr.trim();
+    if (/([a-zA-Z0-9_.])\s+([a-zA-Z0-9_.])/.test(trimmedExpr)) {
+      errors.push(`Línea ${lineNo}: falta un operador (+, -, *) entre términos en "${expr}".`);
+      return null;
+    }
+    const clean = trimmedExpr.replace(/\s+/g, "");
     if (!clean) {
       errors.push(`Línea ${lineNo}: expresión vacía.`);
       return null;
@@ -189,8 +219,8 @@ export function parseAlgebraicModel(
       const sign = match[1] === "-" ? -1 : 1;
       const body = match[2];
 
-      // Forma 1: constante numérica pura (ej. "+100" o "50")
-      if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(body)) {
+      // Forma 1: constante numérica pura (ej. "+100", ".5" o "50")
+      if (/^(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(body)) {
         const cVal = parseFloat(body);
         constant += sign * cVal;
         if (!Number.isFinite(constant)) {
@@ -201,7 +231,7 @@ export function parseAlgebraicModel(
       }
 
       // Forma 2: [numero][*][variable] o [variable]
-      const mTerm = body.match(/^(?:(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\*?)?([a-zA-Z][a-zA-Z0-9_]*)$/);
+      const mTerm = body.match(/^(?:((?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\*?)?([a-zA-Z][a-zA-Z0-9_]*)$/);
       if (!mTerm) {
         errors.push(`Línea ${lineNo}: término inválido "${match[0]}". Usa formato como "3*x1", "2x1" o "1e3*x1".`);
         return null;
@@ -257,8 +287,9 @@ export function parseAlgebraicModel(
 
       const rawSense = mObjNamed ? mObjNamed[1] : mObjDirect![1];
       const sense: ObjectiveSense = /^max/i.test(rawSense) ? "maximize" : "minimize";
+      const extractedName = mObjNamed ? extractObjectiveName(mObjNamed[2]) : "";
       const name = mObjNamed
-        ? extractObjectiveName(mObjNamed[2])
+        ? extractedName || `Objetivo ${parsedObjectives.length + 1}`
         : existingModel.objectives[parsedObjectives.length]?.name || `Objetivo ${parsedObjectives.length + 1}`;
       const rhsExpr = mObjNamed ? mObjNamed[3] : mObjDirect![2];
 
@@ -349,17 +380,23 @@ export function modelToLatex(model: ModelDefinition): string {
   const conLines = model.constraints.map((c) => {
     const expr = formatLinearExpr(c.coefficients, varNames, true);
     const op = c.sense === "<=" ? "\\le" : c.sense === ">=" ? "\\ge" : "=";
-    return `${expr} &${op} ${fmtLatexNum(c.rhs, 2)}`;
+    return `${expr} &${op} ${fmtLatexNum(c.rhs, 4)}`;
   });
 
+  const dupPrefixes = duplicateVarPrefixes(varNames);
   const domainLines = model.variables.map((v) => {
-    const vn = formatVarLatex(v.name);
+    const head = v.name.trim().split(/\s+/)[0];
+    const vn = formatVarLatex(v.name, dupPrefixes.has(head));
     if (v.var_type === "binary") return `${vn} \\in \\{0,1\\}`;
-    const lb = v.lower_bound !== null && v.lower_bound !== undefined ? v.lower_bound : "-\\infty";
-    const ub = v.upper_bound !== null && v.upper_bound !== undefined ? v.upper_bound : "+\\infty";
+    const hasLb = v.lower_bound !== null && v.lower_bound !== undefined;
+    const hasUb = v.upper_bound !== null && v.upper_bound !== undefined;
     const dom = v.var_type === "integer" ? ",\\;\\mathbb{Z}" : "";
-    if (ub === "+\\infty") return `${vn} \\ge ${lb}${dom}`;
-    return `${lb} \\le ${vn} \\le ${ub}${dom}`;
+    if (!hasLb && !hasUb) {
+      return `${vn} \\in ${v.var_type === "integer" ? "\\mathbb{Z}" : "\\mathbb{R}"}`;
+    }
+    if (hasLb && !hasUb) return `${vn} \\ge ${fmtLatexNum(v.lower_bound, 4)}${dom}`;
+    if (!hasLb && hasUb) return `${vn} \\le ${fmtLatexNum(v.upper_bound, 4)}${dom}`;
+    return `${fmtLatexNum(v.lower_bound, 4)} \\le ${vn} \\le ${fmtLatexNum(v.upper_bound, 4)}${dom}`;
   });
 
   const parts = [
@@ -398,10 +435,11 @@ export function buildLinfXRayLatex(
         ? `${zIdealStr} - (${zExpr})`
         : `(${zExpr}) - ${zIdealStr}`;
     const dVal = solLinf?.normalized_distances?.[i];
-    const wdVal = dVal !== undefined ? w * dVal : null;
+    const wdVal = dVal !== undefined && Number.isFinite(dVal) ? w * dVal : null;
+    const aggVal = solLinf?.aggregate_distance;
     const evalSuffix =
-      wdVal !== undefined && wdVal !== null
-        ? `\\quad \\Rightarrow \\; ${wdVal.toFixed(4)} \\le ${(solLinf?.aggregate_distance ?? 0).toFixed(4)}`
+      wdVal !== null && Number.isFinite(wdVal) && aggVal !== undefined && Number.isFinite(aggVal)
+        ? `\\quad \\Rightarrow \\; ${wdVal.toFixed(4)} \\le ${aggVal.toFixed(4)}`
         : "";
     return `${fmtLatexNum(w, 4)} \\cdot \\frac{${numLatex}}{${fmtLatexNum(denom, 2)}} \\le \\lambda ${evalSuffix}`;
   });
@@ -409,7 +447,8 @@ export function buildLinfXRayLatex(
   return {
     headerLatex,
     constraintsLatex,
-    lambdaVal: solLinf ? solLinf.aggregate_distance : null,
+    lambdaVal:
+      solLinf && Number.isFinite(solLinf.aggregate_distance) ? solLinf.aggregate_distance : null,
   };
 }
 
@@ -436,9 +475,26 @@ export function computeFeasiblePolygon2D(
     const rawLower = variable.var_type === "binary" ? Math.max(0, variable.lower_bound ?? 0) : variable.lower_bound;
     const rawUpper = variable.var_type === "binary" ? Math.min(1, variable.upper_bound ?? 1) : variable.upper_bound;
     const [lower, upper] = payoff?.decision_ranges_2d?.[idx] ?? [rawLower, rawUpper];
-    const witnesses = payoff?.independent_solutions.map((point) => point[variable.name]) ?? [0];
-    const minWitness = Math.min(...witnesses, lower ?? Infinity, upper ?? Infinity);
-    const maxWitness = Math.max(...witnesses, lower ?? -Infinity, upper ?? -Infinity);
+    const rawWitnesses = (payoff?.independent_solutions ?? [])
+      .map((point) => point[variable.name])
+      .filter(Number.isFinite);
+    const constraintHints = !payoff?.decision_ranges_2d?.[idx]
+      ? model.constraints
+          .map((c) => {
+            const coef = c.coefficients[idx] ?? 0;
+            return Math.abs(coef) > 1e-12 && Number.isFinite(c.rhs) ? c.rhs / coef : NaN;
+          })
+          .filter(Number.isFinite)
+      : [];
+    const samples = [
+      ...rawWitnesses,
+      ...constraintHints,
+      ...(lower !== null && lower !== undefined && Number.isFinite(lower) ? [lower] : []),
+      ...(upper !== null && upper !== undefined && Number.isFinite(upper) ? [upper] : []),
+    ];
+    const safeSamples = samples.length > 0 ? samples : [0];
+    const minWitness = Math.min(...safeSamples);
+    const maxWitness = Math.max(...safeSamples);
     const pad = Math.max(1, maxWitness - minWitness) * 0.5;
     return [lower ?? minWitness - pad, upper ?? maxWitness + pad];
   });
@@ -521,11 +577,21 @@ export function computeFeasibleObjectivesPolygon2D(
   const evalObj = (coeffs: number[], x0: number, x1: number) =>
     (coeffs[0] ?? 0) * x0 + (coeffs[1] ?? 0) * x1;
 
-  const rawPts: Array<[number, number]> = [];
+  const rawPtsAll: Array<[number, number]> = [];
   for (let i = 0; i < decPoly.x.length; i++) {
-    const zx = evalObj(objX.coefficients, decPoly.x[i], decPoly.y[i]);
-    const zy = evalObj(objY.coefficients, decPoly.x[i], decPoly.y[i]);
-    if (!rawPts.some((p) => Math.hypot(p[0] - zx, p[1] - zy) < 1e-7)) {
+    rawPtsAll.push([
+      evalObj(objX.coefficients, decPoly.x[i], decPoly.y[i]),
+      evalObj(objY.coefficients, decPoly.x[i], decPoly.y[i]),
+    ]);
+  }
+  const xsAll = rawPtsAll.map((p) => p[0]);
+  const ysAll = rawPtsAll.map((p) => p[1]);
+  const spanX = Math.max(1e-30, Math.max(...xsAll) - Math.min(...xsAll));
+  const spanY = Math.max(1e-30, Math.max(...ysAll) - Math.min(...ysAll));
+
+  const rawPts: Array<[number, number]> = [];
+  for (const [zx, zy] of rawPtsAll) {
+    if (!rawPts.some((p) => Math.hypot((p[0] - zx) / spanX, (p[1] - zy) / spanY) < 1e-6)) {
       rawPts.push([zx, zy]);
     }
   }
@@ -535,10 +601,11 @@ export function computeFeasibleObjectivesPolygon2D(
   rawPts.sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]));
   const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
     (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const crossTol = 1e-9 * spanX * spanY;
 
   const lower: Array<[number, number]> = [];
   for (const p of rawPts) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 1e-9) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= crossTol) {
       lower.pop();
     }
     lower.push(p);
@@ -547,7 +614,7 @@ export function computeFeasibleObjectivesPolygon2D(
   const upper: Array<[number, number]> = [];
   for (let i = rawPts.length - 1; i >= 0; i--) {
     const p = rawPts[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 1e-9) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= crossTol) {
       upper.pop();
     }
     upper.push(p);
@@ -575,7 +642,8 @@ export function computeIsodistanceTraces2D(
   weights: number[],
   solutions: SolveResponse["solutions"],
   idxX: number,
-  idxY: number
+  idxY: number,
+  isDark = false
 ): Array<{ name: string; x: number[]; y: number[]; color: string; dash: string }> {
   const zIdX = payoff.ideal_point[idxX];
   const zIdY = payoff.ideal_point[idxY];
@@ -587,24 +655,39 @@ export function computeIsodistanceTraces2D(
   const sX = model.objectives[idxX]?.sense === "maximize" ? -1 : 1;
   const sY = model.objectives[idxY]?.sense === "maximize" ? -1 : 1;
 
-  const wX = weights[idxX];
-  const wY = weights[idxY];
+  const constX = payoff.normalization_sources?.[idxX] === "constant";
+  const constY = payoff.normalization_sources?.[idxY] === "constant";
+  const rawWX = weights[idxX] ?? 0;
+  const rawWY = weights[idxY] ?? 0;
+  const EPS_W = 1e-4;
+  const wX = constX || rawWX <= EPS_W ? 0 : rawWX;
+  const wY = constY || rawWY <= EPS_W ? 0 : rawWY;
+  const l2Color = isDark ? "#CBD5E1" : "#334155";
 
   const traces: Array<{ name: string; x: number[]; y: number[]; color: string; dash: string }> = [];
 
   if (wX === 0 && wY === 0) return traces;
   if (wX === 0 || wY === 0) {
+    if ((wX === 0 && constX) || (wY === 0 && constY)) {
+      return traces;
+    }
     // Los tres niveles fijan solo la desviación del eje con peso positivo.
-    const span = Math.max(1, ...Object.values(solutions).map(
-      (sol) => sol.normalized_distances[wX === 0 ? idxX : idxY] ?? 0,
-    ));
+    const span = Math.max(
+      1,
+      ...Object.values(solutions)
+        .filter((sol): sol is MetricSolution => Boolean(sol && Array.isArray(sol.normalized_distances)))
+        .map((sol) => sol.normalized_distances[wX === 0 ? idxX : idxY] ?? 0),
+    );
     for (const [metric, name, color, dash] of [
       ["L1", "Iso L₁", "#2563EB", "dot"],
-      ["L2", "Iso L₂", "#334155", "dash"],
+      ["L2", "Iso L₂", l2Color, "dash"],
       ["L_inf", "Iso L∞", "#E11D48", "dashdot"],
     ] as const) {
-      const distances = solutions[metric].normalized_distances;
-      if (distances.length <= Math.max(idxX, idxY)) continue;
+      const sol = solutions[metric];
+      if (!sol || !Array.isArray(sol.normalized_distances) || sol.normalized_distances.length <= Math.max(idxX, idxY)) {
+        continue;
+      }
+      const distances = sol.normalized_distances;
       const x = zIdX + sX * rX * distances[idxX];
       const y = zIdY + sY * rY * distances[idxY];
       traces.push({
@@ -616,14 +699,13 @@ export function computeIsodistanceTraces2D(
     return traces;
   }
 
-  // L1: wX * dX + wY * dY = R1 (cuadrante dX>=0, dY>=0 + reflejo ligero para mostrar rombo)
+  // L1: wX * dX + wY * dY = R1 (segmento diagonal del rombo dentro de la caja visible)
   const sol1 = solutions.L1;
   if (sol1 && sol1.normalized_distances.length > Math.max(idxX, idxY)) {
     const R1 = wX * sol1.normalized_distances[idxX] + wY * sol1.normalized_distances[idxY];
     if (R1 > 1e-6) {
       const dxMax = R1 / wX;
       const dyMax = R1 / wY;
-      // Cuadrante factible hacia el anti-ideal (segmento diagonal del rombo)
       const pts: [number, number][] = [
         [zIdX + sX * dxMax * rX, zIdY],
         [zIdX, zIdY + sY * dyMax * rY],
@@ -660,7 +742,7 @@ export function computeIsodistanceTraces2D(
         name: "Iso L₂",
         x: xs,
         y: ys,
-        color: "#334155",
+        color: l2Color,
         dash: "dash",
       });
     }
@@ -893,28 +975,88 @@ export function computeDiscreteFeasiblePoints2D(
   } else if (isInt0) {
     const countX = Math.max(0, maxX - minX + 1);
     if (countX > 80) return null;
-    const minYCont = Math.min(...poly.y);
-    const maxYCont = Math.max(...poly.y);
+    const minYCont = v1.lower_bound !== null ? Math.max(v1.lower_bound, Math.min(...poly.y)) : Math.min(...poly.y);
+    const maxYCont = v1.upper_bound !== null ? Math.min(v1.upper_bound, Math.max(...poly.y)) : Math.max(...poly.y);
     for (let ix = minX; ix <= maxX; ix++) {
-      for (let k = 0; k <= 12; k++) {
-        const py = minYCont + ((maxYCont - minYCont) * k) / 12;
-        if (satisfies(ix, py)) {
-          xs.push(ix);
-          ys.push(py);
+      let cMin = minYCont;
+      let cMax = maxYCont;
+      for (const { sense, values: [a, b, rhs] } of rows) {
+        const rem = rhs - a * ix;
+        if (Math.abs(b) <= 1e-12) {
+          if (
+            (sense === "<=" && 0 > rem + 1e-6) ||
+            (sense === ">=" && 0 < rem - 1e-6) ||
+            (sense === "==" && Math.abs(rem) > 1e-6)
+          ) {
+            cMax = -Infinity;
+            break;
+          }
+          continue;
+        }
+        const bound = rem / b;
+        if (sense === "==") {
+          cMin = Math.max(cMin, bound);
+          cMax = Math.min(cMax, bound);
+        } else if ((sense === "<=" && b > 0) || (sense === ">=" && b < 0)) {
+          cMax = Math.min(cMax, bound);
+        } else {
+          cMin = Math.max(cMin, bound);
+        }
+      }
+      if (cMin <= cMax + 1e-7) {
+        const lo = Math.min(cMin, cMax);
+        const hi = Math.max(cMin, cMax);
+        const steps = hi - lo < 1e-7 ? 0 : 12;
+        for (let k = 0; k <= steps; k++) {
+          const py = steps === 0 ? lo : lo + ((hi - lo) * k) / steps;
+          if (satisfies(ix, py)) {
+            xs.push(ix);
+            ys.push(py);
+          }
         }
       }
     }
   } else {
     const countY = Math.max(0, maxY - minY + 1);
     if (countY > 80) return null;
-    const minXCont = Math.min(...poly.x);
-    const maxXCont = Math.max(...poly.x);
+    const minXCont = v0.lower_bound !== null ? Math.max(v0.lower_bound, Math.min(...poly.x)) : Math.min(...poly.x);
+    const maxXCont = v0.upper_bound !== null ? Math.min(v0.upper_bound, Math.max(...poly.x)) : Math.max(...poly.x);
     for (let iy = minY; iy <= maxY; iy++) {
-      for (let k = 0; k <= 12; k++) {
-        const px = minXCont + ((maxXCont - minXCont) * k) / 12;
-        if (satisfies(px, iy)) {
-          xs.push(px);
-          ys.push(iy);
+      let cMin = minXCont;
+      let cMax = maxXCont;
+      for (const { sense, values: [a, b, rhs] } of rows) {
+        const rem = rhs - b * iy;
+        if (Math.abs(a) <= 1e-12) {
+          if (
+            (sense === "<=" && 0 > rem + 1e-6) ||
+            (sense === ">=" && 0 < rem - 1e-6) ||
+            (sense === "==" && Math.abs(rem) > 1e-6)
+          ) {
+            cMax = -Infinity;
+            break;
+          }
+          continue;
+        }
+        const bound = rem / a;
+        if (sense === "==") {
+          cMin = Math.max(cMin, bound);
+          cMax = Math.min(cMax, bound);
+        } else if ((sense === "<=" && a > 0) || (sense === ">=" && a < 0)) {
+          cMax = Math.min(cMax, bound);
+        } else {
+          cMin = Math.max(cMin, bound);
+        }
+      }
+      if (cMin <= cMax + 1e-7) {
+        const lo = Math.min(cMin, cMax);
+        const hi = Math.max(cMin, cMax);
+        const steps = hi - lo < 1e-7 ? 0 : 12;
+        for (let k = 0; k <= steps; k++) {
+          const px = steps === 0 ? lo : lo + ((hi - lo) * k) / steps;
+          if (satisfies(px, iy)) {
+            xs.push(px);
+            ys.push(iy);
+          }
         }
       }
     }
@@ -1030,8 +1172,8 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     return {
       name: v.name.trim(),
       var_type: vt,
-      lower_bound: v.lower_bound === null ? null : readNumber(v.lower_bound ?? 0, `cota inferior de «${v.name}»`),
-      upper_bound: v.upper_bound == null ? null : readNumber(v.upper_bound, `cota superior de «${v.name}»`),
+      lower_bound: vt === "binary" ? 0 : (v.lower_bound === null ? null : readNumber(v.lower_bound ?? 0, `cota inferior de «${v.name}»`)),
+      upper_bound: vt === "binary" ? 1 : (v.upper_bound == null ? null : readNumber(v.upper_bound, `cota superior de «${v.name}»`)),
     };
   });
   const validObjs = obj.objectives.map((o, idx) => {
@@ -1123,8 +1265,13 @@ export async function importModelFromFile(
       throw new Error("La hoja importada está vacía.");
     }
 
-    // Buscar dinámicamente la fila de encabezado que contiene "Seccion" (permite re-importar CSV de resultados)
-    let headerIdx = matrixRows.findIndex((r) =>
+    // Buscar dinámicamente la fila de encabezado que contiene "Seccion" después del marcador de definición si existe
+    const defMarkerIdx = matrixRows.findIndex((r) =>
+      r.some((cell) => String(cell ?? "").trim().toLowerCase().includes("definicion del modelo"))
+    );
+    const searchFrom = defMarkerIdx >= 0 ? defMarkerIdx + 1 : 0;
+    let headerIdx = matrixRows.findIndex((r, idx) =>
+      idx >= searchFrom &&
       r.some((cell) => {
         const txt = String(cell ?? "").trim().toLowerCase();
         return txt === "seccion" || txt === "sección";
@@ -1188,8 +1335,8 @@ export async function importModelFromFile(
         variables.push({
           name,
           var_type,
-          lower_bound: parseBoundCell(minRaw, 0, `cota inferior de «${name}»`),
-          upper_bound: parseBoundCell(maxRaw, var_type === "binary" ? 1 : null, `cota superior de «${name}»`),
+          lower_bound: var_type === "binary" ? 0 : parseBoundCell(minRaw, 0, `cota inferior de «${name}»`),
+          upper_bound: var_type === "binary" ? 1 : parseBoundCell(maxRaw, null, `cota superior de «${name}»`),
         });
       } else if (sec.startsWith("obj")) {
         objRows.push(row);

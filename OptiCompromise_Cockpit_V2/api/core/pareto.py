@@ -50,7 +50,7 @@ def compute_pareto_frontier(
         for w1 in np.linspace(0.0, 1.0, num_samples):
             weight_vectors.append(np.array([w1, 1.0 - w1]))
     elif n_objs == 3:
-        steps = 10  # genera 66 combinaciones en el simplex 3D
+        steps = 10 if num_samples == 21 else max(2, num_samples // 2)  # genera 66 combinaciones cuando num_samples=21
         for i in range(steps + 1):
             w1 = i / steps
             for j in range(steps + 1 - i):

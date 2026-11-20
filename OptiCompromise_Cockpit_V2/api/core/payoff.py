@@ -6,10 +6,115 @@ from scipy.optimize import linprog
 from typing import Tuple, List, Dict, Optional
 from .schemas import ModelDefinition, PayoffMatrixData
 
+_HIGHS_PRECISE_OPTIONS = {
+    "primal_feasibility_tolerance": 1e-9,
+    "dual_feasibility_tolerance": 1e-9,
+}
+
+
+def solve_linprog_precise(
+    c: np.ndarray,
+    A_ub: Optional[np.ndarray] = None,
+    b_ub: Optional[np.ndarray] = None,
+    A_eq: Optional[np.ndarray] = None,
+    b_eq: Optional[np.ndarray] = None,
+    bounds: Optional[List[Tuple[Optional[float], Optional[float]]]] = None,
+    integrality: Optional[List[int]] = None,
+):
+    """Ejecuta HiGHS con tolerancia primal/dual estricta (1e-9) y respaldo estándar si hay inestabilidad numérica."""
+    res = linprog(
+        c,
+        A_ub=A_ub,
+        b_ub=b_ub,
+        A_eq=A_eq,
+        b_eq=b_eq,
+        bounds=bounds,
+        integrality=integrality,
+        method="highs",
+        options=_HIGHS_PRECISE_OPTIONS,
+    )
+    if not res.success and getattr(res, "status", None) not in (2, 3):
+        res = linprog(
+            c,
+            A_ub=A_ub,
+            b_ub=b_ub,
+            A_eq=A_eq,
+            b_eq=b_eq,
+            bounds=bounds,
+            integrality=integrality,
+            method="highs",
+        )
+    return res
+
+
+def _payoff_error(headers: List[str], status: str) -> PayoffMatrixData:
+    return PayoffMatrixData(
+        headers=headers,
+        matrix=[],
+        ideal_point=[],
+        anti_ideal_point=[],
+        independent_solutions=[],
+        degenerate_objectives=[],
+        status=status,
+    )
+
+
+def clean_solution_vector(
+    x: np.ndarray,
+    bounds: List[Tuple[Optional[float], Optional[float]]],
+    integrality: Optional[List[int]] = None,
+) -> np.ndarray:
+    """Limpia tolerancias numéricas en cotas y variables enteras/binarias."""
+    cleaned = np.array(x, dtype=float)
+    if integrality is not None:
+        for j, flag in enumerate(integrality):
+            if flag == 1 and abs(cleaned[j] - round(float(cleaned[j]))) < 1e-5:
+                cleaned[j] = float(round(float(cleaned[j])))
+    for j, (lb, ub) in enumerate(bounds):
+        if lb is not None and abs(cleaned[j] - lb) < 1e-9:
+            cleaned[j] = lb
+        if ub is not None and abs(cleaned[j] - ub) < 1e-9:
+            cleaned[j] = ub
+    return cleaned
+
+
+def is_feasible(
+    x: np.ndarray,
+    A_ub: Optional[np.ndarray],
+    b_ub: Optional[np.ndarray],
+    A_eq: Optional[np.ndarray],
+    b_eq: Optional[np.ndarray],
+    bounds: List[Tuple[Optional[float], Optional[float]]],
+    integrality: Optional[List[int]] = None,
+    tol: float = 1e-7,
+) -> bool:
+    """Verifica estrictamente factibilidad (cotas, desigualdades, igualdades e integralidad)."""
+    if x is None or len(x) != len(bounds) or not np.all(np.isfinite(x)):
+        return False
+    for j, (lb, ub) in enumerate(bounds):
+        if lb is not None and x[j] < lb - tol:
+            return False
+        if ub is not None and x[j] > ub + tol:
+            return False
+    if A_ub is not None and b_ub is not None and len(b_ub) > 0:
+        scale_ub = np.maximum(np.linalg.norm(A_ub, axis=1), np.maximum(np.abs(b_ub), 1.0))
+        if np.any((A_ub @ x - b_ub) / scale_ub > tol):
+            return False
+    if A_eq is not None and b_eq is not None and len(b_eq) > 0:
+        scale_eq = np.maximum(np.linalg.norm(A_eq, axis=1), np.maximum(np.abs(b_eq), 1.0))
+        if np.any(np.abs(A_eq @ x - b_eq) / scale_eq > tol):
+            return False
+    if integrality is not None:
+        for j, is_int in enumerate(integrality):
+            if is_int == 1 and abs(x[j] - round(float(x[j]))) > 1e-7:
+                return False
+    return True
+
+
 def scale_linear_objective(coefficients: np.ndarray) -> np.ndarray:
     """Usa una escala positiva para que el solver no trate todo el costo como cero."""
     scale = float(np.max(np.abs(coefficients), initial=0.0))
-    return coefficients / scale if scale else coefficients
+    return coefficients / scale if scale and np.isfinite(scale) else coefficients
 
 
 def build_linear_constraints(model: ModelDefinition) -> Tuple[
@@ -66,11 +171,15 @@ def build_linear_constraints(model: ModelDefinition) -> Tuple[
         lb = v.lower_bound
         ub = v.upper_bound
         if v.var_type == "binary":
-            lb = 0.0 if lb is None else max(0.0, lb)
-            ub = 1.0 if ub is None else min(1.0, ub)
+            lb = 0.0 if lb is None else float(np.ceil(max(0.0, lb) - 1e-12))
+            ub = 1.0 if ub is None else float(np.floor(min(1.0, ub) + 1e-12))
             integrality.append(1)
             has_integer = True
         elif v.var_type == "integer":
+            if lb is not None:
+                lb = float(np.ceil(lb - 1e-12))
+            if ub is not None:
+                ub = float(np.floor(ub + 1e-12))
             integrality.append(1)
             has_integer = True
         else:
@@ -106,7 +215,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
     for k, obj in enumerate(model.objectives):
         c_solver = obj_dirs[k]
 
-        res = linprog(
+        res = solve_linprog_precise(
             c_solver,
             A_ub=A_ub,
             b_ub=b_ub,
@@ -114,70 +223,91 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             b_eq=b_eq,
             bounds=bounds,
             integrality=integrality,
-            method="highs"
         )
 
-        if not res.success:
-            return PayoffMatrixData(
-                headers=headers,
-                matrix=[],
-                ideal_point=[],
-                anti_ideal_point=[],
-                independent_solutions=[],
-                degenerate_objectives=[],
-                status=f"error: {res.message} en objetivo {obj.name}"
-            )
+        if not res.success or res.x is None:
+            return _payoff_error(headers, f"error: {res.message} en objetivo {obj.name}")
 
-        x_opt = np.array(res.x, dtype=float)
+        x_opt = clean_solution_vector(res.x, bounds, integrality)
+        if not np.all(np.isfinite(x_opt)):
+            return _payoff_error(headers, f"error: numerical overflow en objetivo {obj.name}")
 
         # Desempate lexicográfico secundario: entre todos los óptimos alternativos de Z_k,
         # elegir el que mejor desempeña en los demás objetivos para no fabricar un Nadir dominado.
         if n_objs >= 2:
             z_k_opt = float(np.dot(c_solver, x_opt))
-            secondary = np.zeros(n_vars, dtype=float)
-            for j in range(n_objs):
-                if j == k:
-                    continue
-                norm_j = float(np.linalg.norm(obj_dirs[j]))
-                if norm_j > 1e-12:
-                    secondary += obj_dirs[j] / norm_j
-
-            if np.linalg.norm(secondary) > 1e-12:
-                A_eq_lex = (
+            if np.isfinite(z_k_opt):
+                lex_A_eq = (
                     np.vstack([A_eq, c_solver[np.newaxis, :]])
                     if A_eq is not None and len(A_eq) > 0
                     else c_solver[np.newaxis, :]
                 )
-                b_eq_lex = (
+                lex_b_eq = (
                     np.concatenate([b_eq, [z_k_opt]])
                     if b_eq is not None and len(b_eq) > 0
                     else np.array([z_k_opt], dtype=float)
                 )
-                res_lex = linprog(
-                    secondary,
-                    A_ub=A_ub,
-                    b_ub=b_ub,
-                    A_eq=A_eq_lex,
-                    b_eq=b_eq_lex,
-                    bounds=bounds,
-                    integrality=integrality,
-                    method="highs"
-                )
-                if res_lex.success and res_lex.x is not None:
-                    z_k_lex = float(np.dot(c_solver, res_lex.x))
-                    if z_k_lex <= z_k_opt + 1e-9 * max(1.0, abs(z_k_opt)):
-                        x_opt = np.array(res_lex.x, dtype=float)
+                fixed_checks: List[Tuple[np.ndarray, float]] = [(c_solver, z_k_opt)]
 
-        # Limpiar tolerancias de integralidad y ruido de cotas
-        if integrality is not None:
-            for j, flag in enumerate(integrality):
-                if flag == 1 and abs(x_opt[j] - round(float(x_opt[j]))) < 1e-5:
-                    x_opt[j] = float(round(float(x_opt[j])))
-        for j, (lb, ub) in enumerate(bounds):
-            if lb is not None and abs(x_opt[j] - lb) < 1e-9:
-                x_opt[j] = lb
-            if ub is not None and abs(x_opt[j] - ub) < 1e-9:
-                x_opt[j] = ub
+                def _try_lex_dir(dir_vec: np.ndarray, eq_A: np.ndarray, eq_b: np.ndarray) -> Optional[np.ndarray]:
+                    res_lex = solve_linprog_precise(
+                        scale_linear_objective(dir_vec),
+                        A_ub=A_ub,
+                        b_ub=b_ub,
+                        A_eq=eq_A,
+                        b_eq=eq_b,
+                        bounds=bounds,
+                        integrality=integrality,
+                    )
+                    if res_lex.success and res_lex.x is not None and np.all(np.isfinite(res_lex.x)):
+                        cand = clean_solution_vector(res_lex.x, bounds, integrality)
+                        if (
+                            is_feasible(cand, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8)
+                            and all(
+                                float(np.dot(f_vec, cand)) <= f_val + 1e-9 * max(1.0, abs(f_val))
+                                for f_vec, f_val in fixed_checks
+                            )
+                        ):
+                            return cand
+                    return None
+
+                secondary = np.zeros(n_vars, dtype=float)
+                for j in range(n_objs):
+                    if j == k:
+                        continue
+                    norm_j = float(np.linalg.norm(obj_dirs[j]))
+                    if norm_j > 1e-12:
+                        secondary += obj_dirs[j] / norm_j
+
+                sec_norm = float(np.linalg.norm(secondary))
+                if sec_norm > 1e-12:
+                    cand = _try_lex_dir(secondary, lex_A_eq, lex_b_eq)
+                    if cand is not None:
+                        x_opt = cand
+                        sec_val = float(np.dot(secondary, x_opt))
+                        if np.isfinite(sec_val):
+                            lex_A_eq = np.vstack([lex_A_eq, secondary[np.newaxis, :]])
+                            lex_b_eq = np.concatenate([lex_b_eq, [sec_val]])
+                            fixed_checks.append((secondary, sec_val))
+
+                # Si las direcciones secundarias se cancelan o hay >= 3 objetivos,
+                # desempatar secuencialmente objetivo por objetivo para evitar caras dominadas.
+                if sec_norm <= 1e-12 or n_objs >= 3:
+                    for j in range(n_objs):
+                        if j == k or float(np.linalg.norm(obj_dirs[j])) <= 1e-12:
+                            continue
+                        cand = _try_lex_dir(obj_dirs[j], lex_A_eq, lex_b_eq)
+                        if cand is not None:
+                            x_opt = cand
+                        j_val = float(np.dot(obj_dirs[j], x_opt))
+                        if np.isfinite(j_val):
+                            lex_A_eq = np.vstack([lex_A_eq, obj_dirs[j][np.newaxis, :]])
+                            lex_b_eq = np.concatenate([lex_b_eq, [j_val]])
+                            fixed_checks.append((obj_dirs[j], j_val))
+
+        x_opt = clean_solution_vector(x_opt, bounds, integrality)
+        if not is_feasible(x_opt, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8):
+            return _payoff_error(headers, f"error: la solución óptima de {obj.name} no cumple el modelo")
 
         independent_solutions.append({var_names[j]: float(x_opt[j]) for j in range(n_vars)})
 
@@ -187,7 +317,10 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             if len(eval_coeffs) < n_vars:
                 eval_coeffs += [0.0] * (n_vars - len(eval_coeffs))
             eval_coeffs = np.array(eval_coeffs[:n_vars], dtype=float)
-            val = float(np.dot(eval_coeffs, x_opt))
+            with np.errstate(over="ignore", invalid="ignore"):
+                val = float(np.dot(eval_coeffs, x_opt))
+            if not np.isfinite(val):
+                return _payoff_error(headers, f"error: numerical overflow evaluating objective {eval_obj.name}")
             payoff_matrix[k, i] = val
 
     # 2. Determinar punto ideal, referencia de pagos y escalas
@@ -207,25 +340,32 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             z_ideal = float(np.min(col_vals))
             z_anti = float(np.max(col_vals))
 
-        scale = abs(z_ideal - z_anti)
-        source = "payoff"
-        # Comparar con el redondeo de la evaluación, en unidades del criterio.
-        # Una tolerancia absoluta anularía objetivos pequeños pero válidos.
-        coefficients = np.abs(np.asarray(obj.coefficients, dtype=float))
-        magnitude = float(np.max(payoff_vectors[:, :len(coefficients)] @ coefficients))
+        with np.errstate(over="ignore", invalid="ignore"):
+            scale = abs(z_ideal - z_anti)
+            # Comparar con el redondeo de la evaluación, en unidades del criterio.
+            # Una tolerancia absoluta anularía objetivos pequeños pero válidos.
+            coefficients = np.abs(np.asarray(obj.coefficients, dtype=float))
+            magnitude = float(np.max(payoff_vectors[:, :len(coefficients)] @ coefficients))
+        if not np.isfinite(z_ideal) or not np.isfinite(z_anti) or not np.isfinite(scale) or not np.isfinite(magnitude):
+            return _payoff_error(headers, f"error: numerical overflow evaluating objective {obj.name}")
         roundoff = 16 * np.finfo(float).eps * magnitude
+        source = "payoff"
         if scale <= roundoff:
             degenerate_objectives.append(i)
             # La referencia de pagos se conserva. Solo se sustituye el denominador.
-            worst = linprog(
+            worst = solve_linprog_precise(
                 -obj_dirs[i], A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
-                bounds=bounds, integrality=integrality, method="highs",
+                bounds=bounds, integrality=integrality,
             )
-            if worst.success:
+            if worst.success and worst.x is not None and np.all(np.isfinite(worst.x)):
                 original = np.asarray(obj.coefficients, dtype=float)
-                z_worst = float(original @ worst.x[:len(original)])
-                scale = max(0.0, z_ideal - z_worst if obj.sense == "maximize" else z_worst - z_ideal)
-                worst_magnitude = float(np.abs(original) @ np.abs(worst.x[:len(original)]))
+                with np.errstate(over="ignore", invalid="ignore"):
+                    z_worst = float(original @ worst.x[:len(original)])
+                    worst_magnitude = float(np.abs(original) @ np.abs(worst.x[:len(original)]))
+                    span = z_ideal - z_worst if obj.sense == "maximize" else z_worst - z_ideal
+                if not np.isfinite(z_worst) or not np.isfinite(worst_magnitude) or not np.isfinite(span):
+                    return _payoff_error(headers, f"error: numerical overflow evaluating objective {obj.name}")
+                scale = max(0.0, span)
                 if scale > max(roundoff, 16 * np.finfo(float).eps * worst_magnitude):
                     source = "feasible_range"
                 else:
@@ -245,11 +385,15 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
         for axis in np.eye(2):
             endpoints = []
             for direction in (1, -1):
-                projection = linprog(
+                projection = solve_linprog_precise(
                     direction * axis, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
-                    bounds=bounds, method="highs",
+                    bounds=bounds,
                 )
-                endpoints.append(float(direction * projection.fun) if projection.success else None)
+                endpoints.append(
+                    float(direction * projection.fun)
+                    if projection.success and np.isfinite(projection.fun)
+                    else None
+                )
             decision_ranges.append(tuple(endpoints))
 
     return PayoffMatrixData(
