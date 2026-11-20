@@ -55,7 +55,7 @@ export default function TopBar({
         return (
           <div
             title={solverMessage}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/40"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/40"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Óptimo</span>
@@ -67,7 +67,7 @@ export default function TopBar({
         return (
           <div
             title={solverMessage}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/40"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/40"
           >
             <AlertOctagon className="w-3.5 h-3.5" />
             <span>Infactible</span>
@@ -77,7 +77,7 @@ export default function TopBar({
         return (
           <div
             title={solverMessage}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/40"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-500/40"
           >
             <AlertTriangle className="w-3.5 h-3.5" />
             <span>No acotado</span>
@@ -85,7 +85,7 @@ export default function TopBar({
         );
       case "calculating":
         return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold bg-amber-500/15 text-amber-900 dark:text-amber-200 border border-amber-500/40">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             <span>Calculando...</span>
           </div>
@@ -94,7 +94,7 @@ export default function TopBar({
         return (
           <div
             title={solverMessage}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/40"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-800 dark:text-rose-300 border border-rose-500/40"
           >
             <AlertOctagon className="w-3.5 h-3.5" />
             <span>Error Solver</span>
@@ -102,7 +102,7 @@ export default function TopBar({
         );
       default:
         return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-500/15 text-slate-400 border border-slate-500/30">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30">
             <span>Listo</span>
           </div>
         );

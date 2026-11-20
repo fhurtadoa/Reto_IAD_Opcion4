@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import {
   Table2,
   Code2,
-  Sliders,
   Plus,
   Trash2,
   Scale,
@@ -26,6 +25,7 @@ import {
   parseAlgebraicModel,
   modelToLatex,
 } from "./mathUtils";
+import SectionHeading from "./SectionHeading";
 import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
 
@@ -376,7 +376,7 @@ export default function ControlPanelLeft({
   return (
     <aside className="workspace-controls min-w-0 space-y-4">
       <div className="model-form space-y-4">
-      <div className="section-intro"><h2>Formular el ejercicio</h2><p>Registra el contexto y define el modelo. Usa Resolver para comparar sus compromisos.</p></div>
+      <SectionHeading title="Formular el ejercicio" cue="Del enunciado al modelo de decisión" />
       {/* Encabezado del Modelo */}
       <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
@@ -835,18 +835,9 @@ export default function ControlPanelLeft({
         id="cockpit-weights-panel"
         className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3"
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Sliders className="w-4 h-4 text-[#E11D48]" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Preferencias
-            </h2>
-            <TooltipBadge
-              title="Pesos de Preferencia (wᵢ)"
-              content="Definen la importancia relativa de cada objetivo en las métricas L1 (compensatoria), L2 (euclidiana) y L∞ (equilibrio minimax). Deben sumar exactamente 1.00."
-            />
-          </div>
-
+        <SectionHeading title="Preferencias" cue="Ajusta los pesos para recalcular las soluciones." />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TooltipBadge title="Pesos de preferencia" content="Los pesos expresan la importancia relativa de cada objetivo y suman 1." />
           <div className="flex items-center gap-1.5">
             <span
               className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-sm border ${
@@ -855,7 +846,7 @@ export default function ControlPanelLeft({
                   : "bg-rose-500/15 text-[#E11D48] dark:text-rose-400 border-rose-500/40 animate-pulse"
               }`}
             >
-              Σw = {weightSum.toFixed(3)}
+              <span className="whitespace-nowrap">Σw = {weightSum.toFixed(3)}</span>
             </span>
             <button
               type="button"
@@ -869,8 +860,6 @@ export default function ControlPanelLeft({
           </div>
         </div>
 
-        <p className="section-cue">Asigna importancia a cada objetivo. Mueve un peso para recalcular las soluciones.</p>
-
         {/* Selector Rápido de Actitud / Perfil del Decisor */}
         <div className="grid grid-cols-3 gap-1.5">
           {[
@@ -881,6 +870,7 @@ export default function ControlPanelLeft({
             <button
               key={p.id}
               type="button"
+              aria-pressed={decisionProfile === p.id}
               onClick={() => onSelectProfile(p.id)}
               className={`px-2 py-1.5 rounded-sm border text-left transition-colors cursor-pointer ${
                 decisionProfile === p.id

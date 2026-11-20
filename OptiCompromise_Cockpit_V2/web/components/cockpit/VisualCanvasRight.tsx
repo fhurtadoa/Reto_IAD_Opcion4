@@ -7,16 +7,11 @@ import {
   Box,
   Compass,
   Grid,
-  Table as TableIcon,
   ChevronDown,
   ChevronUp,
-  Microscope,
-  Layers,
   AlertOctagon,
   Loader2,
   Target,
-  Maximize2,
-  Sliders,
 } from "lucide-react";
 import {
   ModelDefinition,
@@ -33,11 +28,10 @@ import {
   computeFeasibleObjectivesPolygon2D,
   computeDiscreteFeasiblePoints2D,
   computeIsodistanceTraces2D,
-  buildLinfXRayLatex,
 } from "./mathUtils";
 import { sensitivityCurves, sensitivityLayout, sensitivitySelection } from "./weightSensitivity";
-import TooltipBadge from "./TooltipBadge";
-import KatexBlock from "./KatexBlock";
+import MethodGuide from "./MethodGuide";
+import SectionHeading from "./SectionHeading";
 
 const Plot = dynamic(async () => {
   const [{ default: createPlot }, { default: plotly }] = await Promise.all([
@@ -91,7 +85,6 @@ export default function VisualCanvasRight({
   const [axis3DX, setAxis3DX] = useState<number>(0);
   const [axis3DY, setAxis3DY] = useState<number>(1);
   const [axis3DZ, setAxis3DZ] = useState<number>(2);
-  const [xrayOpen, setXrayOpen] = useState<boolean>(false);
   const [showAllVars, setShowAllVars] = useState<boolean>(false);
   const [downloadError, setDownloadError] = useState(false);
   const [exportingPlot, setExportingPlot] = useState(false);
@@ -706,17 +699,6 @@ export default function VisualCanvasRight({
     };
   }, [solveResult, model, nVars, isDark, paperBg, plotBg, gridColor, textColor, modelKey]);
 
-  // --- Datos Rayos X (L_inf) ---
-  const xrayData = useMemo(() => {
-    if (!solveResult?.solutions.L_inf.objectives.length) return null;
-    return buildLinfXRayLatex(
-      model,
-      solveResult.payoff,
-      solveResult.weights,
-      solveResult.solutions.L_inf
-    );
-  }, [model, solveResult]);
-
   // Estado vacío o error inicial (si ya existe solveResult previo, mantenemos el contexto con banner arriba)
   const hasActiveError =
     solverStatus === "infeasible" || solverStatus === "unbounded" || solverStatus === "error";
@@ -802,22 +784,17 @@ export default function VisualCanvasRight({
       <div hidden={workspace !== "results"} className="space-y-4">
       {/* 1. GRÁFICO PRINCIPAL INTERACTIVO */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden" id="grafico-resultados" aria-labelledby="grafico-titulo">
-        <div className="section-intro chart-intro px-4 py-3">
-          <h2 id="grafico-titulo">{chartGuide[effectiveTab][0]}</h2>
-          <p>{chartGuide[effectiveTab][1]}</p>
+        <div className="chart-intro px-4 py-3">
+          <SectionHeading id="grafico-titulo" title={chartGuide[effectiveTab][0]} cue={chartGuide[effectiveTab][1]} />
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
           {/* Pestañas de vista gráfica */}
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="chart-tabs flex flex-wrap items-center gap-1">
             <button
               type="button"
               onClick={() => setChartTab("objectives2d")}
               aria-pressed={effectiveTab === "objectives2d"}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
-                effectiveTab === "objectives2d"
-                  ? "bg-[#E11D48] text-white"
-                  : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-              }`}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors"
             >
               <Compass className="w-3.5 h-3.5" />
               <span>Objetivos 2D</span>
@@ -826,7 +803,7 @@ export default function VisualCanvasRight({
             {nObjs === 2 && (
               <button type="button" aria-pressed={effectiveTab === "sensitivity"}
                 onClick={() => setChartTab("sensitivity")}
-                className={`px-2.5 py-1 rounded-sm text-xs font-semibold ${effectiveTab === "sensitivity" ? "bg-[#be123c] text-white" : "text-slate-600 dark:text-slate-300"}`}>
+                className="px-2.5 py-1 rounded-sm text-xs font-semibold">
                 Sensibilidad de pesos
               </button>
             )}
@@ -836,11 +813,7 @@ export default function VisualCanvasRight({
                   type="button"
                   onClick={() => setChartTab("objectives3d")}
                   aria-pressed={effectiveTab === "objectives3d"}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
-                    effectiveTab === "objectives3d"
-                      ? "bg-[#E11D48] text-white"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors"
                 >
                   <Box className="w-3.5 h-3.5" />
                   <span>Espacio 3D</span>
@@ -849,11 +822,7 @@ export default function VisualCanvasRight({
                   type="button"
                   onClick={() => setChartTab("radar")}
                   aria-pressed={effectiveTab === "radar"}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
-                    effectiveTab === "radar"
-                      ? "bg-[#E11D48] text-white"
-                      : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                  }`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors"
                 >
                   <Target className="w-3.5 h-3.5" />
                   <span>Radar (% Logro)</span>
@@ -866,11 +835,7 @@ export default function VisualCanvasRight({
                 type="button"
                 onClick={() => setChartTab("decision2d")}
                 aria-pressed={effectiveTab === "decision2d"}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
-                  effectiveTab === "decision2d"
-                    ? "bg-[#E11D48] text-white"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                }`}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors"
               >
                 <Grid className="w-3.5 h-3.5" />
                 <span>Región Factible ({model.variables[0].name} vs {model.variables[1].name})</span>
@@ -1201,25 +1166,10 @@ export default function VisualCanvasRight({
       )}
       {/* 2. TABLA UNIFICADA: SOLUCIONES COMPROMISO (VALORES, % LOGRO Y DISTANCIA D_p) */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Layers className="w-4 h-4 text-[#E11D48]" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Comparación de soluciones
-            </h2>
-            <TooltipBadge
-              title="Lectura Unificada de Métricas"
-              content="Reúne para cada criterio el valor real alcanzado Zᵢ(x*), su logro y la distancia al ideal. Compara los logros por criterio. Cada métrica calcula una distancia diferente."
-            />
-          </div>
-          <span className="text-[10px] font-mono text-slate-400">
-            Motor: HiGHS + SLSQP / B&amp;B
-          </span>
-        </div>
-
-        <p className="section-cue">Compara el valor y el logro de cada objetivo en las tres soluciones.</p>
-        <div className="overflow-x-auto cockpit-scroll">
-          <table className="w-full text-xs border-collapse">
+        <SectionHeading title="Comparación de soluciones"
+          cue="Compara el valor y el logro de cada objetivo en las tres soluciones." />
+        <div className="overflow-x-auto cockpit-scroll" role="region" aria-label="Datos de las soluciones" tabIndex={0}>
+          <table className="data-table w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
                 <th className="text-left py-2 pr-3 font-semibold">Criterio / Métrica</th>
@@ -1299,16 +1249,8 @@ export default function VisualCanvasRight({
       {/* 3. SECCIÓN EXPLÍCITA: DECISIONES ÓPTIMAS POR VARIABLE (VECTOR x*) */}
       <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Sliders className="w-4 h-4 text-[#E11D48]" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Decisiones Óptimas por Variable (Vector x*)
-            </h2>
-            <TooltipBadge
-              title="Asignación de Variables de Decisión"
-              content="Muestra explícitamente la cantidad óptima recomendada para cada variable de decisión bajo cada métrica compromiso (L₁, L₂ y L∞), junto con su dominio."
-            />
-          </div>
+          <SectionHeading title="Valores de las variables"
+            cue="Consulta las cantidades que tendrías que aplicar en cada solución." />
           {model.variables.length > 6 && (
             <button
               type="button"
@@ -1320,9 +1262,8 @@ export default function VisualCanvasRight({
           )}
         </div>
 
-        <p className="section-cue">Consulta las cantidades que tendrías que aplicar para ejecutar cada solución.</p>
-        <div className="overflow-x-auto cockpit-scroll">
-          <table className="w-full text-xs border-collapse">
+        <div className="overflow-x-auto cockpit-scroll" role="region" aria-label="Variables por métrica" tabIndex={0}>
+          <table className="data-table w-full border-collapse">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
                 <th className="text-left py-2 pr-3 font-semibold">Variable</th>
@@ -1369,360 +1310,7 @@ export default function VisualCanvasRight({
       </section>
 
       </div>
-      <div hidden={workspace !== "method"} className="space-y-4">
-      {/* 4. MATRIZ DE PAGOS LITERAL + VECTORES IDEAL Y NADIR SEPARADOS */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-        <div className="section-intro"><h2>Cómo se calcula el compromiso</h2><p>Sigue la transformación desde los óptimos individuales hasta las soluciones ponderadas.</p></div>
-        <ol className="mt-3 grid gap-3 text-sm leading-relaxed md:grid-cols-3">
-          <li><strong className="block">1. Optimizar cada objetivo</strong> La diagonal de la matriz de pagos da el ideal.</li>
-          <li><strong className="block">2. Medir la brecha</strong> Divide la brecha por el rango entre el ideal y el nadir aproximado.</li>
-          <li><strong className="block">3. Aplicar los pesos</strong> L₁ suma brechas ponderadas, L₂ penaliza sus cuadrados y L∞ minimiza la mayor brecha ponderada.</li>
-        </ol>
-      </section>
-      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <TableIcon className="w-4 h-4 text-amber-600" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Matriz de Pagos (Payoff Matrix {headers.length}×{headers.length})
-            </h2>
-            <TooltipBadge
-              title="Matriz de Pagos Pura"
-              content="Cada fila k corresponde a optimizar el objetivo Z_k en solitario y evaluar todos los objetivos en esa solución x*(Z_k). La diagonal dorada marca el mejor desempeño individual de cada objetivo."
-            />
-          </div>
-          <div className="flex items-center gap-3 text-[10px] font-semibold">
-            <span className="inline-flex items-center gap-1 text-amber-600">
-              <span className="w-2 h-2 rounded-xs bg-amber-500/40 border border-amber-500" />
-              Diagonal Ideal
-            </span>
-            <span className="inline-flex items-center gap-1 text-[#E11D48]">
-              <span className="w-2 h-2 rounded-xs bg-rose-500/40 border border-[#E11D48]" />
-              Peor Valor (Nadir)
-            </span>
-          </div>
-        </div>
-
-        <p className="section-cue">Cada fila optimiza un criterio por separado y evalúa los demás en esa misma solución.</p>
-        {/* Matriz literal k x k */}
-        <div className="overflow-x-auto cockpit-scroll">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-                <th className="text-left py-2 pr-3 font-semibold">Óptimo Individual de:</th>
-                {headers.map((h, i) => (
-                  <th key={i} className="text-right py-2 px-2 font-semibold">
-                    Z{i + 1}: {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 font-mono">
-              {solveResult.payoff.matrix.map((row, rIdx) => (
-                <tr key={rIdx}>
-                  <td className="py-1.5 pr-3 font-sans font-medium text-slate-700 dark:text-slate-200">
-                    x*(Z{rIdx + 1}) · {headers[rIdx]}
-                  </td>
-                  {row.map((val, cIdx) => {
-                    const isIdeal = rIdx === cIdx;
-                    const isNadir =
-                      !isIdeal &&
-                      Math.abs(val - solveResult.payoff.anti_ideal_point[cIdx]) < 1e-4;
-                    return (
-                      <td
-                        key={cIdx}
-                        className={`py-1.5 px-2 text-right ${
-                          isIdeal
-                            ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold"
-                            : isNadir
-                            ? "bg-rose-500/10 text-[#E11D48] dark:text-rose-400"
-                            : "text-slate-700 dark:text-slate-300"
-                        }`}
-                      >
-                        {fmtNum(val, 2)}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Vectores Punto Ideal y Punto Nadir separados abajo */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="p-3 rounded-sm bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/60 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                ★ Vector Punto Ideal (Z*)
-              </span>
-              <span className="text-[10px] font-mono text-amber-700/80 dark:text-amber-400/80">
-                Óptimos individuales
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-xs">
-              {solveResult.payoff.ideal_point.map((val, idx) => (
-                <div
-                  key={`id-${idx}`}
-                  className="flex items-center justify-between bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 border border-amber-200/80 dark:border-amber-900/50 rounded-sm"
-                >
-                  <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300 truncate pr-2" title={headers[idx]}>
-                    Z{idx + 1}*:
-                  </span>
-                  <span className="font-bold text-amber-800 dark:text-amber-300">
-                    {fmtNum(val, 2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-3 rounded-sm bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/60 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#E11D48] dark:text-rose-300">
-                ✕ Vector Punto Nadir / Anti-Ideal (Z_peor)
-              </span>
-              <span className="text-[10px] font-mono text-[#E11D48]/80 dark:text-rose-400/80">
-                Peores valores observados en la matriz
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 font-mono text-xs">
-              {solveResult.payoff.anti_ideal_point.map((val, idx) => (
-                <div
-                  key={`nad-${idx}`}
-                  className="flex items-center justify-between bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 border border-rose-200/80 dark:border-rose-900/50 rounded-sm"
-                >
-                  <span className="font-sans text-[11px] text-slate-600 dark:text-slate-300 truncate pr-2" title={headers[idx]}>
-                    Z{idx + 1}_peor:
-                  </span>
-                  <span className="font-bold text-[#E11D48] dark:text-rose-300">
-                    {fmtNum(val, 2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. NORMALIZACIÓN POR RANGO IDEAL–ANTI-IDEAL (FÓRMULAS LATEX + MATRIZ NORMALIZADA) */}
-      <details className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">Consultar fórmulas y tablas de normalización</summary>
-      <section className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Maximize2 className="w-4 h-4 text-[#E11D48]" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-              Normalización por objetivo
-            </h2>
-            <TooltipBadge
-              title="Normalización Ideal–Nadir"
-              content="Divide la brecha al ideal por el rango de referencia. Una desviación mayor que 1 indica un resultado peor que el nadir aproximado."
-            />
-          </div>
-          <span className="text-[10px] font-mono text-slate-400">
-            0 = Ideal · 1 = Nadir de referencia
-          </span>
-        </div>
-
-        <p className="section-cue">Consulta la escala común que permite comparar objetivos con unidades distintas.</p>
-        {/* Fórmulas Matemáticas en KaTeX antes de la matriz */}
-        <div className="p-3 rounded-sm bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] space-y-2">
-          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-            Para evitar sesgos por unidades dispares (ej. dólares vs puntos o kg), cada criterio se normaliza respecto a su rango de referencia{" "}
-            <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">Rᵢ = |Zᵢ* − Zᵢ,peor|</span>:
-          </p>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-sm overflow-x-auto">
-            <KatexBlock
-              latex={`D_i(x) = \\begin{cases} \\dfrac{Z_i^* - Z_i(x)}{Z_i^* - Z_{i,\\text{peor}}} & \\text{(Maximizar)} \\\\[8pt] \\dfrac{Z_i(x) - Z_i^*}{Z_{i,\\text{peor}} - Z_i^*} & \\text{(Minimizar)} \\end{cases} \\qquad\\qquad Z'_i(x) = 100 \\cdot \\bigl(1 - D_i(x)\\bigr)\\%`}
-              className="text-slate-900 dark:text-slate-100 text-xs"
-            />
-          </div>
-        </div>
-
-        {/* Tabla de Parámetros de Normalización por Criterio */}
-        <div className="space-y-1.5">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Parámetros de Normalización y Ponderación por Criterio
-          </div>
-          <div className="overflow-x-auto cockpit-scroll">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-                  <th className="text-left py-2 pr-2 font-semibold">Objetivo (Zᵢ)</th>
-                  <th className="text-right py-2 px-2 font-semibold">Ideal (Zᵢ*)</th>
-                  <th className="text-right py-2 px-2 font-semibold">Nadir (Z_peor)</th>
-                  <th className="text-right py-2 px-2 font-semibold">Rango Rᵢ</th>
-                  <th className="text-left py-2 px-2 font-semibold">Desviación Dᵢ(x)</th>
-                  <th className="text-center py-2 pl-2 font-semibold">Peso wᵢ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 font-mono text-[11px]">
-                {model.objectives.map((obj, i) => {
-                  const zId = solveResult.payoff.ideal_point[i] ?? 0;
-                  const zNad = solveResult.payoff.anti_ideal_point[i] ?? 0;
-                  const range = solveResult.payoff.normalization_ranges?.[i] ?? Math.abs(zId - zNad);
-                  const w = solveResult.weights[i] ?? 0;
-                  const isMin = obj.sense === "minimize";
-                  return (
-                    <tr key={`norm-param-${i}`}>
-                      <td className="py-1.5 pr-2 font-sans font-semibold text-slate-800 dark:text-slate-200">
-                        Z{i + 1}: {obj.name}
-                      </td>
-                      <td className="py-1.5 px-2 text-right font-bold text-amber-700 dark:text-amber-300">
-                        {fmtNum(zId, 2)}
-                      </td>
-                      <td className="py-1.5 px-2 text-right font-semibold text-[#E11D48] dark:text-rose-400">
-                        {fmtNum(zNad, 2)}
-                      </td>
-                      <td className="py-1.5 px-2 text-right font-bold text-slate-800 dark:text-slate-200">
-                        {fmtNum(range, 4)}{degenerateObjs.includes(i) ? " (aux.)" : ""}
-                      </td>
-                      <td className="py-1.5 px-2 text-[10px] text-slate-600 dark:text-slate-300">
-                        {range > 1e-9
-                          ? isMin
-                            ? `(Z${i + 1} - ${fmtNum(zId, 1)}) / ${fmtNum(range, 1)}`
-                            : `(${fmtNum(zId, 1)} - Z${i + 1}) / ${fmtNum(range, 1)}`
-                          : "Rango nulo"}
-                      </td>
-                      <td className="py-1.5 pl-2 text-center font-bold text-[#E11D48]">
-                        {w.toFixed(2)} ({(w * 100).toFixed(0)}%)
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Matriz de Pagos Normalizada (Valores en escala [0, 1]) */}
-        <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Matriz de Normalización (Dₖ,ᵢ ∈ [0, 1])
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              0.000 = Ideal · 1.000 = Anti-Ideal (Nadir)
-            </span>
-          </div>
-          <div className="overflow-x-auto cockpit-scroll">
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
-                  <th className="text-left py-2 pr-3 font-semibold">Solución / Escenario</th>
-                  {headers.map((h, i) => (
-                    <th key={`nh-${i}`} className="text-right py-2 px-2 font-semibold">
-                      D{i + 1} ({h})
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/70 font-mono text-[11px]">
-                {solveResult.payoff.matrix.map((row, rIdx) => (
-                  <tr key={`norm-row-${rIdx}`}>
-                    <td className="py-1.5 pr-3 font-sans font-medium text-slate-700 dark:text-slate-200">
-                      x*(Z{rIdx + 1}) · {headers[rIdx]}
-                    </td>
-                    {row.map((val, cIdx) => {
-                      const zId = solveResult.payoff.ideal_point[cIdx] ?? 0;
-                      const zNad = solveResult.payoff.anti_ideal_point[cIdx] ?? 0;
-                      const range = solveResult.payoff.normalization_ranges?.[cIdx] || Math.abs(zId - zNad) || 1;
-                      const dNorm = Math.max(0, Math.abs(zId - val) / range);
-                      const isZero = dNorm < 1e-4;
-                      const isOne = Math.abs(dNorm - 1.0) < 1e-4;
-                      return (
-                        <td
-                          key={`nc-${cIdx}`}
-                          className={`py-1.5 px-2 text-right ${
-                            isZero
-                              ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold"
-                              : isOne
-                              ? "bg-rose-500/10 text-[#E11D48] dark:text-rose-400 font-bold"
-                              : "text-slate-700 dark:text-slate-300"
-                          }`}
-                        >
-                          {dNorm.toFixed(3)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-      </details>
-
-      {/* 4. ACORDEÓN "MODO RAYOS X (L_inf)" PARA SUSTENTACIÓN */}
-      <section className="rounded-sm border border-slate-200 dark:border-slate-800 border-l-4 border-l-[#E11D48] bg-white dark:bg-slate-900 overflow-hidden">
-        <button
-          type="button"
-          aria-expanded={xrayOpen}
-          onClick={() => setXrayOpen((o) => !o)}
-          className="w-full flex items-center justify-between px-4 py-3 text-left bg-slate-50 dark:bg-slate-900 hover:bg-rose-50/50 dark:hover:bg-slate-800 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Microscope className="w-4 h-4 text-[#E11D48]" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
-              Modo Rayos X (L∞) — Linealización Minimax para Sustentación
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {xrayData?.lambdaVal !== null && xrayData?.lambdaVal !== undefined && (
-              <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-sm bg-rose-50 dark:bg-rose-950/60 text-[#E11D48] dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-                λ* = {xrayData.lambdaVal.toFixed(4)}
-              </span>
-            )}
-            {xrayOpen ? (
-              <ChevronUp className="w-4 h-4 text-[#E11D48]" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-slate-500" />
-            )}
-          </div>
-        </button>
-
-        <p className="section-cue px-4 py-2">Revisa cómo λ limita la mayor desviación ponderada.</p>
-
-        {xrayOpen && xrayData && (
-          <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-3 text-xs bg-slate-50/70 dark:bg-slate-950/60">
-            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-              Para resolver la métrica no lineal{" "}
-              <span className="font-mono font-semibold text-[#E11D48]">
-                min maxᵢ [ wᵢ · Dᵢ(x) ]
-              </span>{" "}
-              como un Programa Lineal (o MIP) exacto en HiGHS, se introduce la variable auxiliar{" "}
-              <span className="font-mono font-bold">λ ≥ 0</span> que acota superiormente todas las
-              desviaciones ponderadas del modelo actual:
-            </p>
-
-            <div className="p-3 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
-              <KatexBlock
-                latex={xrayData.headerLatex}
-                className="text-slate-900 dark:text-slate-100"
-              />
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                {xrayData.constraintsLatex.map((cLatex, idx) => (
-                  <div
-                    key={idx}
-                    className="p-2 rounded-sm bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800"
-                  >
-                    <div className="text-[10px] font-semibold text-slate-400 mb-1">
-                      Restricción Minimax #{idx + 1} ({headers[idx]}):
-                    </div>
-                    <KatexBlock
-                      latex={cLatex}
-                      className="text-slate-800 dark:text-slate-200 text-xs"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-      </div>
+      {workspace === "method" && <MethodGuide model={model} result={solveResult} />}
     </main>
   );
 }

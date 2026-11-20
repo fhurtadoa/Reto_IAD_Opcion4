@@ -13,7 +13,7 @@
 2. En el gráfico, identifica el ideal, el nadir de referencia y las tres soluciones. Elige **Región factible** para dos variables o **Espacio 3D** para tres o más objetivos.
 3. En un modelo de dos objetivos, abre **Sensibilidad de pesos** para comparar la desviación al ideal de L₁, L₂ y L∞. La línea punteada sigue el peso seleccionado. Los marcadores grandes corresponden al último cálculo del motor. **PNG** exporta los tres paneles juntos.
 4. En **Comparación de soluciones**, revisa qué gana y qué cede cada objetivo. Consulta la tabla de variables para traducir la solución a decisiones concretas.
-5. En **Ver método**, consulta la matriz de pagos, los rangos de normalización y la formulación minimax con λ.
+5. En **Ver método**, usa el índice para saltar a Referencias, Normalización o Métricas. La matriz de pagos incluye el ideal y el nadir como filas de referencia. Las fórmulas principales están visibles. Abre las consultas avanzadas para ver la matriz normalizada o cada restricción minimax con sus coeficientes.
 6. Guarda el modelo con **JSON**. Exporta el cálculo a **Excel** o **CSV** y descarga el gráfico visible con **PNG**.
 
 | Concepto | Lectura |
@@ -33,7 +33,7 @@
 
 **Ver método.** La matriz de pagos muestra qué se consigue al optimizar cada criterio por separado. Debajo se usa el rango de referencia para comparar unidades distintas.
 
-![Matriz de pagos y normalización de Celdas](capturas/opticompromise-metodo.jpg)
+![Vista de método y matriz de pagos del ejercicio de Flota](capturas/opticompromise-metodo.jpg)
 
 **Modelo triobjetivo.** Selecciona **Espacio 3D** para girar el gráfico y ver la relación entre los tres criterios.
 
