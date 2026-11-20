@@ -81,16 +81,18 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
     headers = [obj.name for obj in model.objectives]
     var_names = [v.name for v in model.variables]
     
-    # 1. Optimización independiente de cada objetivo
-    for k, obj in enumerate(model.objectives):
+    # 1. Optimización independiente de cada objetivo (con desempate lexicográfico para evitar soluciones dominadas)
+    obj_dirs: List[np.ndarray] = []
+    for obj in model.objectives:
         coeffs = list(obj.coefficients)
         if len(coeffs) < n_vars:
             coeffs += [0.0] * (n_vars - len(coeffs))
-        coeffs = np.array(coeffs[:n_vars], dtype=float)
-        
-        # linprog siempre minimiza: si es maximize, multiplicamos por -1
-        c_solver = -coeffs if obj.sense == "maximize" else coeffs
-        
+        arr = np.array(coeffs[:n_vars], dtype=float)
+        obj_dirs.append(-arr if obj.sense == "maximize" else arr)
+
+    for k, obj in enumerate(model.objectives):
+        c_solver = obj_dirs[k]
+
         res = linprog(
             c_solver,
             A_ub=A_ub,
@@ -101,7 +103,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             integrality=integrality,
             method="highs"
         )
-        
+
         if not res.success:
             return PayoffMatrixData(
                 headers=headers,
@@ -109,12 +111,63 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
                 ideal_point=[],
                 anti_ideal_point=[],
                 independent_solutions=[],
+                degenerate_objectives=[],
                 status=f"error: {res.message} en objetivo {obj.name}"
             )
-            
-        x_opt = res.x
+
+        x_opt = np.array(res.x, dtype=float)
+
+        # Desempate lexicográfico secundario: entre todos los óptimos alternativos de Z_k,
+        # elegir el que mejor desempeña en los demás objetivos para no fabricar un Nadir dominado.
+        if n_objs >= 2:
+            z_k_opt = float(np.dot(c_solver, x_opt))
+            secondary = np.zeros(n_vars, dtype=float)
+            for j in range(n_objs):
+                if j == k:
+                    continue
+                norm_j = float(np.linalg.norm(obj_dirs[j]))
+                if norm_j > 1e-12:
+                    secondary += obj_dirs[j] / norm_j
+
+            if np.linalg.norm(secondary) > 1e-12:
+                A_eq_lex = (
+                    np.vstack([A_eq, c_solver[np.newaxis, :]])
+                    if A_eq is not None and len(A_eq) > 0
+                    else c_solver[np.newaxis, :]
+                )
+                b_eq_lex = (
+                    np.concatenate([b_eq, [z_k_opt]])
+                    if b_eq is not None and len(b_eq) > 0
+                    else np.array([z_k_opt], dtype=float)
+                )
+                res_lex = linprog(
+                    secondary,
+                    A_ub=A_ub,
+                    b_ub=b_ub,
+                    A_eq=A_eq_lex,
+                    b_eq=b_eq_lex,
+                    bounds=bounds,
+                    integrality=integrality,
+                    method="highs"
+                )
+                if res_lex.success and res_lex.x is not None:
+                    z_k_lex = float(np.dot(c_solver, res_lex.x))
+                    if z_k_lex <= z_k_opt + 1e-9 * max(1.0, abs(z_k_opt)):
+                        x_opt = np.array(res_lex.x, dtype=float)
+
+        # Limpiar tolerancias de integralidad y ruido de cotas
+        if integrality is not None:
+            for j, flag in enumerate(integrality):
+                if flag == 1 and abs(x_opt[j] - round(float(x_opt[j]))) < 1e-5:
+                    x_opt[j] = float(round(float(x_opt[j])))
+        for j, (lb, ub) in enumerate(bounds):
+            if lb is not None and abs(x_opt[j] - lb) < 1e-9:
+                x_opt[j] = lb
+            if ub is not None and abs(x_opt[j] - ub) < 1e-9:
+                x_opt[j] = ub
+
         independent_solutions.append({var_names[j]: float(x_opt[j]) for j in range(n_vars)})
-        
+
         # Evaluar todos los objetivos bajo esta solución óptima x^(k)*
         for i, eval_obj in enumerate(model.objectives):
             eval_coeffs = list(eval_obj.coefficients)
@@ -123,11 +176,12 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
             eval_coeffs = np.array(eval_coeffs[:n_vars], dtype=float)
             val = float(np.dot(eval_coeffs, x_opt))
             payoff_matrix[k, i] = val
-            
+
     # 2. Determinar Punto Ideal y Punto Anti-Ideal (Nadir aproximado)
     ideal_point = []
     anti_ideal_point = []
-    
+    degenerate_objectives: List[int] = []
+
     for i, obj in enumerate(model.objectives):
         col_vals = payoff_matrix[:, i]
         if obj.sense == "maximize":
@@ -136,23 +190,25 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
         else:
             z_ideal = float(np.min(col_vals))
             z_anti = float(np.max(col_vals))
-            
+
         # Prevención de división por cero si ideal == peor
         if np.isclose(z_ideal, z_anti):
+            degenerate_objectives.append(i)
             delta = abs(z_ideal) * 0.05 if not np.isclose(z_ideal, 0.0) else 1.0
             if obj.sense == "maximize":
                 z_anti = z_ideal - delta
             else:
                 z_anti = z_ideal + delta
-                
+
         ideal_point.append(z_ideal)
         anti_ideal_point.append(z_anti)
-        
+
     return PayoffMatrixData(
         headers=headers,
         matrix=payoff_matrix.tolist(),
         ideal_point=ideal_point,
         anti_ideal_point=anti_ideal_point,
         independent_solutions=independent_solutions,
+        degenerate_objectives=degenerate_objectives,
         status="optimal"
     )

@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import {
   ModelDefinition,
   ObjectiveModel,
@@ -10,7 +11,7 @@ import {
 } from "./types";
 
 /**
- * Formatea un número compacto para visualización en tablas y ecuaciones.
+ * Formatea un número compacto para visualización en tablas (locale es-CO).
  */
 export function fmtNum(val: number | undefined | null, decimals = 2): string {
   if (val === undefined || val === null || Number.isNaN(val)) return "—";
@@ -18,6 +19,20 @@ export function fmtNum(val: number | undefined | null, decimals = 2): string {
     return val.toLocaleString("es-CO", { maximumFractionDigits: Math.min(decimals, 1) });
   }
   return val.toLocaleString("es-CO", { maximumFractionDigits: decimals });
+}
+
+/**
+ * Formatea números limpios para KaTeX/LaTeX (punto decimal estándar y separador fino \, para miles,
+ * evitando la coma española que genera espacios extra en modo matemático).
+ */
+export function fmtLatexNum(val: number | undefined | null, decimals = 2): string {
+  if (val === undefined || val === null || Number.isNaN(val)) return "0";
+  const rounded = Number(val.toFixed(Math.abs(val) >= 10000 ? Math.min(decimals, 1) : decimals));
+  const [intPart, decPart] = String(rounded).split(".");
+  const sign = intPart.startsWith("-") ? "-" : "";
+  const digits = intPart.replace("-", "");
+  const withSep = digits.replace(/\B(?=(\d{3})+(?!\d))/g, "\\,");
+  return decPart ? `${sign}${withSep}.${decPart}` : `${sign}${withSep}`;
 }
 
 /**
@@ -89,6 +104,8 @@ export interface AlgebraicParseResult {
 
 /**
  * Parsea un bloque de texto algebraico en objetivos y restricciones lineales.
+ * Soporta constantes aditivas, variables en ambos lados de las restricciones,
+ * paréntesis anidados en nombres de objetivos y comas decimales.
  * Retorna errores detallados en español si hay sintaxis inválida.
  */
 export function parseAlgebraicModel(
@@ -96,7 +113,14 @@ export function parseAlgebraicModel(
   existingModel: ModelDefinition
 ): AlgebraicParseResult {
   const errors: string[] = [];
-  const rawLines = text
+  // Normalizar símbolos Unicode comunes (≤, ≥, −) y comas decimales (2,5 -> 2.5)
+  const sanitizedText = text
+    .replace(/≤/g, "<=")
+    .replace(/≥/g, ">=")
+    .replace(/[−–—]/g, "-")
+    .replace(/(\d),(\d)/g, "$1.$2");
+
+  const rawLines = sanitizedText
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//"));
@@ -105,32 +129,45 @@ export function parseAlgebraicModel(
     return { ok: false, errors: ["El editor algebraico está vacío. Ingresa al menos 2 objetivos."] };
   }
 
-  const knownVars = existingModel.variables.map((v) => v.name.split(" ")[0].trim());
-  const varList = [...knownVars];
+  // Preservar mapa token -> nombre completo (ej. "x1" -> "x1 (BYD Seal)")
+  const tokenToFullName = new Map<string, string>();
+  const varList: string[] = [];
+  const usedVarTokens = new Set<string>();
+  existingModel.variables.forEach((v) => {
+    const token = v.name.split(" ")[0].trim();
+    if (token && !tokenToFullName.has(token)) {
+      tokenToFullName.set(token, v.name);
+      varList.push(token);
+    }
+  });
 
   const ensureVar = (v: string): number => {
+    usedVarTokens.add(v);
     const idx = varList.indexOf(v);
     if (idx >= 0) return idx;
     varList.push(v);
+    tokenToFullName.set(v, v);
     return varList.length - 1;
   };
 
-  const parseLinearSide = (expr: string, lineNo: number): number[] | null => {
+  const parseLinearSide = (
+    expr: string,
+    lineNo: number
+  ): { coeffsMap: Record<string, number>; constant: number } | null => {
     const clean = expr.replace(/\s+/g, "");
     if (!clean) {
       errors.push(`Línea ${lineNo}: expresión vacía.`);
       return null;
     }
-    // Validar caracteres permitidos
     if (/[^a-zA-Z0-9_+\-.*]/.test(clean)) {
       errors.push(`Línea ${lineNo}: contiene caracteres no reconocidos en "${expr}".`);
       return null;
     }
 
     const coeffsMap: Record<string, number> = {};
-    // Separar por + o - manteniendo el signo
+    let constant = 0;
     const normalized = clean.startsWith("+") || clean.startsWith("-") ? clean : `+${clean}`;
-    const termRegex = /([+-])([^+-]+)/g;
+    const termRegex = /([+-])((?:[^+-]|(?<=[0-9][eE])[+-])+)/g;
     let match: RegExpExecArray | null;
     let consumed = 0;
 
@@ -139,10 +176,21 @@ export function parseAlgebraicModel(
       const sign = match[1] === "-" ? -1 : 1;
       const body = match[2];
 
-      // Forma: [numero][*][variable] o [variable]
-      const mTerm = body.match(/^(\d+(?:\.\d+)?)?\*?([a-zA-Z][a-zA-Z0-9_]*)$/);
+      // Forma 1: constante numérica pura (ej. "+100" o "50")
+      if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(body)) {
+        const cVal = parseFloat(body);
+        if (Number.isNaN(cVal)) {
+          errors.push(`Línea ${lineNo}: constante numérica inválida "${match[0]}".`);
+          return null;
+        }
+        constant += sign * cVal;
+        continue;
+      }
+
+      // Forma 2: [numero][*][variable] o [variable]
+      const mTerm = body.match(/^(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)?\*?([a-zA-Z][a-zA-Z0-9_]*)$/);
       if (!mTerm) {
-        errors.push(`Línea ${lineNo}: término inválido "${match[0]}". Usa formato como "3*x1" o "2x1".`);
+        errors.push(`Línea ${lineNo}: término inválido "${match[0]}". Usa formato como "3*x1", "2x1" o "1e3*x1".`);
         return null;
       }
       const numVal = mTerm[1] !== undefined ? parseFloat(mTerm[1]) : 1.0;
@@ -160,11 +208,21 @@ export function parseAlgebraicModel(
       return null;
     }
 
-    return varList.map((v) => coeffsMap[v] || 0);
+    return { coeffsMap, constant };
   };
 
-  const parsedObjectives: { name: string; sense: ObjectiveSense; rawCoeffs: number[] }[] = [];
-  const parsedConstraints: { name: string; sense: ConstraintSense; rhs: number; rawCoeffs: number[] }[] = [];
+  const extractObjectiveName = (headerPart: string): string => {
+    const trimmed = headerPart.trim();
+    const firstParen = trimmed.indexOf("(");
+    const lastParen = trimmed.lastIndexOf(")");
+    if (firstParen !== -1 && lastParen > firstParen) {
+      return trimmed.slice(firstParen + 1, lastParen).trim();
+    }
+    return trimmed;
+  };
+
+  const parsedObjectives: { name: string; sense: ObjectiveSense; coeffsMap: Record<string, number> }[] = [];
+  const parsedConstraints: { name: string; sense: ConstraintSense; rhs: number; coeffsMap: Record<string, number> }[] = [];
   let inConstraints = false;
 
   rawLines.forEach((line, idx) => {
@@ -175,78 +233,84 @@ export function parseAlgebraicModel(
     }
 
     if (!inConstraints && /^(max|min|maximizar|minimizar)\b/i.test(line)) {
-      const mObj = line.match(/^(max|min|maximizar|minimizar)\s+([^=]+?)\s*=\s*(.+)$/i);
-      if (!mObj) {
+      const mObjNamed = line.match(/^(max|min|maximizar|minimizar)\s+([^=]+?)\s*=\s*(.+)$/i);
+      const mObjDirect = !mObjNamed ? line.match(/^(max|min|maximizar|minimizar)\s+(.+)$/i) : null;
+
+      if (!mObjNamed && !mObjDirect) {
         errors.push(`Línea ${lineNo}: formato de objetivo inválido. Ejemplo: "Max Z1 = 1000*x1 + 3000*x2".`);
         return;
       }
-      const sense: ObjectiveSense = /^max/i.test(mObj[1]) ? "maximize" : "minimize";
-      const labelMatch = mObj[2].match(/\(([^)]+)\)/);
-      const name = labelMatch ? labelMatch[1].trim() : mObj[2].trim();
-      const coeffs = parseLinearSide(mObj[3], lineNo);
-      if (coeffs) {
-        parsedObjectives.push({ name, sense, rawCoeffs: coeffs });
+
+      const rawSense = mObjNamed ? mObjNamed[1] : mObjDirect![1];
+      const sense: ObjectiveSense = /^max/i.test(rawSense) ? "maximize" : "minimize";
+      const name = mObjNamed
+        ? extractObjectiveName(mObjNamed[2])
+        : existingModel.objectives[parsedObjectives.length]?.name || `Objetivo ${parsedObjectives.length + 1}`;
+      const rhsExpr = mObjNamed ? mObjNamed[3] : mObjDirect![2];
+
+      const parsedSide = parseLinearSide(rhsExpr, lineNo);
+      if (parsedSide) {
+        parsedObjectives.push({ name, sense, coeffsMap: parsedSide.coeffsMap });
       }
       return;
     }
 
-    // Restricción
+    // Restricción (soporta variables y constantes en ambos lados: lhs op rhs)
     inConstraints = true;
-    const mCon = line.match(/^(.+?)\s*(<=|>=|==|=)\s*([+-]?\d+(?:\.\d+)?)$/);
+    const mCon = line.match(/^(.+?)\s*(<=|>=|==|=)\s*(.+)$/);
     if (!mCon) {
       errors.push(
-        `Línea ${lineNo}: formato de restricción inválido ("${line}"). Ejemplo: "x1 + x2 <= 400".`
+        `Línea ${lineNo}: formato de restricción inválido ("${line}"). Ejemplo: "x1 + x2 <= 400" o "x1 <= 2*x2".`
       );
       return;
     }
-    const lhs = mCon[1].trim();
+    const lhsParsed = parseLinearSide(mCon[1].trim(), lineNo);
+    const rhsParsed = parseLinearSide(mCon[3].trim(), lineNo);
+    if (!lhsParsed || !rhsParsed) return;
+
     const rawSense = mCon[2];
-    const rhs = parseFloat(mCon[3]);
-    if (Number.isNaN(rhs)) {
-      errors.push(`Línea ${lineNo}: lado derecho numérico inválido.`);
-      return;
-    }
     const sense: ConstraintSense = rawSense === "=" ? "==" : (rawSense as ConstraintSense);
-    const coeffs = parseLinearSide(lhs, lineNo);
-    if (coeffs) {
-      const existingName = existingModel.constraints[parsedConstraints.length]?.name;
-      parsedConstraints.push({
-        name: existingName || `Restricción ${parsedConstraints.length + 1}`,
-        sense,
-        rhs,
-        rawCoeffs: coeffs,
-      });
+    const netCoeffs: Record<string, number> = { ...lhsParsed.coeffsMap };
+    for (const [v, val] of Object.entries(rhsParsed.coeffsMap)) {
+      netCoeffs[v] = (netCoeffs[v] || 0) - val;
     }
+    const netRhs = rhsParsed.constant - lhsParsed.constant;
+    const existingName = existingModel.constraints[parsedConstraints.length]?.name;
+    parsedConstraints.push({
+      name: existingName || `Restricción ${parsedConstraints.length + 1}`,
+      sense,
+      rhs: netRhs,
+      coeffsMap: netCoeffs,
+    });
   });
 
   if (parsedObjectives.length < 2) {
     errors.push("Un problema multiobjetivo requiere al menos 2 funciones objetivo (Max/Min).");
   }
 
+  // Conservar únicamente las variables realmente referenciadas en las ecuaciones
+  const finalVars = varList.filter((v) => usedVarTokens.has(v));
+  if (finalVars.length < 1 && errors.length === 0) {
+    errors.push("El modelo debe incluir al menos 1 variable de decisión en sus ecuaciones.");
+  }
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  const totalVars = varList.length;
-  const pad = (arr: number[]) => {
-    const out = [...arr];
-    while (out.length < totalVars) out.push(0);
-    return out;
-  };
-
   return {
     ok: true,
-    detectedVariables: varList,
+    detectedVariables: finalVars.map((tok) => tokenToFullName.get(tok) || tok),
     objectives: parsedObjectives.map((o) => ({
       name: o.name,
       sense: o.sense,
-      coefficients: pad(o.rawCoeffs),
+      coefficients: finalVars.map((v) => o.coeffsMap[v] || 0),
     })),
     constraints: parsedConstraints.map((c) => ({
       name: c.name,
       sense: c.sense,
       rhs: c.rhs,
-      coefficients: pad(c.rawCoeffs),
+      coefficients: finalVars.map((v) => c.coeffsMap[v] || 0),
     })),
     errors: [],
   };
@@ -266,7 +330,7 @@ export function modelToLatex(model: ModelDefinition): string {
   const conLines = model.constraints.map((c) => {
     const expr = formatLinearExpr(c.coefficients, varNames, true);
     const op = c.sense === "<=" ? "\\le" : c.sense === ">=" ? "\\ge" : "=";
-    return `${expr} &${op} ${fmtNum(c.rhs, 2)}`;
+    return `${expr} &${op} ${fmtLatexNum(c.rhs, 2)}`;
   });
 
   const domainLines = model.variables.map((v) => {
@@ -308,17 +372,18 @@ export function buildLinfXRayLatex(
     const zNadir = payoff.anti_ideal_point[i] ?? 0;
     const denom = Math.abs(zIdeal - zNadir) > 1e-9 ? Math.abs(zIdeal - zNadir) : 1;
     const zExpr = formatLinearExpr(obj.coefficients, varNames, true);
+    const zIdealStr = zIdeal < 0 ? `(${fmtLatexNum(zIdeal, 2)})` : fmtLatexNum(zIdeal, 2);
     const numLatex =
       obj.sense === "maximize"
-        ? `${fmtNum(zIdeal, 2)} - (${zExpr})`
-        : `(${zExpr}) - ${fmtNum(zIdeal, 2)}`;
+        ? `${zIdealStr} - (${zExpr})`
+        : `(${zExpr}) - ${zIdealStr}`;
     const dVal = solLinf?.normalized_distances?.[i];
     const wdVal = dVal !== undefined ? w * dVal : null;
     const evalSuffix =
       wdVal !== undefined && wdVal !== null
         ? `\\quad \\Rightarrow \\; ${wdVal.toFixed(4)} \\le ${(solLinf?.aggregate_distance ?? 0).toFixed(4)}`
         : "";
-    return `${w.toFixed(3)} \\cdot \\frac{${numLatex}}{${fmtNum(denom, 2)}} \\le \\lambda ${evalSuffix}`;
+    return `${w.toFixed(3)} \\cdot \\frac{${numLatex}}{${fmtLatexNum(denom, 2)}} \\le \\lambda ${evalSuffix}`;
   });
 
   return {
@@ -410,6 +475,70 @@ export function computeFeasiblePolygon2D(model: ModelDefinition): { x: number[];
 }
 
 /**
+ * Proyecta el polígono factible 2D del espacio de decisiones al espacio de objetivos (Z_x, Z_y)
+ * mediante la envolvente convexa (Andrew's monotone chain) de los vértices transformados.
+ */
+export function computeFeasibleObjectivesPolygon2D(
+  model: ModelDefinition,
+  idxX: number,
+  idxY: number
+): { x: number[]; y: number[] } | null {
+  if (model.variables.length !== 2) return null;
+  const objX = model.objectives[idxX];
+  const objY = model.objectives[idxY];
+  if (!objX || !objY) return null;
+
+  const decPoly = computeFeasiblePolygon2D(model);
+  if (!decPoly || decPoly.x.length < 2) return null;
+
+  const evalObj = (coeffs: number[], x0: number, x1: number) =>
+    (coeffs[0] ?? 0) * x0 + (coeffs[1] ?? 0) * x1;
+
+  const rawPts: Array<[number, number]> = [];
+  for (let i = 0; i < decPoly.x.length; i++) {
+    const zx = evalObj(objX.coefficients, decPoly.x[i], decPoly.y[i]);
+    const zy = evalObj(objY.coefficients, decPoly.x[i], decPoly.y[i]);
+    if (!rawPts.some((p) => Math.hypot(p[0] - zx, p[1] - zy) < 1e-7)) {
+      rawPts.push([zx, zy]);
+    }
+  }
+
+  if (rawPts.length < 2) return null;
+
+  rawPts.sort((a, b) => (a[0] !== b[0] ? a[0] - b[0] : a[1] - b[1]));
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+  const lower: Array<[number, number]> = [];
+  for (const p of rawPts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 1e-9) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+
+  const upper: Array<[number, number]> = [];
+  for (let i = rawPts.length - 1; i >= 0; i--) {
+    const p = rawPts[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 1e-9) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+
+  lower.pop();
+  upper.pop();
+  const hull = [...lower, ...upper];
+  if (hull.length < 2) return null;
+
+  const closed = [...hull, hull[0]];
+  return {
+    x: closed.map((p) => p[0]),
+    y: closed.map((p) => p[1]),
+  };
+}
+
+/**
  * Calcula curvas de isodistancia (L1 rombo, L2 elipse, L_inf rectángulo) en el espacio
  * de objetivos 2D centradas en el Punto Ideal Z* y pasando por cada solución compromiso.
  */
@@ -449,10 +578,10 @@ export function computeIsodistanceTraces2D(
         [zIdX, zIdY + sY * dyMax * rY],
       ];
       traces.push({
-        name: "Isodistancia L1 (Rombo)",
+        name: "Iso L₁",
         x: pts.map((p) => p[0]),
         y: pts.map((p) => p[1]),
-        color: "#06B6D4",
+        color: "#2563EB",
         dash: "dot",
       });
     }
@@ -477,10 +606,10 @@ export function computeIsodistanceTraces2D(
         ys.push(zIdY + sY * dy * rY);
       }
       traces.push({
-        name: "Isodistancia L2 (Elipse)",
+        name: "Iso L₂",
         x: xs,
         y: ys,
-        color: "#10B981",
+        color: "#334155",
         dash: "dash",
       });
     }
@@ -499,10 +628,10 @@ export function computeIsodistanceTraces2D(
       const cornerX = zIdX + sX * dx * rX;
       const cornerY = zIdY + sY * dy * rY;
       traces.push({
-        name: "Isodistancia L∞ (Cuadrado)",
+        name: "Iso L∞",
         x: [cornerX, cornerX, zIdX],
         y: [zIdY, cornerY, cornerY],
-        color: "#8B5CF6",
+        color: "#E11D48",
         dash: "dashdot",
       });
     }
@@ -526,7 +655,70 @@ export function exportModelJSON(model: ModelDefinition, weights: number[]) {
 }
 
 /**
- * Exporta los resultados de optimización a un archivo CSV estructurado.
+ * Construye filas tabulares re-importables con la definición completa del modelo
+ * (Metadatos, Variables con cotas -inf/+inf, Objetivos con pesos y Restricciones).
+ */
+function buildTabularModelRows(
+  model: ModelDefinition,
+  weights?: number[]
+): Record<string, string | number>[] {
+  const varNames = model.variables.map((v) => v.name);
+  const rows: Record<string, string | number>[] = [
+    {
+      Seccion: "Meta",
+      Nombre: model.name,
+      Tipo_o_Sentido: model.description || "",
+      Min_o_RHS: "",
+      Max_o_Peso: "",
+    },
+  ];
+
+  model.variables.forEach((v) => {
+    rows.push({
+      Seccion: "Variable",
+      Nombre: v.name,
+      Tipo_o_Sentido: v.var_type,
+      Min_o_RHS: v.lower_bound === null || v.lower_bound === undefined ? "-inf" : v.lower_bound,
+      Max_o_Peso: v.upper_bound === null || v.upper_bound === undefined ? "+inf" : v.upper_bound,
+    });
+  });
+
+  model.objectives.forEach((o, oIdx) => {
+    const row: Record<string, string | number> = {
+      Seccion: "Objetivo",
+      Nombre: o.name,
+      Tipo_o_Sentido: o.sense,
+      Min_o_RHS: "",
+      Max_o_Peso:
+        weights?.[oIdx] ??
+        model.weights?.[oIdx] ??
+        Number((1 / model.objectives.length).toFixed(4)),
+    };
+    varNames.forEach((vn, vIdx) => {
+      row[vn] = o.coefficients[vIdx] ?? 0;
+    });
+    rows.push(row);
+  });
+
+  model.constraints.forEach((c) => {
+    const row: Record<string, string | number> = {
+      Seccion: "Restriccion",
+      Nombre: c.name,
+      Tipo_o_Sentido: c.sense,
+      Min_o_RHS: c.rhs,
+      Max_o_Peso: "",
+    };
+    varNames.forEach((vn, vIdx) => {
+      row[vn] = c.coefficients[vIdx] ?? 0;
+    });
+    rows.push(row);
+  });
+
+  return rows;
+}
+
+/**
+ * Exporta los resultados de optimización y la definición re-importable del modelo a CSV.
  */
 export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) {
   const rows: string[][] = [];
@@ -567,6 +759,16 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
     ]);
   });
 
+  // Bloque tabular del modelo (permite re-importar el mismo CSV en OptiCompromise)
+  rows.push([]);
+  rows.push(["DEFINICION DEL MODELO (RE-IMPORTABLE)"]);
+  const modelHeaders = ["Seccion", "Nombre", "Tipo_o_Sentido", "Min_o_RHS", "Max_o_Peso", ...varNames];
+  rows.push(modelHeaders);
+  const modelRows = buildTabularModelRows(model, result.weights);
+  modelRows.forEach((r) => {
+    rows.push(modelHeaders.map((h) => String(r[h] ?? "")));
+  });
+
   const csvContent = rows
     .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     .join("\n");
@@ -578,4 +780,396 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
   a.download = `resultados_${model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Calcula puntos discretos factibles en 2D cuando el modelo tiene variables enteras o binarias.
+ * Si ambas variables son enteras/binarias y el rango es manejable, devuelve la malla de puntos factibles.
+ */
+export function computeDiscreteFeasiblePoints2D(
+  model: ModelDefinition
+): { x: number[]; y: number[] } | null {
+  if (model.variables.length !== 2) return null;
+  const v0 = model.variables[0];
+  const v1 = model.variables[1];
+  const isInt0 = v0.var_type === "integer" || v0.var_type === "binary";
+  const isInt1 = v1.var_type === "integer" || v1.var_type === "binary";
+  if (!isInt0 && !isInt1) return null;
+
+  const poly = computeFeasiblePolygon2D(model);
+  if (!poly || poly.x.length === 0) return null;
+
+  const minX = Math.ceil(Math.min(...poly.x) - 1e-6);
+  const maxX = Math.floor(Math.max(...poly.x) + 1e-6);
+  const minY = Math.ceil(Math.min(...poly.y) - 1e-6);
+  const maxY = Math.floor(Math.max(...poly.y) + 1e-6);
+
+  const satisfies = (px: number, py: number): boolean => {
+    for (const c of model.constraints) {
+      const lhs = (c.coefficients[0] ?? 0) * px + (c.coefficients[1] ?? 0) * py;
+      if (c.sense === "<=" && lhs > c.rhs + 1e-6) return false;
+      if (c.sense === ">=" && lhs < c.rhs - 1e-6) return false;
+      if (c.sense === "==" && Math.abs(lhs - c.rhs) > 1e-6) return false;
+    }
+    if (v0.lower_bound !== null && px < v0.lower_bound - 1e-6) return false;
+    if (v0.upper_bound !== null && px > v0.upper_bound + 1e-6) return false;
+    if (v1.lower_bound !== null && py < v1.lower_bound - 1e-6) return false;
+    if (v1.upper_bound !== null && py > v1.upper_bound + 1e-6) return false;
+    return true;
+  };
+
+  const xs: number[] = [];
+  const ys: number[] = [];
+
+  if (isInt0 && isInt1) {
+    const countX = Math.max(0, maxX - minX + 1);
+    const countY = Math.max(0, maxY - minY + 1);
+    if (countX * countY > 2500) return null;
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let iy = minY; iy <= maxY; iy++) {
+        if (satisfies(ix, iy)) {
+          xs.push(ix);
+          ys.push(iy);
+        }
+      }
+    }
+  } else if (isInt0) {
+    const countX = Math.max(0, maxX - minX + 1);
+    if (countX > 80) return null;
+    const minYCont = Math.min(...poly.y);
+    const maxYCont = Math.max(...poly.y);
+    for (let ix = minX; ix <= maxX; ix++) {
+      for (let k = 0; k <= 12; k++) {
+        const py = minYCont + ((maxYCont - minYCont) * k) / 12;
+        if (satisfies(ix, py)) {
+          xs.push(ix);
+          ys.push(py);
+        }
+      }
+    }
+  } else {
+    const countY = Math.max(0, maxY - minY + 1);
+    if (countY > 80) return null;
+    const minXCont = Math.min(...poly.x);
+    const maxXCont = Math.max(...poly.x);
+    for (let iy = minY; iy <= maxY; iy++) {
+      for (let k = 0; k <= 12; k++) {
+        const px = minXCont + ((maxXCont - minXCont) * k) / 12;
+        if (satisfies(px, iy)) {
+          xs.push(px);
+          ys.push(iy);
+        }
+      }
+    }
+  }
+
+  return xs.length > 0 ? { x: xs, y: ys } : null;
+}
+
+/**
+ * Exporta un libro Excel (.xlsx) profesional con múltiples hojas:
+ * Matriz_de_Pagos, Soluciones_Compromiso y Frontera_Pareto.
+ */
+export function exportResultsExcel(model: ModelDefinition, result: SolveResponse) {
+  const wb = XLSX.utils.book_new();
+  const headers = result.payoff.headers;
+  const varNames = model.variables.map((v) => v.name);
+
+  // Hoja 1: Matriz de Pagos
+  const payoffRows = result.payoff.matrix.map((row, idx) => ({
+    "Óptimo Individual": headers[idx],
+    ...Object.fromEntries(row.map((val, i) => [headers[i], Number(val.toFixed(4))])),
+  }));
+  payoffRows.push({
+    "Óptimo Individual": "Punto Ideal (Z*)",
+    ...Object.fromEntries(result.payoff.ideal_point.map((val, i) => [headers[i], Number(val.toFixed(4))])),
+  });
+  payoffRows.push({
+    "Óptimo Individual": "Punto Nadir (Anti-Ideal)",
+    ...Object.fromEntries(result.payoff.anti_ideal_point.map((val, i) => [headers[i], Number(val.toFixed(4))])),
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(payoffRows), "Matriz_de_Pagos");
+
+  // Hoja 2: Soluciones Compromiso (L1, L2, L_inf)
+  const solRows = (["L1", "L2", "L_inf"] as const)
+    .map((key) => {
+      const sol = result.solutions[key];
+      if (!sol) return null;
+      return {
+        Métrica: key,
+        "Distancia D_p": Number(sol.aggregate_distance.toFixed(6)),
+        ...Object.fromEntries(varNames.map((vn) => [vn, Number((sol.variables[vn] ?? 0).toFixed(4))])),
+        ...Object.fromEntries(sol.objectives.map((val, i) => [`${headers[i]} (Real)`, Number(val.toFixed(4))])),
+        ...Object.fromEntries(sol.achievement_pct.map((val, i) => [`${headers[i]} (% Logro)`, `${val.toFixed(2)}%`])),
+      };
+    })
+    .filter(Boolean);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(solRows), "Soluciones_Compromiso");
+
+  // Hoja 3: Frontera de Pareto
+  if (result.pareto_points && result.pareto_points.length > 0) {
+    const paretoRows = result.pareto_points.map((pt, idx) => ({
+      "#": idx + 1,
+      Métrica: pt.metric,
+      ...Object.fromEntries(pt.objectives.map((val, i) => [headers[i], Number(val.toFixed(4))])),
+      ...Object.fromEntries(varNames.map((vn) => [vn, Number((pt.variables[vn] ?? 0).toFixed(4))])),
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(paretoRows), "Frontera_Pareto");
+  }
+
+  // Hoja 4: Definición tabular del Modelo (re-importable en Excel/CSV sin pérdida de cotas ni descripción)
+  const modelRows = buildTabularModelRows(model, result.weights);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(modelRows), "Modelo");
+
+  const safeName = model.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  XLSX.writeFile(wb, `OptiCompromise_${safeName}.xlsx`);
+}
+
+type TabularRow = Record<string, string | number | boolean | null | undefined>;
+
+function parseBoundCell(raw: unknown, fallback: number | null): number | null {
+  if (raw === undefined || raw === null) return fallback;
+  const txt = String(raw).trim().toLowerCase();
+  if (txt === "" || txt === "-inf" || txt === "+inf" || txt === "inf" || txt === "-∞" || txt === "+∞" || txt === "∞") {
+    return txt === "" ? fallback : null;
+  }
+  const num = Number(txt);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function validateImportedModel(parsed: unknown): ModelDefinition {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("El archivo JSON debe contener un objeto de definición de modelo.");
+  }
+  const obj = parsed as Partial<ModelDefinition>;
+  if (!Array.isArray(obj.variables) || obj.variables.length < 1) {
+    throw new Error("El archivo JSON debe incluir al menos 1 variable válida en 'variables'.");
+  }
+  if (!Array.isArray(obj.objectives) || obj.objectives.length < 2) {
+    throw new Error("El archivo JSON debe incluir al menos 2 objetivos válidos en 'objectives'.");
+  }
+  const validVars = obj.variables.map((v, idx) => {
+    if (!v || typeof v.name !== "string" || !v.name.trim()) {
+      throw new Error(`Variable #${idx + 1} inválida en el JSON (falta 'name').`);
+    }
+    const vt: "continuous" | "integer" | "binary" =
+      v.var_type === "integer"
+        ? "integer"
+        : v.var_type === "binary"
+        ? "binary"
+        : "continuous";
+    return {
+      name: v.name.trim(),
+      var_type: vt,
+      lower_bound: v.lower_bound === undefined ? 0 : v.lower_bound,
+      upper_bound: v.upper_bound === undefined ? null : v.upper_bound,
+    };
+  });
+  const validObjs = obj.objectives.map((o, idx) => {
+    if (!o || typeof o.name !== "string" || !o.name.trim() || !Array.isArray(o.coefficients)) {
+      throw new Error(`Objetivo #${idx + 1} inválido en el JSON (requiere 'name' y 'coefficients').`);
+    }
+    return {
+      name: o.name.trim(),
+      sense: o.sense === "minimize" ? ("minimize" as const) : ("maximize" as const),
+      coefficients: validVars.map((_, vIdx) => {
+        const val = Number(o.coefficients[vIdx] ?? 0);
+        return Number.isFinite(val) ? val : 0;
+      }),
+    };
+  });
+  const validCons = Array.isArray(obj.constraints)
+    ? obj.constraints.map((c, idx) => ({
+        name: c?.name && typeof c.name === "string" ? c.name : `Restricción ${idx + 1}`,
+        sense: c?.sense === ">=" || c?.sense === "==" ? c.sense : ("<=" as const),
+        rhs: Number.isFinite(Number(c?.rhs)) ? Number(c.rhs) : 0,
+        coefficients: validVars.map((_, vIdx) => {
+          const val = Number(c?.coefficients?.[vIdx] ?? 0);
+          return Number.isFinite(val) ? val : 0;
+        }),
+      }))
+    : [];
+
+  return {
+    name: typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : "Modelo Importado",
+    description: typeof obj.description === "string" ? obj.description : "",
+    variables: validVars,
+    objectives: validObjs,
+    constraints: validCons,
+    weights: Array.isArray(obj.weights) ? obj.weights : undefined,
+  };
+}
+
+/**
+ * Importa un modelo desde JSON (.json), Excel (.xlsx/.xls) o CSV (.csv).
+ * Soporta libros exportados por OptiCompromise (hoja "Modelo"), archivos CSV de resultados
+ * con el bloque "DEFINICION DEL MODELO" y plantillas tabulares con columna Seccion.
+ */
+export async function importModelFromFile(
+  file: File
+): Promise<{ model: ModelDefinition; weights?: number[] }> {
+  const lower = file.name.toLowerCase();
+
+  if (lower.endsWith(".json")) {
+    const text = await file.text();
+    const raw = JSON.parse(text) as unknown;
+    const validated = validateImportedModel(raw);
+    return {
+      model: validated,
+      weights: validated.weights,
+    };
+  }
+
+  if (lower.endsWith(".xlsx") || lower.endsWith(".xls") || lower.endsWith(".csv")) {
+    const buf = await file.arrayBuffer();
+    const wb = lower.endsWith(".csv")
+      ? XLSX.read(new TextDecoder("utf-8").decode(buf), { type: "string" })
+      : XLSX.read(buf, { type: "array" });
+
+    const sheetName =
+      wb.SheetNames.find((s) => s.toLowerCase() === "modelo") || wb.SheetNames[0];
+    if (!sheetName) {
+      throw new Error("El archivo no contiene ninguna hoja legible.");
+    }
+
+    const sheet = wb.Sheets[sheetName];
+    const matrixRows = XLSX.utils.sheet_to_json<Array<string | number | boolean | null>>(sheet, {
+      header: 1,
+      defval: "",
+    });
+    if (matrixRows.length === 0) {
+      throw new Error("La hoja importada está vacía.");
+    }
+
+    // Buscar dinámicamente la fila de encabezado que contiene "Seccion" (permite re-importar CSV de resultados)
+    let headerIdx = matrixRows.findIndex((r) =>
+      r.some((cell) => {
+        const txt = String(cell ?? "").trim().toLowerCase();
+        return txt === "seccion" || txt === "sección";
+      })
+    );
+    if (headerIdx < 0) headerIdx = 0;
+
+    const headerRow = matrixRows[headerIdx].map((h) => String(h ?? "").trim());
+    const rows: TabularRow[] = matrixRows.slice(headerIdx + 1).map((r) => {
+      const rec: TabularRow = {};
+      headerRow.forEach((colName, cIdx) => {
+        if (colName) rec[colName] = r[cIdx];
+      });
+      return rec;
+    });
+
+    let importedName = file.name.replace(/\.(xlsx|xls|csv)$/i, "");
+    let importedDescription = `Modelo importado desde ${file.name}.`;
+    const variables: ModelDefinition["variables"] = [];
+    const objRows: TabularRow[] = [];
+    const conRows: TabularRow[] = [];
+
+    const getField = (row: TabularRow, candidates: string[]) => {
+      for (const k of Object.keys(row)) {
+        if (candidates.includes(k.trim().toLowerCase())) return row[k];
+      }
+      return undefined;
+    };
+
+    rows.forEach((row) => {
+      const sec = String(getField(row, ["seccion", "sección", "tipo", "elemento"]) ?? "")
+        .trim()
+        .toLowerCase();
+      if (sec === "meta" || sec === "metadata") {
+        const metaName = String(getField(row, ["nombre", "name"]) ?? "").trim();
+        const metaDesc = String(getField(row, ["tipo_o_sentido", "description", "descripcion"]) ?? "").trim();
+        if (metaName) importedName = metaName;
+        if (metaDesc) importedDescription = metaDesc;
+      } else if (sec.startsWith("var")) {
+        const name = String(getField(row, ["nombre", "name", "variable"]) ?? "").trim();
+        if (!name) return;
+        const vtRaw = String(getField(row, ["tipo_o_sentido", "var_type", "tipo_var"]) ?? "continuous")
+          .trim()
+          .toLowerCase();
+        const var_type =
+          vtRaw.startsWith("int") || vtRaw.startsWith("ent")
+            ? "integer"
+            : vtRaw.startsWith("bin")
+            ? "binary"
+            : "continuous";
+        const minRaw = getField(row, ["min_o_rhs", "min", "lower_bound", "lb"]);
+        const maxRaw = getField(row, ["max_o_peso", "max", "upper_bound", "ub"]);
+        variables.push({
+          name,
+          var_type,
+          lower_bound: var_type === "binary" ? 0 : parseBoundCell(minRaw, 0),
+          upper_bound: var_type === "binary" ? 1 : parseBoundCell(maxRaw, null),
+        });
+      } else if (sec.startsWith("obj")) {
+        objRows.push(row);
+      } else if (sec.startsWith("res")) {
+        conRows.push(row);
+      }
+    });
+
+    if (variables.length < 1 || objRows.length < 2) {
+      throw new Error(
+        "Formato Excel/CSV no reconocido. Usa un archivo exportado por OptiCompromise o columnas Seccion (Variable/Objetivo/Restriccion), Nombre, Tipo_o_Sentido, Min_o_RHS, Max_o_Peso y columnas de variables."
+      );
+    }
+
+    const varNames = variables.map((v) => v.name);
+    const objectives: ModelDefinition["objectives"] = [];
+    const importedWeights: number[] = [];
+
+    objRows.forEach((row, idx) => {
+      const name = String(getField(row, ["nombre", "name"]) ?? `Objetivo ${idx + 1}`).trim();
+      const sRaw = String(getField(row, ["tipo_o_sentido", "sense", "sentido"]) ?? "maximize")
+        .trim()
+        .toLowerCase();
+      const sense = sRaw.startsWith("min") ? "minimize" : "maximize";
+      const coeffs = varNames.map((vn) => {
+        const val = row[vn];
+        const num = Number(val);
+        return Number.isFinite(num) ? num : 0;
+      });
+      objectives.push({ name, sense, coefficients: coeffs });
+      const wRaw = Number(getField(row, ["max_o_peso", "peso", "weight"]));
+      importedWeights.push(Number.isFinite(wRaw) && wRaw >= 0 ? wRaw : 1 / objRows.length);
+    });
+
+    const constraints: ModelDefinition["constraints"] = conRows.map((row, idx) => {
+      const name = String(getField(row, ["nombre", "name"]) ?? `Restricción ${idx + 1}`).trim();
+      const sRaw = String(getField(row, ["tipo_o_sentido", "sense", "operador"]) ?? "<=").trim();
+      const sense = sRaw === ">=" || sRaw === "≥" ? ">=" : sRaw === "==" || sRaw === "=" ? "==" : "<=";
+      const rhsVal = Number(getField(row, ["min_o_rhs", "rhs", "ld"]));
+      const coeffs = varNames.map((vn) => {
+        const val = row[vn];
+        const num = Number(val);
+        return Number.isFinite(num) ? num : 0;
+      });
+      return {
+        name,
+        coefficients: coeffs,
+        sense,
+        rhs: Number.isFinite(rhsVal) ? rhsVal : 0,
+      };
+    });
+
+    const wSum = importedWeights.reduce((a, b) => a + b, 0);
+    const normWeights =
+      wSum > 1e-6
+        ? importedWeights.map((w) => Number((w / wSum).toFixed(4)))
+        : Array(objectives.length).fill(Number((1 / objectives.length).toFixed(4)));
+
+    return {
+      model: {
+        name: importedName,
+        description: importedDescription,
+        variables,
+        objectives,
+        constraints,
+        weights: normWeights,
+      },
+      weights: normWeights,
+    };
+  }
+
+  throw new Error("Formato de archivo no soportado. Usa .json, .xlsx, .xls o .csv.");
 }

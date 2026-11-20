@@ -2,9 +2,9 @@
   "name": "Optimización Sostenible Triobjetivo 3D (Bonus)",
   "description": "Problema con 3 dimensiones de impacto: maximizar retorno económico, minimizar impacto ambiental y maximizar beneficio social.",
   "variables": [
-    {"name": "x1", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x2", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x3", "var_type": "continuous", "lower_bound": 0.0}
+    {"name": "x1 (Línea Rentable)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x2 (Línea Social)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x3 (Línea Intensiva)", "var_type": "continuous", "lower_bound": 0.0}
   ],
   "objectives": [
     {"name": "Retorno Económico (kUSD)", "sense": "maximize", "coefficients": [3.0, 1.0, 2.0]},

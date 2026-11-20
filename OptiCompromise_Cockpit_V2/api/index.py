@@ -2,11 +2,14 @@
 API Principal de OptiCompromise en FastAPI.
 Compatible con Vercel Serverless Functions y ejecución local con uvicorn.
 """
+import math
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import json
-from typing import Dict, Any
+import hashlib
+from collections import OrderedDict
+from typing import Dict, Any, Tuple, List
 
 try:
     from .core.schemas import ModelDefinition, PayoffMatrixData, SolveResponse, ParetoPoint
@@ -44,8 +47,65 @@ def health_check():
         "engine": "SciPy 1.17+ HiGHS & SLSQP"
     }
 
+# Cache LRU en memoria para (payoff, pareto_points) indexado por la estructura del modelo (sin pesos).
+# Al arrastrar los sliders de pesos, evita recomputar 100+ puntos Pareto en cada frame.
+_STRUCTURE_CACHE: "OrderedDict[str, Tuple[PayoffMatrixData, List[ParetoPoint]]]" = OrderedDict()
+_MAX_CACHE_SIZE = 32
+
+
+def _model_structure_key(model: ModelDefinition) -> str:
+    payload = {
+        "variables": [
+            (v.name, v.var_type, v.lower_bound, v.upper_bound) for v in model.variables
+        ],
+        "objectives": [
+            (o.name, o.sense, list(o.coefficients)) for o in model.objectives
+        ],
+        "constraints": [
+            (c.sense, float(c.rhs), list(c.coefficients)) for c in model.constraints
+        ],
+    }
+    raw = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _validate_model(model: ModelDefinition) -> None:
+    if len(model.variables) < 1:
+        raise HTTPException(status_code=400, detail="El modelo debe contener al menos 1 variable de decisión.")
+    if len(model.objectives) < 2:
+        raise HTTPException(status_code=400, detail="Un problema multiobjetivo requiere al menos 2 funciones objetivo.")
+
+    seen_names = set()
+    for v in model.variables:
+        clean = v.name.strip()
+        if not clean:
+            raise HTTPException(status_code=400, detail="Todas las variables de decisión deben tener un nombre no vacío.")
+        if clean in seen_names:
+            raise HTTPException(status_code=400, detail=f"Nombre de variable duplicado: '{clean}'. Cada variable debe ser única.")
+        seen_names.add(clean)
+        for bval in (v.lower_bound, v.upper_bound):
+            if bval is not None and not math.isfinite(bval):
+                raise HTTPException(status_code=400, detail=f"Cota no finita inválida en '{clean}'.")
+        if v.lower_bound is not None and v.upper_bound is not None and v.lower_bound > v.upper_bound:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cotas inválidas en '{clean}': la cota inferior ({v.lower_bound}) supera la cota superior ({v.upper_bound}).",
+            )
+
+    for idx, o in enumerate(model.objectives):
+        if not o.name.strip():
+            raise HTTPException(status_code=400, detail=f"El objetivo #{idx + 1} debe tener un nombre no vacío.")
+        if any(not math.isfinite(c) for c in o.coefficients):
+            raise HTTPException(status_code=400, detail=f"Coeficientes inválidos (NaN/Inf) en objetivo '{o.name}'.")
+
+    for idx, c in enumerate(model.constraints):
+        if not math.isfinite(c.rhs) or any(not math.isfinite(coef) for coef in c.coefficients):
+            raise HTTPException(status_code=400, detail=f"Valores numéricos inválidos (NaN/Inf) en restricción #{idx + 1}.")
+
+
 @app.post("/api/payoff", response_model=PayoffMatrixData)
 def get_payoff_matrix(model: ModelDefinition):
+    _validate_model(model)
     payoff = compute_payoff_matrix(model)
     if "error" in payoff.status:
         raise HTTPException(status_code=400, detail=payoff.status)
@@ -53,17 +113,28 @@ def get_payoff_matrix(model: ModelDefinition):
 
 @app.post("/api/solve", response_model=SolveResponse)
 def solve_model(model: ModelDefinition):
-    # 1. Matriz de pagos
-    payoff = compute_payoff_matrix(model)
-    if "error" in payoff.status:
-        raise HTTPException(status_code=400, detail=payoff.status)
-        
-    # 2. Soluciones compromiso
+    _validate_model(model)
+
+    cache_key = _model_structure_key(model)
+    cached = _STRUCTURE_CACHE.get(cache_key)
+    if cached is not None:
+        _STRUCTURE_CACHE.move_to_end(cache_key)
+        payoff, pareto_pts = cached
+    else:
+        # 1. Matriz de pagos
+        payoff = compute_payoff_matrix(model)
+        if "error" in payoff.status:
+            raise HTTPException(status_code=400, detail=payoff.status)
+
+        # 3. Muestra de frontera de Pareto (independiente de los pesos actuales)
+        pareto_pts = compute_pareto_frontier(model, payoff, num_samples=21)
+        _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts)
+        if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
+            _STRUCTURE_CACHE.popitem(last=False)
+
+    # 2. Soluciones compromiso para los pesos actuales
     solutions, normalized_weights = solve_all_metrics(model, payoff, weights=model.weights)
-    
-    # 3. Muestra de frontera de Pareto (rápida para interactividad)
-    pareto_pts = compute_pareto_frontier(model, payoff, num_samples=15)
-    
+
     return SolveResponse(
         status="optimal",
         message="Solución calculada exitosamente",
@@ -75,15 +146,22 @@ def solve_model(model: ModelDefinition):
 
 @app.post("/api/pareto")
 def get_pareto_frontier(model: ModelDefinition):
+    _validate_model(model)
     payoff = compute_payoff_matrix(model)
     if "error" in payoff.status:
         raise HTTPException(status_code=400, detail=payoff.status)
     pareto_pts = compute_pareto_frontier(model, payoff, num_samples=25)
-    return {"pareto_points": [p.dict() for p in pareto_pts]}
+    return {
+        "pareto_points": [
+            p.model_dump() if hasattr(p, "model_dump") else p.dict()
+            for p in pareto_pts
+        ]
+    }
 
 @app.get("/api/examples/{example_id}")
 def get_example_model(example_id: str) -> Dict[str, Any]:
     examples_map = {
+        "flota": "05_flota_vehiculos.json",
         "celdas": "01_celdas_fotovoltaicas.json",
         "transporte": "02_problema_transporte.json",
         "mip": "03_mip_produccion.json",

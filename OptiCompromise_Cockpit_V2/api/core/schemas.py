@@ -49,6 +49,10 @@ class PayoffMatrixData(BaseModel):
     ideal_point: List[float]   # Mejor valor encontrado para cada objetivo
     anti_ideal_point: List[float] # Peor valor encontrado en la matriz para cada objetivo
     independent_solutions: List[Dict[str, float]]
+    degenerate_objectives: List[int] = Field(
+        default_factory=list,
+        description="Índices (0-based) de objetivos cuyo rango Ideal-Nadir fue nulo antes del ajuste numérico"
+    )
     status: str = "optimal"
 
 class MetricSolution(BaseModel):

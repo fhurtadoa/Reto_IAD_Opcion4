@@ -39,6 +39,7 @@ export interface PayoffMatrixData {
   ideal_point: number[];
   anti_ideal_point: number[];
   independent_solutions: Record<string, number>[];
+  degenerate_objectives?: number[];
   status: string;
 }
 
@@ -76,6 +77,7 @@ export interface SolveResponse {
 export type SolverStatus = "idle" | "calculating" | "optimal" | "infeasible" | "unbounded" | "error";
 
 export type ThemeMode = "dark" | "light";
+export type DecisionProfile = "equitativo" | "compensatorio" | "moderado" | "personalizado";
 
 export interface PresetOption {
   id: string;
@@ -85,19 +87,20 @@ export interface PresetOption {
 }
 
 export const PRESET_OPTIONS: PresetOption[] = [
-  { id: "celdas", label: "01. Celdas Fotovoltaicas (Clase 15)", badge: "2D · LP", source: "api" },
-  { id: "transporte", label: "02. Problema de Transporte (Taller 3)", badge: "12 Vars · 2D", source: "api" },
-  { id: "mip", label: "03. Planificación Entera / Binaria", badge: "MIP Bonus", source: "api" },
-  { id: "triobjetivo", label: "04. Sostenibilidad Triobjetivo", badge: "3D · Bonus", source: "api" },
-  { id: "blank", label: "+ Nuevo Modelo en Blanco", badge: "Personalizado", source: "blank" },
+  { id: "celdas", label: "1. Celdas 2D (Clase 15 · Curso)", badge: "2V · 2Z", source: "api" },
+  { id: "transporte", label: "2. Transporte 2D (Taller 3 · ≥4 Vars)", badge: "12V · 2Z", source: "api" },
+  { id: "triobjetivo", label: "3. Sostenibilidad 3D (Triobjetivo)", badge: "3V · 3Z", source: "api" },
+  { id: "mip", label: "4. Producción Mixta MIP (Bonus ℤ/{0,1})", badge: "3V · 2Z", source: "api" },
+  { id: "flota", label: "5. Flota Vehículos Eléctricos (4Z)", badge: "6V · 4Z", source: "api" },
+  { id: "blank", label: "+ Nuevo Modelo en Blanco", badge: "Desde cero", source: "blank" },
 ];
 
 export const BLANK_MODEL: ModelDefinition = {
   name: "Nuevo Modelo Multiobjetivo",
   description: "Modelo editable desde cero para formular variables, objetivos y restricciones.",
   variables: [
-    { name: "x1", var_type: "continuous", lower_bound: 0, upper_bound: 100 },
-    { name: "x2", var_type: "continuous", lower_bound: 0, upper_bound: 100 },
+    { name: "x1 (Alternativa A)", var_type: "continuous", lower_bound: 0, upper_bound: 100 },
+    { name: "x2 (Alternativa B)", var_type: "continuous", lower_bound: 0, upper_bound: 100 },
   ],
   objectives: [
     { name: "Objetivo 1", sense: "maximize", coefficients: [2, 3] },
@@ -114,8 +117,8 @@ export const FALLBACK_CELDAS_MODEL: ModelDefinition = {
   name: "Planificación de Celdas Fotovoltaicas (Clase 15)",
   description: "Problema biobjetivo del curso: maximizar utilidad económica vs minimizar generación de contaminantes.",
   variables: [
-    { name: "x1", var_type: "continuous", lower_bound: 0, upper_bound: 300 },
-    { name: "x2", var_type: "continuous", lower_bound: 0, upper_bound: 200 },
+    { name: "x1 (Celdas Fotov.)", var_type: "continuous", lower_bound: 0, upper_bound: 300 },
+    { name: "x2 (Celdas GP)", var_type: "continuous", lower_bound: 0, upper_bound: 200 },
   ],
   objectives: [
     { name: "Utilidad Total (USD)", sense: "maximize", coefficients: [1000, 3000] },
@@ -129,10 +132,10 @@ export const FALLBACK_CELDAS_MODEL: ModelDefinition = {
 };
 
 export const SEMANTIC_COLORS = {
-  ideal: "#F59E0B",    // Dorado / Amber
-  nadir: "#F43F5E",    // Coral / Rose
-  L1: "#06B6D4",       // Cian / Cyan
-  L2: "#10B981",       // Esmeralda / Emerald
-  L_inf: "#8B5CF6",    // Violeta / Violet
-  pareto: "#38BDF8",   // Sky
+  ideal: "#D97706",    // Dorado / Amber
+  nadir: "#BE123C",    // Rojo oscuro / Nadir
+  L1: "#2563EB",       // Azul Cobalto
+  L2: "#334155",       // Slate / Marino Técnico
+  L_inf: "#E11D48",    // Rojo Suizo / Minimax
+  pareto: "#0F766E",   // Verde petróleo / Pareto (o azul acero)
 };

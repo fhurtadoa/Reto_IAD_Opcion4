@@ -2,6 +2,11 @@
   "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/.next",
   "framework": "nextjs",
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "examples/**"
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",

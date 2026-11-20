@@ -29,16 +29,16 @@ export default function TooltipBadge({ title, content, align = "left" }: Tooltip
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label={`Ayuda: ${title}`}
-        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-slate-400 hover:text-cyan-400 focus:outline-none transition-colors"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full text-slate-400 hover:text-[#E11D48] focus:outline-none transition-colors"
       >
         <HelpCircle className="w-3.5 h-3.5" />
       </button>
 
       {open && (
         <div
-          className={`absolute bottom-full mb-2 ${alignClass} z-50 w-64 p-3 rounded-lg shadow-xl border text-left pointer-events-none bg-slate-900 text-slate-100 border-slate-700 dark:bg-slate-950 dark:border-slate-700`}
+          className={`absolute top-full mt-2 ${alignClass} z-50 w-64 p-3 rounded-sm shadow-xl border text-left pointer-events-none bg-[#111524] text-slate-100 border-slate-700`}
         >
-          <div className="text-[11px] font-bold text-cyan-400 mb-1">{title}</div>
+          <div className="text-[11px] font-bold text-[#FB7185] mb-1">{title}</div>
           <p className="text-[11px] leading-relaxed text-slate-300">{content}</p>
         </div>
       )}

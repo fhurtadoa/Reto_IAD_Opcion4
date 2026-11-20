@@ -13,7 +13,6 @@ import {
   AlertOctagon,
   AlertTriangle,
   Loader2,
-  ChevronRight,
 } from "lucide-react";
 import { PRESET_OPTIONS, SolverStatus, ThemeMode } from "./types";
 
@@ -22,33 +21,26 @@ interface TopBarProps {
   onSelectPreset: (presetId: string) => void;
   solverStatus: SolverStatus;
   solverMessage: string;
-  activeStage: 1 | 2 | 3 | 4;
   theme: ThemeMode;
   onToggleTheme: () => void;
   onImportJSON: (file: File) => void;
   onExportJSON: () => void;
   onExportCSV: () => void;
+  onExportExcel: () => void;
   canExportResults: boolean;
 }
-
-const STAGES = [
-  { id: 1, label: "1. Definir" },
-  { id: 2, label: "2. Configurar" },
-  { id: 3, label: "3. Resolver" },
-  { id: 4, label: "4. Exportar" },
-] as const;
 
 export default function TopBar({
   selectedPreset,
   onSelectPreset,
   solverStatus,
   solverMessage,
-  activeStage,
   theme,
   onToggleTheme,
   onImportJSON,
   onExportJSON,
   onExportCSV,
+  onExportExcel,
   canExportResults,
 }: TopBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -87,7 +79,7 @@ export default function TopBar({
         );
       case "calculating":
         return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-400 border border-cyan-500/40">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
             <span>Calculando...</span>
           </div>
@@ -112,57 +104,26 @@ export default function TopBar({
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-white/95 dark:bg-[#0F172A]/95 backdrop-blur border-slate-200 dark:border-slate-800 px-4 py-2.5">
+    <header className="sticky top-0 z-40 w-full border-b bg-white dark:bg-[#111524] border-slate-200 dark:border-slate-800 px-4 py-2.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Izquierda: Logo + Flujo de 4 etapas */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 via-emerald-500 to-violet-600 flex items-center justify-center shadow-md shadow-cyan-500/20">
-              <Compass className="w-4.5 h-4.5 text-white" />
-            </div>
-            <div className="leading-tight">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
-                  OptiCompromise
-                </h1>
-                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
-                  COCKPIT V2
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                Programación de Compromiso Multiobjetivo · UNAL
-              </p>
-            </div>
+        {/* Izquierda: Logo */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-sm bg-[#E11D48] flex items-center justify-center">
+            <Compass className="w-4.5 h-4.5 text-white" />
           </div>
-
-          {/* Indicador de flujo de 4 etapas */}
-          <nav
-            aria-label="Etapas del flujo"
-            className="hidden xl:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800"
-          >
-            {STAGES.map((stage, idx) => {
-              const isCompleted = activeStage > stage.id;
-              const isCurrent = activeStage === stage.id;
-              return (
-                <React.Fragment key={stage.id}>
-                  <span
-                    className={`text-[11px] font-medium px-2 py-0.5 rounded transition-colors ${
-                      isCurrent
-                        ? "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-semibold"
-                        : isCompleted
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : "text-slate-400 dark:text-slate-500"
-                    }`}
-                  >
-                    {stage.label}
-                  </span>
-                  {idx < STAGES.length - 1 && (
-                    <ChevronRight className="w-3 h-3 text-slate-400 dark:text-slate-600" />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </nav>
+          <div className="leading-tight">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white">
+                OptiCompromise
+              </h1>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-rose-50 dark:bg-rose-950/60 text-[#E11D48] dark:text-rose-400 border border-rose-200 dark:border-rose-800">
+                COCKPIT V2
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              Programación de Compromiso Multiobjetivo · UNAL
+            </p>
+          </div>
         </div>
 
         {/* Centro: Selector de casos + Semáforo del Solver */}
@@ -172,13 +133,13 @@ export default function TopBar({
               htmlFor="preset-selector"
               className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 hidden sm:inline"
             >
-              Caso:
+              Ejemplos:
             </label>
             <select
               id="preset-selector"
               value={selectedPreset}
               onChange={(e) => onSelectPreset(e.target.value)}
-              className="text-xs font-medium rounded-lg px-2.5 py-1.5 border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 max-w-[260px]"
+              className="text-xs font-medium rounded-sm px-2.5 py-1.5 border bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-[#E11D48] max-w-[310px]"
             >
               {PRESET_OPTIONS.map((opt) => (
                 <option key={opt.id} value={opt.id}>
@@ -196,7 +157,7 @@ export default function TopBar({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".json,application/json"
+            accept=".json,.xlsx,.xls,.csv,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -208,8 +169,8 @@ export default function TopBar({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="Importar modelo (.json)"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            title="Importar modelo desde JSON, Excel (.xlsx) o CSV"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Importar</span>
@@ -219,7 +180,7 @@ export default function TopBar({
             type="button"
             onClick={onExportJSON}
             title="Exportar definición del modelo (.json)"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-cyan-500/60 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="hidden md:inline">JSON</span>
@@ -227,13 +188,24 @@ export default function TopBar({
 
           <button
             type="button"
+            onClick={onExportExcel}
+            disabled={!canExportResults}
+            title="Exportar libro Excel (.xlsx) con Matriz de Pagos, Soluciones y Pareto"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[#E11D48]" />
+            <span className="hidden md:inline">Excel</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onExportCSV}
             disabled={!canExportResults}
             title="Exportar resultados completos (.csv)"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-emerald-500/60 hover:text-emerald-600 dark:hover:text-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">CSV</span>
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline">CSV</span>
           </button>
 
           <a
@@ -241,17 +213,17 @@ export default function TopBar({
             target="_blank"
             rel="noopener noreferrer"
             title="Descargar Manual de Usuario PDF"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-amber-500/60 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-semibold bg-[#111524] hover:bg-slate-800 text-white border border-slate-800 transition-colors"
           >
-            <BookOpen className="w-3.5 h-3.5" />
+            <BookOpen className="w-3.5 h-3.5 text-[#E11D48]" />
             <span className="hidden lg:inline">Manual PDF</span>
           </a>
 
           <button
             type="button"
             onClick={onToggleTheme}
-            title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro (Slate Technical)"}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-200 hover:border-cyan-500/60 transition-colors"
+            title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+            className="p-1.5 rounded-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] transition-colors"
           >
             {theme === "dark" ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
           </button>

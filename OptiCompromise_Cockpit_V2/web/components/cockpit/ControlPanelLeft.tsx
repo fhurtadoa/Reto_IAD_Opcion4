@@ -12,12 +12,15 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   ModelDefinition,
   VarType,
   ObjectiveSense,
   ConstraintSense,
+  DecisionProfile,
 } from "./types";
 import {
   modelToAlgebraicText,
@@ -27,9 +30,110 @@ import {
 import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
 
+interface NumericInputProps {
+  value: number | null | undefined;
+  onCommit: (val: number | null) => void;
+  allowNull?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  title?: string;
+  className?: string;
+  min?: number;
+  max?: number;
+}
+
+/**
+ * Input numérico con buffer de texto local mientras tiene foco:
+ * permite borrar dígitos o empezar a escribir "-" sin forzar 0 en cada tecla.
+ */
+function NumericInput({
+  value,
+  onCommit,
+  allowNull = false,
+  disabled = false,
+  placeholder,
+  title,
+  className = "",
+  min,
+  max,
+}: NumericInputProps) {
+  const formatProp = (v: number | null | undefined) =>
+    v === null || v === undefined || Number.isNaN(v) ? "" : String(v);
+
+  const [draft, setDraft] = useState<string>(() => formatProp(value));
+  const [focused, setFocused] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(formatProp(value));
+    }
+  }, [value, focused]);
+
+  const handleChange = (raw: string) => {
+    setDraft(raw);
+    const trimmed = raw.trim();
+    if (trimmed === "") {
+      if (allowNull) onCommit(null);
+      return;
+    }
+    if (trimmed === "-" || trimmed === "." || trimmed === "-." || /[eE][+-]?$/.test(trimmed)) {
+      return;
+    }
+    const parsed = Number(trimmed.replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      let clamped = parsed;
+      if (min !== undefined) clamped = Math.max(min, clamped);
+      if (max !== undefined) clamped = Math.min(max, clamped);
+      onCommit(clamped);
+    }
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    const trimmed = draft.trim();
+    if (trimmed === "" || trimmed === "-" || trimmed === "." || trimmed === "-.") {
+      const fallback = allowNull ? null : 0;
+      onCommit(fallback);
+      setDraft(formatProp(fallback));
+      return;
+    }
+    const parsed = Number(trimmed.replace(",", "."));
+    if (Number.isFinite(parsed)) {
+      let clamped = parsed;
+      if (min !== undefined) clamped = Math.max(min, clamped);
+      if (max !== undefined) clamped = Math.min(max, clamped);
+      onCommit(clamped);
+      setDraft(formatProp(clamped));
+    } else {
+      setDraft(formatProp(value));
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      disabled={disabled}
+      placeholder={placeholder}
+      title={title}
+      onFocus={() => setFocused(true)}
+      onBlur={handleBlur}
+      onChange={(e) => handleChange(e.target.value)}
+      className={className}
+    />
+  );
+}
+
 interface ControlPanelLeftProps {
   model: ModelDefinition;
+  modelKey: number;
   weights: number[];
+  autoBalance: boolean;
+  onToggleAutoBalance: (enabled: boolean) => void;
+  decisionProfile: DecisionProfile;
+  onSelectProfile: (profile: DecisionProfile) => void;
+  validationError: string | null;
   onModelChange: (updated: ModelDefinition, newWeights?: number[]) => void;
   onWeightChange: (index: number, value: number) => void;
   onNormalizeWeights: () => void;
@@ -39,7 +143,13 @@ interface ControlPanelLeftProps {
 
 export default function ControlPanelLeft({
   model,
+  modelKey,
   weights,
+  autoBalance,
+  onToggleAutoBalance,
+  decisionProfile,
+  onSelectProfile,
+  validationError,
   onModelChange,
   onWeightChange,
   onNormalizeWeights,
@@ -47,16 +157,33 @@ export default function ControlPanelLeft({
   isCalculating,
 }: ControlPanelLeftProps) {
   const [editorTab, setEditorTab] = useState<"table" | "algebraic">("table");
+  const [openSections, setOpenSections] = useState<{ vars: boolean; objs: boolean; cons: boolean }>({
+    vars: true,
+    objs: true,
+    cons: true,
+  });
   const [algebraicText, setAlgebraicText] = useState<string>(() =>
     modelToAlgebraicText(model)
   );
+  const [algebraicDirty, setAlgebraicDirty] = useState<boolean>(false);
   const [algebraicErrors, setAlgebraicErrors] = useState<string[]>([]);
   const [algebraicAppliedMsg, setAlgebraicAppliedMsg] = useState<string | null>(null);
 
+  // Al cambiar de caso/importación reiniciamos el borrador algebraico
   useEffect(() => {
     setAlgebraicText(modelToAlgebraicText(model));
+    setAlgebraicDirty(false);
     setAlgebraicErrors([]);
-  }, [model]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelKey]);
+
+  // Solo sincronizar el texto algebraico desde Tabla si no hay ediciones sin aplicar en el textarea
+  useEffect(() => {
+    if (!algebraicDirty) {
+      setAlgebraicText(modelToAlgebraicText(model));
+      setAlgebraicErrors([]);
+    }
+  }, [model, algebraicDirty]);
 
   const latexPreview = useMemo(() => modelToLatex(model), [model]);
 
@@ -65,31 +192,34 @@ export default function ControlPanelLeft({
 
   const handleVarChange = (
     idx: number,
-    field: "name" | "var_type" | "lower_bound" | "upper_bound",
+    field: "name" | "var_type",
     value: string
   ) => {
     const nextVars = model.variables.map((v, i) => {
       if (i !== idx) return v;
       if (field === "name") return { ...v, name: value };
-      if (field === "var_type") {
-        const vt = value as VarType;
-        return {
-          ...v,
-          var_type: vt,
-          lower_bound: vt === "binary" ? 0 : v.lower_bound,
-          upper_bound: vt === "binary" ? 1 : v.upper_bound,
-        };
-      }
-      if (field === "lower_bound") {
-        return { ...v, lower_bound: value === "" ? null : parseFloat(value) };
-      }
-      return { ...v, upper_bound: value === "" ? null : parseFloat(value) };
+      const vt = value as VarType;
+      return {
+        ...v,
+        var_type: vt,
+        lower_bound: vt === "binary" ? 0 : v.lower_bound,
+        upper_bound: vt === "binary" ? 1 : v.upper_bound,
+      };
     });
     onModelChange({ ...model, variables: nextVars });
   };
 
+  const handleVarBound = (idx: number, field: "lower_bound" | "upper_bound", val: number | null) => {
+    const nextVars = model.variables.map((v, i) => (i === idx ? { ...v, [field]: val } : v));
+    onModelChange({ ...model, variables: nextVars });
+  };
+
   const handleAddVariable = () => {
-    const nextIdx = model.variables.length + 1;
+    const existingNames = new Set(model.variables.map((v) => v.name.trim()));
+    let nextIdx = model.variables.length + 1;
+    while (existingNames.has(`x${nextIdx}`)) {
+      nextIdx += 1;
+    }
     const nextVars = [
       ...model.variables,
       { name: `x${nextIdx}`, var_type: "continuous" as VarType, lower_bound: 0, upper_bound: null },
@@ -126,12 +256,11 @@ export default function ControlPanelLeft({
     onModelChange({ ...model, objectives: nextObjs });
   };
 
-  const handleObjCoeff = (objIdx: number, varIdx: number, value: string) => {
-    const parsed = value === "" ? 0 : parseFloat(value);
+  const handleObjCoeff = (objIdx: number, varIdx: number, val: number) => {
     const nextObjs = model.objectives.map((o, i) => {
       if (i !== objIdx) return o;
       const nextC = [...o.coefficients];
-      nextC[varIdx] = Number.isNaN(parsed) ? 0 : parsed;
+      nextC[varIdx] = Number.isFinite(val) ? val : 0;
       return { ...o, coefficients: nextC };
     });
     onModelChange({ ...model, objectives: nextObjs });
@@ -165,25 +294,24 @@ export default function ControlPanelLeft({
     onModelChange({ ...model, objectives: nextObjs }, normW);
   };
 
-  const handleConField = (idx: number, field: "name" | "sense" | "rhs", value: string) => {
+  const handleConField = (idx: number, field: "name" | "sense" | "rhs", value: string | number) => {
     const nextCons = model.constraints.map((c, i) => {
       if (i !== idx) return c;
       if (field === "rhs") {
-        const parsed = value === "" ? 0 : parseFloat(value);
-        return { ...c, rhs: Number.isNaN(parsed) ? 0 : parsed };
+        const num = typeof value === "number" ? value : parseFloat(value);
+        return { ...c, rhs: Number.isFinite(num) ? num : 0 };
       }
       if (field === "sense") return { ...c, sense: value as ConstraintSense };
-      return { ...c, name: value };
+      return { ...c, name: String(value) };
     });
     onModelChange({ ...model, constraints: nextCons });
   };
 
-  const handleConCoeff = (conIdx: number, varIdx: number, value: string) => {
-    const parsed = value === "" ? 0 : parseFloat(value);
+  const handleConCoeff = (conIdx: number, varIdx: number, val: number) => {
     const nextCons = model.constraints.map((c, i) => {
       if (i !== conIdx) return c;
       const nextC = [...c.coefficients];
-      nextC[varIdx] = Number.isNaN(parsed) ? 0 : parsed;
+      nextC[varIdx] = Number.isFinite(val) ? val : 0;
       return { ...c, coefficients: nextC };
     });
     onModelChange({ ...model, constraints: nextCons });
@@ -217,7 +345,9 @@ export default function ControlPanelLeft({
     }
 
     const updatedVars = parsed.detectedVariables.map((vName) => {
-      const existing = model.variables.find((v) => v.name.split(" ")[0].trim() === vName);
+      const existing = model.variables.find(
+        (v) => v.name === vName || v.name.split(" ")[0].trim() === vName.split(" ")[0].trim()
+      );
       return (
         existing || {
           name: vName,
@@ -236,6 +366,7 @@ export default function ControlPanelLeft({
       nextW[0] = parseFloat((nextW[0] + diff).toFixed(3));
     }
 
+    setAlgebraicDirty(false);
     setAlgebraicErrors([]);
     setAlgebraicAppliedMsg("Ecuaciones aplicadas y enviadas al motor FastAPI.");
     setTimeout(() => setAlgebraicAppliedMsg(null), 3000);
@@ -252,161 +383,60 @@ export default function ControlPanelLeft({
   };
 
   return (
-    <aside className="w-full lg:w-[35%] lg:min-w-[380px] lg:max-w-[520px] lg:h-[calc(100vh-57px)] lg:overflow-y-auto cockpit-scroll border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#0B1120] p-4 space-y-4">
+    <aside className="w-full lg:w-[35%] lg:min-w-[380px] lg:max-w-[520px] lg:h-[calc(100vh-57px)] lg:overflow-y-auto cockpit-scroll border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 bg-[#F3F4F8] dark:bg-[#0B0F1A] p-4 space-y-4">
       {/* Encabezado del Modelo */}
-      <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3.5 space-y-2">
+      <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
           <input
             type="text"
             value={model.name}
             onChange={(e) => onModelChange({ ...model, name: e.target.value })}
-            className="w-full text-sm font-bold bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 rounded px-1 -ml-1"
+            placeholder="Nombre del problema"
+            className="w-full text-sm font-bold bg-transparent text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#E11D48] rounded-sm px-1 -ml-1"
           />
           <button
             type="button"
             onClick={onManualSolve}
-            disabled={isCalculating}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm shadow-cyan-500/20 disabled:opacity-50 transition-colors"
+            disabled={isCalculating || Boolean(validationError)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white disabled:opacity-50 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Resolver</span>
           </button>
         </div>
-        {model.description && (
-          <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-            {model.description}
-          </p>
-        )}
+        <textarea
+          rows={2}
+          value={model.description || ""}
+          onChange={(e) => onModelChange({ ...model, description: e.target.value })}
+          placeholder="Descripción opcional del problema de decisión..."
+          className="w-full text-[11px] leading-relaxed bg-transparent text-slate-500 dark:text-slate-400 resize-none focus:outline-none focus:ring-1 focus:ring-[#E11D48] rounded-sm px-1 -ml-1"
+        />
       </div>
 
-      {/* Ecualizador de Pesos (w_i) */}
-      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 p-3.5 space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Sliders className="w-4 h-4 text-cyan-500" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-              Ecualizador de Pesos (wᵢ)
-            </h2>
-            <TooltipBadge
-              title="Pesos de Preferencia (wᵢ)"
-              content="Definen la importancia relativa de cada objetivo en las métricas de compromiso L1 (compensatoria), L2 (euclidiana) y L∞ (equilibrio minimax). Idealmente deben sumar 1.00."
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full border ${
-                isWeightSumValid
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                  : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/40"
-              }`}
-            >
-              Σw = {weightSum.toFixed(2)}
-            </span>
-            <button
-              type="button"
-              onClick={onNormalizeWeights}
-              title="Auto-normalizar pesos (w_i / Σw_i)"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-cyan-500/20 text-slate-700 dark:text-cyan-300 border border-slate-200 dark:border-slate-700 transition-colors"
-            >
-              <Scale className="w-3 h-3" />
-              <span>Normalizar</span>
-            </button>
+      {/* Alerta de Validación Inmediata en Cliente */}
+      {validationError && (
+        <div className="flex items-start gap-2 p-3 rounded-sm bg-rose-50 dark:bg-rose-950/40 border-2 border-[#E11D48] text-xs text-rose-900 dark:text-rose-200">
+          <AlertCircle className="w-4 h-4 text-[#E11D48] shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold block">Error de Validación del Modelo:</span>
+            <span>{validationError}</span>
           </div>
         </div>
+      )}
 
-        {!isWeightSumValid && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-700 dark:text-amber-300">
-            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            <span>
-              Los pesos suman <b>{weightSum.toFixed(2)}</b> (≠ 1.00). El motor normalizará automáticamente o haz clic en <b>Normalizar</b>.
-            </span>
-          </div>
-        )}
-
-        <div className="space-y-2.5">
-          {model.objectives.map((obj, idx) => {
-            const wVal = weights[idx] ?? 0;
-            const pct = weightSum > 0 ? (wVal / weightSum) * 100 : 0;
-            return (
-              <div key={idx} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-slate-700 dark:text-slate-200 truncate pr-2">
-                    <span className="font-mono text-cyan-600 dark:text-cyan-400 mr-1">
-                      w{idx + 1}
-                    </span>
-                    {obj.name}
-                  </span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono text-slate-400">
-                      ({pct.toFixed(0)}%)
-                    </span>
-                    <input
-                      type="number"
-                      step="0.05"
-                      min="0"
-                      max="1"
-                      value={Number(wVal.toFixed(3))}
-                      onChange={(e) => onWeightChange(idx, parseFloat(e.target.value) || 0)}
-                      className="w-16 text-right font-mono text-xs px-1.5 py-0.5 rounded border bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100"
-                    />
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={Math.min(1, Math.max(0, wVal))}
-                  onChange={(e) => onWeightChange(idx, parseFloat(e.target.value))}
-                  className="w-full weight-slider bg-slate-200 dark:bg-slate-700"
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Leyenda rápida de métricas con tooltips */}
-        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-          <div className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
-            <span>L₁</span>
-            <TooltipBadge
-              title="Métrica L₁ (Compensatoria / Manhattan)"
-              content="Minimiza la suma ponderada de desviaciones. Permite compensación total: sacrificar mucho un objetivo si otro mejora más."
-            />
-          </div>
-          <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-[#10B981]" />
-            <span>L₂</span>
-            <TooltipBadge
-              title="Métrica L₂ (Euclidiana)"
-              content="Minimiza la distancia geométrica cuadrática al punto Ideal. Penaliza desviaciones grandes más que pequeñas."
-              align="center"
-            />
-          </div>
-          <div className="flex items-center gap-1 text-violet-600 dark:text-violet-400 font-medium">
-            <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
-            <span>L∞</span>
-            <TooltipBadge
-              title="Métrica L∞ (Equilibrio Minimax / Tchebysheff)"
-              content="Minimiza la máxima desviación ponderada (λ). Busca equidad entre objetivos evitando que alguno quede rezagado."
-              align="right"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Editor del Modelo con Pestañas (Tabla / Algebraico) */}
-      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 overflow-hidden">
+      {/* Editor del Modelo con Pestañas (Tabla / Algebraico) — Primero se define el problema */}
+      <section
+        id="cockpit-model-editor"
+        className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
+      >
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-3 py-2 bg-slate-50 dark:bg-slate-900">
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => setEditorTab("table")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                 editorTab === "table"
-                  ? "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                  ? "bg-[#E11D48] text-white"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -416,9 +446,9 @@ export default function ControlPanelLeft({
             <button
               type="button"
               onClick={() => setEditorTab("algebraic")}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                 editorTab === "algebraic"
-                  ? "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
+                  ? "bg-[#E11D48] text-white"
                   : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
               }`}
             >
@@ -434,72 +464,89 @@ export default function ControlPanelLeft({
         <div className="p-3.5 space-y-4">
           {editorTab === "table" ? (
             <>
-              {/* 1. Variables de Decisión */}
+              {/* 1. Variables de Decisión (Acordeón sin scroll anidado) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                      Variables de Decisión
-                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setOpenSections((s) => ({ ...s, vars: !s.vars }))}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
+                    >
+                      {openSections.vars ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      <span>Variables ({model.variables.length})</span>
+                    </button>
                     <TooltipBadge
                       title="Variables (LP y MIP)"
-                      content="Soporta variables Continuas (ℝ), Enteras (ℤ) y Binarias ({0,1}) resueltas con HiGHS en FastAPI."
+                      content="Soporta variables Continuas (ℝ), Enteras (ℤ) y Binarias ({0,1}) resueltas con HiGHS y Branch-and-Bound exacto en FastAPI."
                     />
                   </div>
                   <button
                     type="button"
-                    onClick={handleAddVariable}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline"
+                    onClick={() => {
+                      setOpenSections((s) => ({ ...s, vars: true }));
+                      handleAddVariable();
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E11D48] hover:underline cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Añadir
                   </button>
                 </div>
 
-                <div className="space-y-1.5 max-h-48 overflow-y-auto cockpit-scroll pr-1">
+                {openSections.vars && (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-[1.8fr_1.1fr_0.75fr_0.75fr_24px] gap-1.5 px-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <span>Variable (Descripción)</span>
+                    <span>Tipo</span>
+                    <span className="text-right">Mín</span>
+                    <span className="text-right">Máx</span>
+                    <span />
+                  </div>
                   {model.variables.map((v, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-12 gap-1.5 items-center bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-200/70 dark:border-slate-700/60"
+                      className="grid grid-cols-[1.8fr_1.1fr_0.75fr_0.75fr_24px] gap-1.5 items-center bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-sm border border-slate-200 dark:border-slate-700/60"
                     >
                       <input
                         type="text"
                         value={v.name}
+                        title={v.name}
                         onChange={(e) => handleVarChange(idx, "name", e.target.value)}
-                        className="col-span-3 text-xs font-mono px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
-                        placeholder="x1"
+                        className="text-xs font-mono px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-[#E11D48] min-w-0"
+                        placeholder="x1 (Nombre)"
                       />
                       <select
                         value={v.var_type}
                         onChange={(e) => handleVarChange(idx, "var_type", e.target.value)}
-                        className="col-span-3 text-[11px] px-1 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
+                        className="text-[11px] px-1 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 focus:outline-[#E11D48] min-w-0"
                       >
                         <option value="continuous">Continua</option>
                         <option value="integer">Entera</option>
                         <option value="binary">Binaria</option>
                       </select>
-                      <input
-                        type="number"
-                        value={v.lower_bound ?? ""}
-                        onChange={(e) => handleVarChange(idx, "lower_bound", e.target.value)}
+                      <NumericInput
+                        value={v.lower_bound}
+                        allowNull={true}
+                        onCommit={(val) => handleVarBound(idx, "lower_bound", val)}
                         disabled={v.var_type === "binary"}
-                        placeholder="Min"
-                        title="Cota inferior"
-                        className="col-span-2 text-xs font-mono text-right px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50"
+                        placeholder="-∞"
+                        title="Cota inferior (vacío = -∞)"
+                        className="text-xs font-mono text-right px-1 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50 focus:outline-[#E11D48] min-w-0"
                       />
-                      <input
-                        type="number"
-                        value={v.upper_bound ?? ""}
-                        onChange={(e) => handleVarChange(idx, "upper_bound", e.target.value)}
+                      <NumericInput
+                        value={v.upper_bound}
+                        allowNull={true}
+                        onCommit={(val) => handleVarBound(idx, "upper_bound", val)}
                         disabled={v.var_type === "binary"}
-                        placeholder="∞"
-                        title="Cota superior (vacío = sin límite)"
-                        className="col-span-3 text-xs font-mono text-right px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50"
+                        placeholder="+∞"
+                        title="Cota superior (vacío = +∞)"
+                        className="text-xs font-mono text-right px-1 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 disabled:opacity-50 focus:outline-[#E11D48] min-w-0"
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveVariable(idx)}
                         disabled={model.variables.length <= 1}
-                        className="col-span-1 flex justify-center text-slate-400 hover:text-rose-500 disabled:opacity-30"
+                        className="flex justify-center text-slate-400 hover:text-[#E11D48] disabled:opacity-30 cursor-pointer"
                         title="Eliminar variable"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -507,37 +554,53 @@ export default function ControlPanelLeft({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* 2. Funciones Objetivo */}
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Funciones Objetivo
-                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setOpenSections((s) => ({ ...s, objs: !s.objs }))}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
+                    >
+                      {openSections.objs ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      <span>Funciones Objetivo ({model.objectives.length})</span>
+                    </button>
+                    <TooltipBadge
+                      title="Funciones Objetivo (Zᵢ)"
+                      content="Define al menos 2 criterios en conflicto (Max o Min) con sus coeficientes lineales por variable. Pulsa '+ Añadir' para 3 o más objetivos (gráfico 3D y Radar)."
+                    />
+                  </div>
                   <button
                     type="button"
-                    onClick={handleAddObjective}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline"
+                    onClick={() => {
+                      setOpenSections((s) => ({ ...s, objs: true }));
+                      handleAddObjective();
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E11D48] hover:underline cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Añadir
                   </button>
                 </div>
 
+                {openSections.objs && (
                 <div className="space-y-2">
                   {model.objectives.map((obj, oIdx) => (
                     <div
                       key={oIdx}
-                      className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 space-y-1.5"
+                      className="p-2 rounded-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5"
                     >
                       <div className="flex items-center gap-1.5">
                         <select
                           value={obj.sense}
                           onChange={(e) => handleObjField(oIdx, "sense", e.target.value)}
-                          className={`text-[11px] font-bold px-1.5 py-1 rounded border ${
+                          className={`text-[11px] font-bold px-1.5 py-1 rounded-sm border ${
                             obj.sense === "maximize"
-                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-                              : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                              ? "bg-[#111524] text-white border-[#111524]"
+                              : "bg-rose-50 dark:bg-rose-950/50 text-[#E11D48] dark:text-rose-400 border-rose-200 dark:border-rose-800"
                           }`}
                         >
                           <option value="maximize">Max</option>
@@ -547,13 +610,13 @@ export default function ControlPanelLeft({
                           type="text"
                           value={obj.name}
                           onChange={(e) => handleObjField(oIdx, "name", e.target.value)}
-                          className="flex-1 text-xs font-medium px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+                          className="flex-1 text-xs font-medium px-2 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveObjective(oIdx)}
                           disabled={model.objectives.length <= 2}
-                          className="text-slate-400 hover:text-rose-500 disabled:opacity-30"
+                          className="text-slate-400 hover:text-[#E11D48] disabled:opacity-30 cursor-pointer"
                           title="Eliminar objetivo"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -564,16 +627,14 @@ export default function ControlPanelLeft({
                         {model.variables.map((v, vIdx) => (
                           <label
                             key={vIdx}
-                            className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5"
+                            className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm px-1.5 py-0.5"
                           >
                             <span className="text-[10px] font-mono text-slate-400">
                               {v.name.split(" ")[0]}:
                             </span>
-                            <input
-                              type="number"
-                              step="any"
+                            <NumericInput
                               value={obj.coefficients[vIdx] ?? 0}
-                              onChange={(e) => handleObjCoeff(oIdx, vIdx, e.target.value)}
+                              onCommit={(val) => handleObjCoeff(oIdx, vIdx, val ?? 0)}
                               className="w-14 text-right font-mono text-[11px] bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none"
                             />
                           </label>
@@ -582,56 +643,70 @@ export default function ControlPanelLeft({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* 3. Restricciones */}
               <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    Restricciones Lineales
-                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setOpenSections((s) => ({ ...s, cons: !s.cons }))}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 hover:text-[#E11D48] cursor-pointer"
+                    >
+                      {openSections.cons ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                      <span>Restricciones Lineales ({model.constraints.length})</span>
+                    </button>
+                    <TooltipBadge
+                      title="Restricciones del Sistema"
+                      content="Limitan la región factible mediante desigualdades (≤, ≥) o igualdades (=). Asegúrate de que el conjunto factible sea no vacío y acotado."
+                    />
+                  </div>
                   <button
                     type="button"
-                    onClick={handleAddConstraint}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:underline"
+                    onClick={() => {
+                      setOpenSections((s) => ({ ...s, cons: true }));
+                      handleAddConstraint();
+                    }}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#E11D48] hover:underline cursor-pointer"
                   >
                     <Plus className="w-3 h-3" /> Añadir
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-60 overflow-y-auto cockpit-scroll pr-1">
+                {openSections.cons && (
+                <div className="space-y-2">
                   {model.constraints.map((c, cIdx) => (
                     <div
                       key={cIdx}
-                      className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/60 space-y-1.5"
+                      className="p-2 rounded-sm bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-1.5"
                     >
                       <div className="flex items-center gap-1.5">
                         <input
                           type="text"
                           value={c.name}
                           onChange={(e) => handleConField(cIdx, "name", e.target.value)}
-                          className="flex-1 text-xs font-medium px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+                          className="flex-1 text-xs font-medium px-2 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
                         />
                         <select
                           value={c.sense}
                           onChange={(e) => handleConField(cIdx, "sense", e.target.value)}
-                          className="text-xs font-mono font-bold px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-cyan-600 dark:text-cyan-400"
+                          className="text-xs font-mono font-bold px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[#E11D48]"
                         >
                           <option value="<=">≤</option>
                           <option value=">=">≥</option>
                           <option value="==">=</option>
                         </select>
-                        <input
-                          type="number"
-                          step="any"
+                        <NumericInput
                           value={c.rhs}
-                          onChange={(e) => handleConField(cIdx, "rhs", e.target.value)}
-                          className="w-20 text-right font-mono text-xs px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
+                          onCommit={(val) => handleConField(cIdx, "rhs", val ?? 0)}
+                          className="w-20 text-right font-mono text-xs px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100"
                         />
                         <button
                           type="button"
                           onClick={() => handleRemoveConstraint(cIdx)}
-                          className="text-slate-400 hover:text-rose-500"
+                          className="text-slate-400 hover:text-[#E11D48]"
                           title="Eliminar restricción"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -642,16 +717,14 @@ export default function ControlPanelLeft({
                         {model.variables.map((v, vIdx) => (
                           <label
                             key={vIdx}
-                            className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5"
+                            className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm px-1.5 py-0.5"
                           >
                             <span className="text-[10px] font-mono text-slate-400">
                               {v.name.split(" ")[0]}:
                             </span>
-                            <input
-                              type="number"
-                              step="any"
+                            <NumericInput
                               value={c.coefficients[vIdx] ?? 0}
-                              onChange={(e) => handleConCoeff(cIdx, vIdx, e.target.value)}
+                              onCommit={(val) => handleConCoeff(cIdx, vIdx, val ?? 0)}
                               className="w-12 text-right font-mono text-[11px] bg-transparent text-slate-800 dark:text-slate-100 focus:outline-none"
                             />
                           </label>
@@ -660,25 +733,49 @@ export default function ControlPanelLeft({
                     </div>
                   ))}
                 </div>
+                )}
               </div>
             </>
           ) : (
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
-                  Ecuaciones del modelo (Max/Min Z = ..., s.a., restricciones ≤ / ≥ / =)
-                </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 block">
+                    Ecuaciones del modelo (Max/Min Z = ..., s.a., ≤ / ≥ / =)
+                  </label>
+                  {algebraicDirty && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAlgebraicText(modelToAlgebraicText(model));
+                        setAlgebraicDirty(false);
+                        setAlgebraicErrors([]);
+                      }}
+                      className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                    >
+                      Descartar borrador
+                    </button>
+                  )}
+                </div>
                 <textarea
                   rows={8}
                   value={algebraicText}
-                  onChange={(e) => setAlgebraicText(e.target.value)}
+                  onChange={(e) => {
+                    setAlgebraicText(e.target.value);
+                    setAlgebraicDirty(true);
+                  }}
                   spellCheck={false}
-                  className="w-full font-mono text-xs p-2.5 rounded-lg border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+                  className="w-full font-mono text-xs p-2.5 rounded-sm border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#E11D48]"
                 />
+                {algebraicDirty && (
+                  <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                    Tienes cambios sin aplicar en el texto. Pulsa &quot;Aplicar Ecuaciones y Resolver&quot; para actualizar el modelo.
+                  </p>
+                )}
               </div>
 
               {algebraicErrors.length > 0 && (
-                <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-600 dark:text-rose-300 space-y-1">
+                <div className="p-2.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-xs text-[#E11D48] dark:text-rose-300 space-y-1">
                   <div className="font-bold flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5" />
                     <span>Errores de sintaxis detectados:</span>
@@ -692,7 +789,7 @@ export default function ControlPanelLeft({
               )}
 
               {algebraicAppliedMsg && (
-                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-600 dark:text-emerald-300 flex items-center gap-1.5">
+                <div className="p-2 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{algebraicAppliedMsg}</span>
                 </div>
@@ -701,23 +798,195 @@ export default function ControlPanelLeft({
               <button
                 type="button"
                 onClick={handleApplyAlgebraic}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Aplicar Ecuaciones y Resolver</span>
               </button>
-
-              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 p-3 space-y-1.5">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Vista Previa Matemática (LaTeX / KaTeX)
-                </div>
-                <KatexBlock
-                  latex={latexPreview}
-                  className="text-xs text-slate-800 dark:text-slate-200"
-                />
-              </div>
             </div>
           )}
+
+          {/* Vista Previa Matemática en LaTeX siempre disponible para Tabla y Algebraico */}
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/70 p-3 space-y-1.5">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Vista Previa Matemática (LaTeX / KaTeX)
+              </div>
+              <KatexBlock
+                latex={latexPreview}
+                className="text-xs text-slate-800 dark:text-slate-200"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Ecualizador de Pesos (w_i) + Perfil del Decisor (Al final tras definir el modelo) */}
+      <section
+        id="cockpit-weights-panel"
+        className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Sliders className="w-4 h-4 text-[#E11D48]" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+              Perfil &amp; Pesos (wᵢ)
+            </h2>
+            <TooltipBadge
+              title="Pesos de Preferencia (wᵢ)"
+              content="Definen la importancia relativa de cada objetivo en las métricas L1 (compensatoria), L2 (euclidiana) y L∞ (equilibrio minimax). Deben sumar exactamente 1.00."
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-sm border ${
+                isWeightSumValid
+                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                  : "bg-rose-500/15 text-[#E11D48] dark:text-rose-400 border-rose-500/40 animate-pulse"
+              }`}
+            >
+              Σw = {weightSum.toFixed(2)}
+            </span>
+            <button
+              type="button"
+              onClick={onNormalizeWeights}
+              title="Auto-normalizar pesos (w_i / Σw_i)"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-[#E11D48] border border-slate-200 dark:border-slate-700 hover:border-[#E11D48] transition-colors"
+            >
+              <Scale className="w-3 h-3" />
+              <span>1.00</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Selector Rápido de Actitud / Perfil del Decisor */}
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { id: "equitativo" as DecisionProfile, label: "Equitativo", sub: "L∞ · 1/q" },
+            { id: "compensatorio" as DecisionProfile, label: "Compensatorio", sub: "L₁ · 70%" },
+            { id: "moderado" as DecisionProfile, label: "Moderado", sub: "L₂ · Suave" },
+          ].map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onSelectProfile(p.id)}
+              className={`px-2 py-1.5 rounded-sm border text-left transition-colors cursor-pointer ${
+                decisionProfile === p.id
+                  ? "bg-rose-50 dark:bg-rose-950/40 border-[#E11D48] text-slate-900 dark:text-white"
+                  : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400"
+              }`}
+            >
+              <span className="block text-[11px] font-bold leading-tight">{p.label}</span>
+              <span className="block text-[9px] font-mono text-[#E11D48] dark:text-rose-400">
+                {p.sub}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Switch Auto-Balanceo */}
+        <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={autoBalance}
+              onChange={(e) => onToggleAutoBalance(e.target.checked)}
+              className="w-3.5 h-3.5 accent-[#E11D48] rounded-sm"
+            />
+            <span className="font-medium">Auto-balancear suma fija en 1.00</span>
+          </label>
+          {decisionProfile === "personalizado" && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              Manual
+            </span>
+          )}
+        </div>
+
+        {!isWeightSumValid && (
+          <div className="flex items-center gap-2 p-2 rounded-sm bg-rose-50 dark:bg-rose-950/30 border border-[#E11D48] text-[11px] text-rose-800 dark:text-rose-200">
+            <AlertCircle className="w-3.5 h-3.5 text-[#E11D48] shrink-0" />
+            <span>
+              Los pesos suman <b>{weightSum.toFixed(2)}</b> (≠ 1.00). Ajusta los deslizadores o pulsa el botón <b>1.00</b> para normalizar antes de resolver.
+            </span>
+          </div>
+        )}
+
+        <div className="space-y-2.5">
+          {model.objectives.map((obj, idx) => {
+            const wVal = weights[idx] ?? 0;
+            const pct = weightSum > 0 ? (wVal / weightSum) * 100 : 0;
+            return (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <label
+                    htmlFor={`weight-slider-${idx}`}
+                    className="font-medium text-slate-700 dark:text-slate-200 truncate pr-2"
+                  >
+                    <span className="font-mono font-bold text-[#E11D48] mr-1">
+                      w{idx + 1}
+                    </span>
+                    {obj.name}
+                  </label>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono text-slate-400">
+                      ({pct.toFixed(0)}%)
+                    </span>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0"
+                      max="1"
+                      aria-label={`Valor numérico peso ${obj.name}`}
+                      value={Number(wVal.toFixed(3))}
+                      onChange={(e) => onWeightChange(idx, parseFloat(e.target.value) || 0)}
+                      className="w-16 text-right font-mono text-xs px-1.5 py-0.5 rounded-sm border bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-[#E11D48]"
+                    />
+                  </div>
+                </div>
+                <input
+                  id={`weight-slider-${idx}`}
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={Math.min(1, Math.max(0, wVal))}
+                  onChange={(e) => onWeightChange(idx, parseFloat(e.target.value))}
+                  className="w-full weight-slider bg-slate-200 dark:bg-slate-700"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Leyenda rápida de métricas con tooltips */}
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+          <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold">
+            <span className="w-2 h-2 rounded-xs bg-[#2563EB]" />
+            <span>L₁</span>
+            <TooltipBadge
+              title="Métrica L₁ (Compensatoria / Manhattan)"
+              content="Minimiza la suma ponderada de desviaciones. Permite compensación total: sacrificar mucho un objetivo si otro mejora más."
+            />
+          </div>
+          <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
+            <span className="w-2 h-2 rounded-xs bg-[#334155]" />
+            <span>L₂</span>
+            <TooltipBadge
+              title="Métrica L₂ (Euclidiana)"
+              content="Minimiza la distancia geométrica cuadrática al punto Ideal. Penaliza desviaciones grandes más que pequeñas."
+              align="center"
+            />
+          </div>
+          <div className="flex items-center gap-1 text-[#E11D48] font-semibold">
+            <span className="w-2 h-2 rounded-xs bg-[#E11D48]" />
+            <span>L∞</span>
+            <TooltipBadge
+              title="Métrica L∞ (Equilibrio Minimax / Tchebysheff)"
+              content="Minimiza la máxima desviación ponderada (λ). Busca equidad entre objetivos evitando que alguno quede rezagado."
+              align="right"
+            />
+          </div>
         </div>
       </section>
     </aside>

@@ -2,18 +2,18 @@
   "name": "Problema de Transporte Multiobjetivo (Taller 3)",
   "description": "Distribución desde 3 orígenes (O1, O2, O3) hacia 4 destinos (D1, D2, D3, D4), minimizando costo total de flete y minimizando riesgo en rutas.",
   "variables": [
-    {"name": "x_1_1", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_1_2", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_1_3", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_1_4", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_2_1", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_2_2", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_2_3", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_2_4", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_3_1", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_3_2", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_3_3", "var_type": "continuous", "lower_bound": 0.0},
-    {"name": "x_3_4", "var_type": "continuous", "lower_bound": 0.0}
+    {"name": "x_1_1 (O1 → D1)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_1_2 (O1 → D2)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_1_3 (O1 → D3)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_1_4 (O1 → D4)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_2_1 (O2 → D1)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_2_2 (O2 → D2)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_2_3 (O2 → D3)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_2_4 (O2 → D4)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_3_1 (O3 → D1)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_3_2 (O3 → D2)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_3_3 (O3 → D3)", "var_type": "continuous", "lower_bound": 0.0},
+    {"name": "x_3_4 (O3 → D4)", "var_type": "continuous", "lower_bound": 0.0}
   ],
   "objectives": [
     {

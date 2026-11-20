@@ -32,7 +32,7 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0F172A] text-slate-100`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#F3F4F8] text-slate-900`}>
         {children}
       </body>
     </html>
