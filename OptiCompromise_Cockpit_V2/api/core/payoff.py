@@ -9,6 +9,7 @@ from .schemas import ModelDefinition, PayoffMatrixData
 _HIGHS_PRECISE_OPTIONS = {
     "primal_feasibility_tolerance": 1e-9,
     "dual_feasibility_tolerance": 1e-9,
+    "mip_rel_gap": 0.0,
 }
 
 
@@ -43,6 +44,7 @@ def solve_linprog_precise(
             bounds=bounds,
             integrality=integrality,
             method="highs",
+            options={"mip_rel_gap": 0.0},
         )
     return res
 
@@ -71,10 +73,11 @@ def clean_solution_vector(
             if flag == 1 and abs(cleaned[j] - round(float(cleaned[j]))) < 1e-5:
                 cleaned[j] = float(round(float(cleaned[j])))
     for j, (lb, ub) in enumerate(bounds):
-        if lb is not None and abs(cleaned[j] - lb) < 1e-9:
+        if lb is not None and lb - 1e-9 < cleaned[j] < lb:
             cleaned[j] = lb
-        if ub is not None and abs(cleaned[j] - ub) < 1e-9:
+        if ub is not None and ub < cleaned[j] < ub + 1e-9:
             cleaned[j] = ub
+    cleaned[cleaned == 0.0] = 0.0
     return cleaned
 
 
@@ -171,15 +174,15 @@ def build_linear_constraints(model: ModelDefinition) -> Tuple[
         lb = v.lower_bound
         ub = v.upper_bound
         if v.var_type == "binary":
-            lb = 0.0 if lb is None else float(np.ceil(max(0.0, lb) - 1e-12))
-            ub = 1.0 if ub is None else float(np.floor(min(1.0, ub) + 1e-12))
+            lb = 0.0 if lb is None else float(np.ceil(max(0.0, lb)))
+            ub = 1.0 if ub is None else float(np.floor(min(1.0, ub)))
             integrality.append(1)
             has_integer = True
         elif v.var_type == "integer":
             if lb is not None:
-                lb = float(np.ceil(lb - 1e-12))
+                lb = float(np.ceil(lb))
             if ub is not None:
-                ub = float(np.floor(ub + 1e-12))
+                ub = float(np.floor(ub))
             integrality.append(1)
             has_integer = True
         else:
@@ -196,11 +199,19 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
     n_vars = len(model.variables)
     n_objs = len(model.objectives)
     A_ub, b_ub, A_eq, b_eq, bounds, integrality = build_linear_constraints(model)
-    
+
+    headers = [obj.name for obj in model.objectives]
+    if any(lo is not None and hi is not None and lo > hi for lo, hi in bounds):
+        return _payoff_error(headers, "error: infeasible integer bounds")
+    for rows, rhs, equality in ((A_ub, b_ub, False), (A_eq, b_eq, True)):
+        if rows is not None:
+            constant_rhs = rhs[~np.any(rows, axis=1)]
+            if np.any(constant_rhs != 0 if equality else constant_rhs < 0):
+                return _payoff_error(headers, "error: infeasible constant constraint")
+
     payoff_matrix = np.zeros((n_objs, n_objs), dtype=float)
     independent_solutions: List[Dict[str, float]] = []
     
-    headers = [obj.name for obj in model.objectives]
     var_names = [v.name for v in model.variables]
     
     # 1. Optimización independiente de cada objetivo (con desempate lexicográfico para evitar soluciones dominadas)
@@ -264,7 +275,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
                         if (
                             is_feasible(cand, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8)
                             and all(
-                                float(np.dot(f_vec, cand)) <= f_val + 1e-9 * max(1.0, abs(f_val))
+                                float(np.dot(f_vec, cand)) <= f_val + 1e-9 * max(abs(f_val), float(np.abs(f_vec) @ np.abs(cand)))
                                 for f_vec, f_val in fixed_checks
                             )
                         ):
@@ -321,7 +332,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
                 val = float(np.dot(eval_coeffs, x_opt))
             if not np.isfinite(val):
                 return _payoff_error(headers, f"error: numerical overflow evaluating objective {eval_obj.name}")
-            payoff_matrix[k, i] = val
+            payoff_matrix[k, i] = val or 0.0
 
     # 2. Determinar punto ideal, referencia de pagos y escalas
     ideal_point = []
@@ -390,7 +401,7 @@ def compute_payoff_matrix(model: ModelDefinition) -> PayoffMatrixData:
                     bounds=bounds,
                 )
                 endpoints.append(
-                    float(direction * projection.fun)
+                    float(direction * projection.fun) or 0.0
                     if projection.success and np.isfinite(projection.fun)
                     else None
                 )

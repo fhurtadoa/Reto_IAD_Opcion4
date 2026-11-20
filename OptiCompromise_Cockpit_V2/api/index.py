@@ -11,6 +11,7 @@ import json
 from pydantic import ValidationError
 import hashlib
 from collections import OrderedDict
+from concurrent.futures import Future
 from threading import Lock
 from typing import Tuple, List
 
@@ -56,7 +57,9 @@ def health_check():
 
 # Cache LRU en memoria para (payoff, pareto_points) indexado por la estructura del modelo (sin pesos).
 # Al arrastrar los sliders de pesos, evita recomputar 100+ puntos Pareto en cada frame.
-_STRUCTURE_CACHE: "OrderedDict[str, Tuple[PayoffMatrixData, List[ParetoPoint], WeightSensitivityData | None]]" = OrderedDict()
+StructureData = Tuple[PayoffMatrixData, List[ParetoPoint], WeightSensitivityData | None]
+_STRUCTURE_CACHE: OrderedDict[str, StructureData] = OrderedDict()
+_IN_FLIGHT: dict[str, Future[StructureData]] = {}
 _MAX_CACHE_SIZE = 32
 _CACHE_LOCK = Lock()
 
@@ -164,29 +167,46 @@ def get_payoff_matrix(model: ModelDefinition):
     _validate_model(model)
     return _require_payoff(model)
 
-@app.post("/api/solve", response_model=SolveResponse)
-def solve_model(model: ModelDefinition):
-    _validate_model(model)
-
+def _solve_structure(model: ModelDefinition) -> StructureData:
     cache_key = _model_structure_key(model)
     with _CACHE_LOCK:
         cached = _STRUCTURE_CACHE.get(cache_key)
         if cached is not None:
             _STRUCTURE_CACHE.move_to_end(cache_key)
-    if cached is not None:
-        payoff, pareto_pts, sensitivity = cached
-    else:
-        # 1. Matriz de pagos
-        payoff = _require_payoff(model)
+            return cached
+        pending = _IN_FLIGHT.get(cache_key)
+        owner = pending is None
+        if pending is None:
+            pending = Future()
+            _IN_FLIGHT[cache_key] = pending
 
-        # 3. Muestra de frontera de Pareto (independiente de los pesos actuales)
+    if not owner:
+        return pending.result()
+
+    try:
+        payoff = _require_payoff(model)
         pareto_pts = compute_pareto_frontier(model, payoff, num_samples=21)
         sensitivity = compute_weight_sensitivity(model, payoff)
         _ensure_finite((pareto_pts, sensitivity))
+        result = (payoff, pareto_pts, sensitivity)
         with _CACHE_LOCK:
-            _STRUCTURE_CACHE[cache_key] = (payoff, pareto_pts, sensitivity)
+            _STRUCTURE_CACHE[cache_key] = result
             if len(_STRUCTURE_CACHE) > _MAX_CACHE_SIZE:
                 _STRUCTURE_CACHE.popitem(last=False)
+        pending.set_result(result)
+        return result
+    except BaseException as exc:
+        pending.set_exception(exc)
+        raise
+    finally:
+        with _CACHE_LOCK:
+            del _IN_FLIGHT[cache_key]
+
+
+@app.post("/api/solve", response_model=SolveResponse)
+def solve_model(model: ModelDefinition):
+    _validate_model(model)
+    payoff, pareto_pts, sensitivity = _solve_structure(model)
 
     # 2. Soluciones compromiso para los pesos actuales
     solutions, normalized_weights = solve_all_metrics(model, payoff, weights=model.weights)

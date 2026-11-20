@@ -4,6 +4,7 @@ const path = require('node:path');
 const base = process.env.RED_URL || 'http://127.0.0.1:13104';
 const dir = path.resolve(process.argv[2] || 'baseline');
 const focus = process.argv.slice(3);
+const solveTimeout = Number(process.env.RED_SOLVE_TIMEOUT_MS ?? 17000);
 const cases = {
   A: 'Max Beneficio = x1\nMin Costo = x1\nx1 <= 10\nx2 = 0',
   B: 'Max Beneficio = t\nMin Costo = t\nt <= 1e10\nx1 = 0\nx2 = 0',
@@ -29,7 +30,7 @@ const eq = (array, other) => array.length === other.length && array.every((v, i)
   const chrome=process.env.RED_CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const browser=await chromium.launch({executablePath:chrome,headless:true});
   const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
-  page.setDefaultTimeout(9000);
+  page.setDefaultTimeout(Math.max(9000, solveTimeout));
   const events=[];
   let tag='initial';
   page.on('pageerror',error=>events.push({tag,error:error.message}));
@@ -43,7 +44,7 @@ const eq = (array, other) => array.length === other.length && array.every((v, i)
   const waitSolve = (predicate) => page.waitForResponse(r=>{
     if (!r.url().endsWith('/api/solve') || r.request().method() !== 'POST') return false;
     return predicate(r.request().postDataJSON());
-  },{timeout:17000});
+  },{timeout:solveTimeout});
   async function responseAnd(op, predicate) {
     const [r] = await Promise.all([waitSolve(predicate), op()]);
     return {code:r.status(), request:r.request().postDataJSON(), response:await r.json()};
@@ -109,7 +110,7 @@ const eq = (array, other) => array.length === other.length && array.every((v, i)
         await resultVisible();
       }
       if(expectedWeights[id]) final=await weights(expectedWeights[id]);
-      await page.waitForFunction(()=>!document.querySelector('header [role=status]')?.innerText.includes('Calculando'),null,{timeout:12000});
+      await page.waitForFunction(()=>!document.querySelector('header [role=status]')?.innerText.includes('Calculando'),null,{timeout:solveTimeout});
       records[id]={input, initialCode:initial?.code, ...final,status:await state()};
       if(final?.code===200) {
         await resultVisible();

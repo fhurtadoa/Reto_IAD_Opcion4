@@ -209,7 +209,7 @@ export default function VisualCanvasRight({
     const senseY2D = model.objectives[safeAxisY]?.sense ?? "maximize";
     const sortedPareto = [...pareto_points].sort((a, b) => {
       const dx = a.objectives[safeAxisX] - b.objectives[safeAxisX];
-      if (Math.abs(dx) > 1e-9) return dx;
+      if (dx !== 0) return dx;
       return senseY2D === "maximize"
         ? b.objectives[safeAxisY] - a.objectives[safeAxisY]
         : a.objectives[safeAxisY] - b.objectives[safeAxisY];
@@ -662,7 +662,8 @@ export default function VisualCanvasRight({
         y: discretePts.y,
         mode: "markers",
         type: "scatter",
-        name: "Muestra de puntos enteros factibles",
+        name: model.variables.every(v => v.var_type !== "continuous")
+          ? "Muestra de puntos enteros factibles" : "Muestra mixta factible",
         marker: { size: 5.5, color: isDark ? "#38BDF8" : "#111524", opacity: 0.8 },
       });
     }
@@ -1323,7 +1324,7 @@ export default function VisualCanvasRight({
                               <div className={`h-full ${col.bar} transition-all duration-300`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
                             </div>
                             <span className={`text-[10px] font-bold tabular-nums w-11 text-right ${col.text}`}>
-                              {fmtNum(pct, 1)}%
+                              {fmtNum(Math.abs(pct) < 1e-11 ? 0 : pct, 1)}%
                             </span>
                           </div>}
                         </td>

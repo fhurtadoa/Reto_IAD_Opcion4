@@ -15,7 +15,7 @@ import {
  */
 export function fmtNum(val: number | undefined | null, decimals = 2): string {
   if (val === undefined || val === null || Number.isNaN(val)) return "—";
-  if (Math.abs(val) < 1e-11) return "0";
+  if (val === 0) return "0";
   if (Math.abs(val) >= 10000) {
     return val.toLocaleString("es-CO", { maximumFractionDigits: Math.min(decimals, 1) });
   }
@@ -30,11 +30,11 @@ export function fmtNum(val: number | undefined | null, decimals = 2): string {
  * Formatea números limpios para KaTeX/LaTeX (punto decimal estándar y separador fino \, para miles,
  * evitando la coma española que genera espacios extra en modo matemático).
  */
-export function fmtLatexNum(val: number | undefined | null, decimals = 2): string {
-  if (val === undefined || val === null || Number.isNaN(val) || Math.abs(val) < 1e-11) return "0";
-  const rounded = Number(val.toFixed(Math.abs(val) >= 10000 ? Math.min(decimals, 1) : decimals));
-  if ((rounded === 0 && val !== 0) || Math.abs(val) >= 1e21) {
-    const [mantissa, exponent] = val.toExponential(decimals).split("e");
+export function fmtLatexNum(val: number | undefined | null, decimals: number | null = 2): string {
+  if (val === undefined || val === null || Number.isNaN(val) || val === 0) return "0";
+  const rounded = decimals === null ? val : Number(val.toFixed(Math.abs(val) >= 10000 ? Math.min(decimals, 1) : decimals));
+  if ((rounded === 0 && val !== 0) || String(rounded).includes("e")) {
+    const [mantissa, exponent] = val.toExponential(decimals ?? undefined).split("e");
     return `${Number(mantissa)} \\times 10^{${Number(exponent)}}`;
   }
   const [intPart, decPart] = String(rounded).split(".");
@@ -70,7 +70,7 @@ export function formatLinearExpr(
     const vRaw = varNames[i];
     const head = vRaw.trim().split(/\s+/)[0];
     const vStr = asLatex ? formatVarLatex(vRaw, dupPrefixes.has(head)) : vRaw;
-    const coeffStr = absC === 1 ? "" : `${asLatex ? fmtLatexNum(absC, 4) : absC}${asLatex ? "\\," : "*"}`;
+    const coeffStr = absC === 1 ? "" : `${asLatex ? fmtLatexNum(absC, null) : absC}${asLatex ? "\\," : "*"}`;
     if (parts.length === 0) {
       parts.push(c < 0 ? `-${coeffStr}${vStr}` : `${coeffStr}${vStr}`);
     } else {
@@ -192,17 +192,12 @@ export function parseAlgebraicModel(
     expr: string,
     lineNo: number
   ): { coeffsMap: Record<string, number>; constant: number } | null => {
-    const trimmedExpr = expr.trim();
-    if (/([a-zA-Z0-9_.])\s+([a-zA-Z0-9_.])/.test(trimmedExpr)) {
-      errors.push(`Línea ${lineNo}: falta un operador (+, -, *) entre términos en "${expr}".`);
-      return null;
-    }
-    const clean = trimmedExpr.replace(/\s+/g, "");
+    const clean = expr.trim();
     if (!clean) {
       errors.push(`Línea ${lineNo}: expresión vacía.`);
       return null;
     }
-    if (/[^a-zA-Z0-9_+\-.*]/.test(clean)) {
+    if (/[^a-zA-Z0-9_+\-.*\s]/.test(clean)) {
       errors.push(`Línea ${lineNo}: contiene caracteres no reconocidos en "${expr}".`);
       return null;
     }
@@ -217,7 +212,7 @@ export function parseAlgebraicModel(
     while ((match = termRegex.exec(normalized)) !== null) {
       consumed += match[0].length;
       const sign = match[1] === "-" ? -1 : 1;
-      const body = match[2];
+      const body = match[2].trim();
 
       // Forma 1: constante numérica pura (ej. "+100", ".5" o "50")
       if (/^(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(body)) {
@@ -231,8 +226,12 @@ export function parseAlgebraicModel(
       }
 
       // Forma 2: [numero][*][variable] o [variable]
-      const mTerm = body.match(/^(?:((?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\*?)?([a-zA-Z][a-zA-Z0-9_]*)$/);
+      const mTerm = body.match(/^(?:((?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?)\s*\*?\s*)?([a-zA-Z][a-zA-Z0-9_]*)$/);
       if (!mTerm) {
+        if (/([a-zA-Z0-9_.])\s+([a-zA-Z0-9_.])/.test(body)) {
+          errors.push(`Línea ${lineNo}: falta un operador (+, -, *) entre términos en "${expr}".`);
+          return null;
+        }
         errors.push(`Línea ${lineNo}: término inválido "${match[0]}". Usa formato como "3*x1", "2x1" o "1e3*x1".`);
         return null;
       }
@@ -380,23 +379,26 @@ export function modelToLatex(model: ModelDefinition): string {
   const conLines = model.constraints.map((c) => {
     const expr = formatLinearExpr(c.coefficients, varNames, true);
     const op = c.sense === "<=" ? "\\le" : c.sense === ">=" ? "\\ge" : "=";
-    return `${expr} &${op} ${fmtLatexNum(c.rhs, 4)}`;
+    return `${expr} &${op} ${fmtLatexNum(c.rhs, null)}`;
   });
 
   const dupPrefixes = duplicateVarPrefixes(varNames);
   const domainLines = model.variables.map((v) => {
     const head = v.name.trim().split(/\s+/)[0];
     const vn = formatVarLatex(v.name, dupPrefixes.has(head));
-    if (v.var_type === "binary") return `${vn} \\in \\{0,1\\}`;
+    if (v.var_type === "binary") {
+      const allowed = [0, 1].filter(x => x >= (v.lower_bound ?? 0) && x <= (v.upper_bound ?? 1));
+      return allowed.length ? `${vn} \\in \\{${allowed.join(",")}\\}` : `${vn} \\in \\varnothing`;
+    }
     const hasLb = v.lower_bound !== null && v.lower_bound !== undefined;
     const hasUb = v.upper_bound !== null && v.upper_bound !== undefined;
     const dom = v.var_type === "integer" ? ",\\;\\mathbb{Z}" : "";
     if (!hasLb && !hasUb) {
       return `${vn} \\in ${v.var_type === "integer" ? "\\mathbb{Z}" : "\\mathbb{R}"}`;
     }
-    if (hasLb && !hasUb) return `${vn} \\ge ${fmtLatexNum(v.lower_bound, 4)}${dom}`;
-    if (!hasLb && hasUb) return `${vn} \\le ${fmtLatexNum(v.upper_bound, 4)}${dom}`;
-    return `${fmtLatexNum(v.lower_bound, 4)} \\le ${vn} \\le ${fmtLatexNum(v.upper_bound, 4)}${dom}`;
+    if (hasLb && !hasUb) return `${vn} \\ge ${fmtLatexNum(v.lower_bound, null)}${dom}`;
+    if (!hasLb && hasUb) return `${vn} \\le ${fmtLatexNum(v.upper_bound, null)}${dom}`;
+    return `${fmtLatexNum(v.lower_bound, null)} \\le ${vn} \\le ${fmtLatexNum(v.upper_bound, null)}${dom}`;
   });
 
   const parts = [
@@ -787,6 +789,20 @@ export function exportModelJSON(model: ModelDefinition, weights: number[]) {
   URL.revokeObjectURL(url);
 }
 
+const MODEL_COLUMNS = ["Seccion", "Nombre", "Tipo_o_Sentido", "Min_o_RHS", "Max_o_Peso"];
+const RESERVED_MODEL_COLUMNS = new Set([
+  ...MODEL_COLUMNS.map((name) => name.toLowerCase()), "sección", "tipo", "elemento",
+  "name", "variable", "description", "descripcion", "pareto_seed", "referencia", "fuente",
+  "var_type", "tipo_var", "min", "max", "lower_bound", "upper_bound", "lb", "ub",
+  "sense", "sentido", "peso", "weight", "operador", "rhs", "ld", "__proto__",
+]);
+
+function coefficientColumn(name: string): string {
+  return RESERVED_MODEL_COLUMNS.has(name.trim().toLowerCase()) || name.startsWith("Coef: ")
+    ? `Coef: ${name}`
+    : name;
+}
+
 /**
  * Construye filas tabulares re-importables con la definición completa del modelo
  * (Metadatos, Variables con cotas -inf/+inf, Objetivos con pesos y Restricciones).
@@ -795,7 +811,7 @@ function buildTabularModelRows(
   model: ModelDefinition,
   weights?: number[]
 ): Record<string, string | number>[] {
-  const varNames = model.variables.map((v) => v.name);
+  const varNames = model.variables.map((v) => coefficientColumn(v.name));
   const rows: Record<string, string | number>[] = [
     {
       Seccion: "Meta",
@@ -897,7 +913,7 @@ export function exportResultsCSV(model: ModelDefinition, result: SolveResponse) 
   // Bloque tabular del modelo (permite re-importar el mismo CSV en OptiCompromise)
   rows.push([]);
   rows.push(["DEFINICION DEL MODELO (RE-IMPORTABLE)"]);
-  const modelHeaders = ["Seccion", "Nombre", "Tipo_o_Sentido", "Min_o_RHS", "Max_o_Peso", ...varNames];
+  const modelHeaders = [...MODEL_COLUMNS, ...varNames.map(coefficientColumn)];
   rows.push(modelHeaders);
   const modelRows = buildTabularModelRows(model, result.weights);
   modelRows.forEach((r) => {
@@ -939,6 +955,8 @@ export function computeDiscreteFeasiblePoints2D(
   const maxX = Math.floor(Math.max(...poly.x) + 1e-6);
   const minY = Math.ceil(Math.min(...poly.y) - 1e-6);
   const maxY = Math.floor(Math.max(...poly.y) + 1e-6);
+  if ((isInt0 && ![minX, maxX].every(Number.isSafeInteger)) ||
+      (isInt1 && ![minY, maxY].every(Number.isSafeInteger))) return null;
 
   const rows = model.constraints.map((constraint) => ({
     sense: constraint.sense, values: normalizedRow2D(constraint),
@@ -1172,8 +1190,8 @@ function validateImportedModel(parsed: unknown): ModelDefinition {
     return {
       name: v.name.trim(),
       var_type: vt,
-      lower_bound: vt === "binary" ? 0 : (v.lower_bound === null ? null : readNumber(v.lower_bound ?? 0, `cota inferior de «${v.name}»`)),
-      upper_bound: vt === "binary" ? 1 : (v.upper_bound == null ? null : readNumber(v.upper_bound, `cota superior de «${v.name}»`)),
+      lower_bound: v.lower_bound === null ? (vt === "binary" ? 0 : null) : readNumber(v.lower_bound ?? 0, `cota inferior de «${v.name}»`),
+      upper_bound: v.upper_bound == null ? (vt === "binary" ? 1 : null) : readNumber(v.upper_bound, `cota superior de «${v.name}»`),
     };
   });
   const validObjs = obj.objectives.map((o, idx) => {
@@ -1281,7 +1299,7 @@ export async function importModelFromFile(
 
     const headerRow = matrixRows[headerIdx].map((h) => String(h ?? "").trim());
     const rows: TabularRow[] = matrixRows.slice(headerIdx + 1).map((r) => {
-      const rec: TabularRow = {};
+      const rec: TabularRow = Object.create(null);
       headerRow.forEach((colName, cIdx) => {
         if (colName) rec[colName] = r[cIdx];
       });
@@ -1297,8 +1315,9 @@ export async function importModelFromFile(
     const conRows: TabularRow[] = [];
 
     const getField = (row: TabularRow, candidates: string[]) => {
-      for (const k of Object.keys(row)) {
-        if (candidates.includes(k.trim().toLowerCase())) return row[k];
+      for (const candidate of candidates) {
+        const key = Object.keys(row).find(k => k.toLowerCase() === candidate);
+        if (key !== undefined) return row[key];
       }
       return undefined;
     };
@@ -1335,8 +1354,8 @@ export async function importModelFromFile(
         variables.push({
           name,
           var_type,
-          lower_bound: var_type === "binary" ? 0 : parseBoundCell(minRaw, 0, `cota inferior de «${name}»`),
-          upper_bound: var_type === "binary" ? 1 : parseBoundCell(maxRaw, null, `cota superior de «${name}»`),
+          lower_bound: parseBoundCell(minRaw, 0, `cota inferior de «${name}»`) ?? (var_type === "binary" ? 0 : null),
+          upper_bound: parseBoundCell(maxRaw, null, `cota superior de «${name}»`) ?? (var_type === "binary" ? 1 : null),
         });
       } else if (sec.startsWith("obj")) {
         objRows.push(row);
@@ -1356,14 +1375,16 @@ export async function importModelFromFile(
     const varNames = variables.map((v) => v.name);
     const objectives: ModelDefinition["objectives"] = [];
     const importedWeights: Array<number | null> = [];
-    for (const name of varNames) {
-      if (headerRow.filter(header => header === name).length !== 1) {
-        throw new Error(`La variable «${name}» debe tener exactamente una columna con el mismo nombre.`);
+    const coefficientColumns = varNames.map((name) => {
+      const encoded = coefficientColumn(name);
+      // Los archivos antiguos conservan los nombres de columnas sin prefijo.
+      const column = headerRow.includes(encoded) ? encoded : name;
+      if (headerRow.filter(header => header === column).length !== 1 ||
+          (column !== encoded && MODEL_COLUMNS.some(metadata => metadata.toLowerCase() === name.toLowerCase()))) {
+        throw new Error(`La variable «${name}» necesita una columna de coeficientes inequívoca.`);
       }
-      if (["seccion", "nombre", "tipo_o_sentido", "min_o_rhs", "max_o_peso"].includes(name.toLowerCase())) {
-        throw new Error(`Usa otro nombre para la variable «${name}». Ese encabezado está reservado.`);
-      }
-    }
+      return column;
+    });
 
     objRows.forEach((row, idx) => {
       const name = String(getField(row, ["nombre", "name"]) ?? `Objetivo ${idx + 1}`).trim();
@@ -1375,7 +1396,7 @@ export async function importModelFromFile(
         throw new Error(`Indica minimize o maximize en el objetivo «${name}».`);
       }
       const sense = sRaw.startsWith("min") ? "minimize" : "maximize";
-      const coeffs = varNames.map(vn => tabularNumber(row[vn], `«${name}», columna «${vn}»`, 0));
+      const coeffs = coefficientColumns.map((column, i) => tabularNumber(row[column], `«${name}», columna «${varNames[i]}»`, 0));
       objectives.push({ name, sense, coefficients: coeffs });
       const raw = getField(row, ["max_o_peso", "peso", "weight"]);
       importedWeights.push(String(raw ?? "").trim() ? tabularNumber(raw, `peso de «${name}»`) : null);
@@ -1390,7 +1411,7 @@ export async function importModelFromFile(
       }
       const sense = sRaw === ">=" || sRaw === "≥" ? ">=" : sRaw === "==" || sRaw === "=" ? "==" : "<=";
       const rhsVal = tabularNumber(getField(row, ["min_o_rhs", "rhs", "ld"]), `lado derecho de «${name}»`);
-      const coeffs = varNames.map(vn => tabularNumber(row[vn], `«${name}», columna «${vn}»`, 0));
+      const coeffs = coefficientColumns.map((column, i) => tabularNumber(row[column], `«${name}», columna «${varNames[i]}»`, 0));
       return {
         name,
         coefficients: coeffs,

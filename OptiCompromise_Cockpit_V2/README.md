@@ -42,7 +42,7 @@ La suite en `api/tests/` (pruebas automatizadas) reproduce y verifica los ejerci
 | **Celdas Fotovoltaicas (Clase 15)** ($w=[0.5, 0.5]$) | 2 cont. | 2 (Max Utilidad, Min Contam.) | $(800.000,\; 200)$ | $(300.000,\; 600)$ | $x=[0, 200] \Rightarrow Z=(600k, 400)$ ($60.0\% / 50.0\%$) | $x=[0, 198.36] \Rightarrow Z=(595.1k, 396.7)$ ($59.0\% / 50.8\%$) | $x=[0, 190.91] \Rightarrow Z=(572.7k, 381.8)$ ($54.55\% = 54.55\%$) |
 | **Transporte (Taller 3)** ($w=[0.5, 0.5]$) | 12 cont. | 2 (Min Costo, Min Riesgo) | $(16.800,\; 2.600)$ | $(18.500,\; 5.700)$ | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17.400,\; 3.600)$ ($64.71\% / 67.74\%$) | $Z=(17\,382.33,\; 3\,661.88)$ ($65.75\% = 65.75\%$) |
 
-Los ejemplos de Sostenibilidad, Producción Mixta y Flota tienen pruebas de soporte triobjetivo, integralidad y cuatro criterios. Consulta la [matriz de trazabilidad y validación](docs/auditoria-iad.md) y la [guía de la interfaz actual](docs/guia-de-uso.md).
+Los ejemplos de Sostenibilidad, Producción Mixta y Flota tienen pruebas de soporte triobjetivo, integralidad y cuatro criterios. Consulta la [matriz de trazabilidad y validación](docs/auditoria-iad.md), la [guía de la interfaz actual](docs/guia-de-uso.md) y el [informe de estabilización](../ESTABILIZACION_FINAL_OPTICOMPROMISE.md).
 
 ---
 
@@ -96,7 +96,7 @@ npx tsc --noEmit && npm run lint && npm run build
 ## 🤖 Declaración de Uso de Inteligencia Artificial
 
 En cumplimiento con la Sección 12 de las Bases del Concurso:
-* Se utilizó Inteligencia Artificial (asistentes de programación Gemini / Antigravity) como apoyo para la estructuración modular del frontend en React/Next.js, la integración de gráficos Plotly/KaTeX, el diseño de pruebas automatizadas y la refactorización de validaciones.
+* Se utilizó Inteligencia Artificial (asistentes de programación Gemini / Antigravity) como apoyo para la estructuración modular del frontend en React/Next.js, la integración de gráficos Plotly/KaTeX, el diseño de pruebas automatizadas y la refactorización de validaciones. OpenAI Codex apoyó la reproducción de defectos, las correcciones de estabilidad del motor y el editor, las pruebas de regresión y el informe de estabilización.
 * Se utilizó OpenAI Codex para revisar el material del curso, transcribir el caso de papel y validar las plantillas y el catálogo. También se usó para auditar la rúbrica, refactorizar el flujo web, ajustar la comprobación de optimalidad y estados del motor, añadir pruebas de regresión y elaborar el [documento técnico](docs/auditoria-iad.md). Los autores deben revisar la versión entregada y explicar y modificar el método durante la sustentación individual.
 
 ---

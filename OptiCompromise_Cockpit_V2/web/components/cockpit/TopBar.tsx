@@ -27,6 +27,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   onImportJSON: (file: File) => void;
   onExportJSON: () => void;
+  canExportModel: boolean;
   onExportCSV: () => void;
   onExportExcel: () => void;
   canExportResults: boolean;
@@ -43,6 +44,7 @@ export default function TopBar({
   onToggleTheme,
   onImportJSON,
   onExportJSON,
+  canExportModel,
   onExportCSV,
   onExportExcel,
   canExportResults,
@@ -50,6 +52,14 @@ export default function TopBar({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const renderStatusPill = () => {
+    if (!canExportModel) {
+      return (
+        <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900"
+          title="Aplica o descarta las ecuaciones pendientes">
+          Borrador sin aplicar
+        </span>
+      );
+    }
     switch (solverStatus) {
       case "optimal":
         return (
@@ -187,8 +197,9 @@ export default function TopBar({
           <button
             type="button"
             onClick={onExportJSON}
-            title="Exportar definición del modelo (.json)"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
+            disabled={!canExportModel}
+            title={canExportModel ? "Exportar definición del modelo (.json)" : "Aplica o descarta el borrador algebraico primero"}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-sm text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-[#E11D48] hover:text-[#E11D48] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             <span className="inline">JSON</span>

@@ -23,15 +23,6 @@ import {
   importModelFromFile,
 } from "../components/cockpit/mathUtils";
 
-const RESERVED_COL_NAMES = new Set([
-  "seccion",
-  "sección",
-  "nombre",
-  "tipo_o_sentido",
-  "min_o_rhs",
-  "max_o_peso",
-]);
-
 function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): string | null {
   if (m.variables.length < 1) return "Agrega al menos 1 variable de decisión.";
   if (m.objectives.length < 2) return "Un problema multiobjetivo requiere al menos 2 objetivos.";
@@ -39,9 +30,6 @@ function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): str
   for (const v of m.variables) {
     const clean = v.name.trim();
     if (!clean) return "Todas las variables deben tener un nombre no vacío.";
-    if (RESERVED_COL_NAMES.has(clean.toLowerCase())) {
-      return `El nombre "${clean}" está reservado para exportación tabular. Usa otro identificador.`;
-    }
     if (seen.has(clean)) return `Variable duplicada: "${clean}". Cambia el nombre para que sea único.`;
     seen.add(clean);
     if (
@@ -94,6 +82,7 @@ export default function OptiCompromiseCockpitPage() {
 
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [selectedPreset, setSelectedPreset] = useState<string>("celdas");
+  const [hasAlgebraicDraft, setHasAlgebraicDraft] = useState(false);
   const [modelKey, setModelKey] = useState<number>(0);
   const [model, setModel] = useState<ModelDefinition>(FALLBACK_CELDAS_MODEL);
   const [weights, setWeights] = useState<number[]>(FALLBACK_CELDAS_MODEL.weights || [0.5, 0.5]);
@@ -425,13 +414,14 @@ export default function OptiCompromiseCockpitPage() {
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
         onImportJSON={handleImportJSON}
         onExportJSON={() => exportModelJSON(model, weights)}
+        canExportModel={!hasAlgebraicDraft}
         onExportCSV={() => {
           if (completed) exportResultsCSV(completed.model, completed.result);
         }}
         onExportExcel={() => {
           if (completed) exportResultsExcel(completed.model, completed.result);
         }}
-        canExportResults={Boolean(solveResult && (solverStatus === "optimal" || solverStatus === "partial"))}
+        canExportResults={Boolean(!hasAlgebraicDraft && solveResult && (solverStatus === "optimal" || solverStatus === "partial"))}
       />
 
       <div className="workspace-shell" data-workspace={workspace}>
@@ -454,6 +444,8 @@ export default function OptiCompromiseCockpitPage() {
             ["results", "Explorar resultados", ChartNoAxesCombined],
           ] as const).map(([id, label, Icon]) => (
             <button key={id} type="button" aria-current={workspace === id ? "page" : undefined}
+              disabled={hasAlgebraicDraft && id !== "model"}
+              title={hasAlgebraicDraft && id !== "model" ? "Aplica o descarta el borrador algebraico primero" : undefined}
               onClick={() => setWorkspace(id)}>
               <Icon aria-hidden="true" size={16} />
               {label}
@@ -467,6 +459,7 @@ export default function OptiCompromiseCockpitPage() {
           <ControlPanelLeft
             model={model}
             modelKey={modelKey}
+            onAlgebraicDraftChange={setHasAlgebraicDraft}
             weights={weights}
             autoBalance={autoBalance}
             onToggleAutoBalance={setAutoBalance}

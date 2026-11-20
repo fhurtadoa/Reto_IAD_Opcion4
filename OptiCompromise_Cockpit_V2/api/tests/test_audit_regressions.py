@@ -270,13 +270,18 @@ class TestAuditRegressions(unittest.TestCase):
                 self.assertIn("pesos deben sumar 1", response.json()["detail"])
 
     def test_stalled_qp_is_reported_as_feasible_not_optimal(self):
-        model = example("01_celdas_fotovoltaicas.json")
+        model = example("02_problema_transporte.json")
+        model.weights = [0.25, 0.75]
         # Simula una parada de SLSQP sin progreso, conservando el punto factible.
         def stalled(_fun, x0, **_options):
             return SimpleNamespace(x=x0, success=False)
 
+        celdas = example("01_celdas_fotovoltaicas.json")
         with patch("core.compromise.minimize", side_effect=stalled):
+            recovered, _ = solve_all_metrics(celdas, compute_payoff_matrix(celdas))
             response = TestClient(app).post("/api/solve", json=model.model_dump())
+        self.assertEqual(recovered["L2"].status, "optimal")
+        self.assertAlmostEqual(recovered["L2"].objectives[0], 595081.967213, places=5)
         self.assertEqual(response.status_code, 200)
         result = response.json()
         self.assertEqual(result["status"], "partial")

@@ -91,7 +91,7 @@ def format_solution(
         if abs(ach_pct) < 1e-11:
             ach_pct = 0.0
         
-        objectives_vals.append(z_val)
+        objectives_vals.append(z_val or 0.0)
         norm_distances.append(d_val)
         achievement_pcts.append(ach_pct)
         
@@ -122,8 +122,10 @@ def _continuous_column_scale(model, payoff, bounds, integrality, minimum=1e4):
             continue
         witness = max((abs(row[variable.name]) for row in payoff.independent_solutions), default=0.0)
         scale = max(witness, abs(lo or 0.0), abs(hi or 0.0))
-        if scale >= minimum:
-            scales[j] = scale
+        if scale >= minimum or (lo is not None and hi is not None and 0.0 < scale < 1e-4):
+            # Las potencias de dos preservan las relaciones lineales en coma flotante.
+            _, exponent = np.frexp(scale)
+            scales[j] = np.ldexp(1.0, exponent - 1)
     return scales
 
 
@@ -209,7 +211,11 @@ def solve_l1(
             aggregate_distance=0.0,
             status="error: la solución L1 no cumple el modelo original",
         )
-    return format_solution("L1", x_clean, model, payoff, alpha, beta, weights, status="optimal")
+    dual_bound = getattr(res, "mip_dual_bound", None) if integrality is not None else None
+    bound = float(c_l1 @ res.x) if dual_bound is None else float(dual_bound)
+    cost = float(c_l1 @ (x_clean / column_scale))
+    status = "optimal" if abs(cost - bound) <= 1e-7 else "feasible_suboptimal"
+    return format_solution("L1", x_clean, model, payoff, alpha, beta, weights, status=status)
 
 def solve_linf(
     model: ModelDefinition,
@@ -244,8 +250,18 @@ def solve_linf(
         b_ub_list.append(b_ub_orig)
 
     # Restricciones auxiliares de minimax: w_i * alpha_i^T @ x - lambda <= - w_i * beta_i
-    A_minimax = np.hstack([weights[:, np.newaxis] * alpha * column_scale, -np.ones((n_objs, 1))])
-    b_minimax = - weights * beta
+    weighted_alpha = weights[:, None] * alpha * column_scale
+    row_norms = np.max(np.abs(weighted_alpha), axis=1)
+    # Resolver con lambda reescalada evita coeficientes estructurales pequeños
+    # en HiGHS sin cambiar las coordenadas enteras.
+    positive_norms = row_norms[row_norms > 0]
+    lambda_scale = max(1.0, 1e-6 / positive_norms.min()) if len(positive_norms) else 1.0
+    if not np.isfinite(lambda_scale) or lambda_scale > 1e12:
+        return MetricSolution(metric="L_inf", variables={}, objectives=[], achievement_pct=[],
+                              normalized_distances=[], aggregate_distance=0.0,
+                              status="error: la escala de minimax excede la precisión del motor")
+    A_minimax = np.column_stack((weighted_alpha * lambda_scale, -np.ones(n_objs)))
+    b_minimax = -weights * beta * lambda_scale
 
     A_ub_list.append(A_minimax)
     b_ub_list.append(b_minimax)
@@ -313,6 +329,7 @@ def solve_linf(
         )
 
     x_opt = None
+    normalized_lambda = lam_opt / lambda_scale
     for cand in ([tie.x] if (tie.success and tie.x is not None) else []) + [res.x]:
         cand_clean = clean_solution_vector(cand[:n_vars] * column_scale, bounds_orig, integrality_orig)
         if is_feasible(cand_clean, A_ub_orig, b_ub_orig, A_eq_orig, b_eq_orig, bounds_orig, integrality_orig, tol=1e-8):
@@ -323,7 +340,9 @@ def solve_linf(
                               normalized_distances=[], aggregate_distance=0.0,
                               status="error: la solución minimax no cumple el modelo original")
     distance = np.max(weights * (alpha @ x_opt + beta))
-    status = "optimal" if abs(distance - lam_opt) <= 1e-7 else "feasible_suboptimal"
+    dual_bound = getattr(res, "mip_dual_bound", None) if integrality_orig is not None else None
+    bound = normalized_lambda if dual_bound is None else float(dual_bound) / lambda_scale
+    status = "optimal" if abs(distance - bound) <= 1e-7 else "feasible_suboptimal"
     return format_solution("L_inf", x_opt, model, payoff, alpha, beta, weights, status=status)
 
 
@@ -369,6 +388,10 @@ def _project_feasible_l1(
     return x_cand
 
 
+class _QPDeadlineReached(Exception):
+    """Interrumpe SLSQP entre iteraciones cuando se agota la búsqueda MIQP."""
+
+
 def _solve_continuous_qp(
     alpha: np.ndarray,
     beta: np.ndarray,
@@ -380,6 +403,7 @@ def _solve_continuous_qp(
     bounds: List[Tuple[Optional[float], Optional[float]]],
     x0_candidates: List[np.ndarray],
     gap_tol: float = 1e-7,
+    deadline: float | None = None,
 ) -> Tuple[Optional[np.ndarray], float, bool]:
     """
     Resuelve la relajación cuadrática continua Min sum((w_i * (alpha_i^T x + beta_i))^2)
@@ -391,11 +415,8 @@ def _solve_continuous_qp(
     clean_bounds: List[Tuple[Optional[float], Optional[float]]] = []
     for lb, ub in bounds:
         if lb is not None and ub is not None:
-            if lb > ub + 1e-9:
-                return None, float("inf"), True
             if lb > ub:
-                mid = 0.5 * (lb + ub)
-                lb, ub = mid, mid
+                return None, float("inf"), True
         clean_bounds.append((lb, ub))
     bounds = clean_bounds
 
@@ -472,36 +493,46 @@ def _solve_continuous_qp(
     alpha_norm = float(np.max(np.abs(weighted_alpha), initial=0.0))
     base_scale = 1.0 / max(alpha_norm * alpha_norm, 1e-12) if alpha_norm > 0.0 else 1.0
     base_scale = float(np.clip(base_scale, 1.0, 1e6))
-    slsqp_progressed = False
+
+    def check_deadline(_x=None):
+        if deadline is not None and time.monotonic() >= deadline:
+            raise _QPDeadlineReached
 
     def _run_slsqp(x_start: np.ndarray, scale_factor: float, maxiter: int = 400, ftol: float = 1e-11) -> bool:
-        nonlocal best_x, best_val, slsqp_progressed
-        res = minimize(
-            lambda x: scale_factor * objective(x),
-            x_start,
-            jac=lambda x: scale_factor * jacobian(x),
-            method="SLSQP",
-            bounds=bounds,
-            constraints=constraints,
-            options={"maxiter": maxiter, "ftol": ftol},
-        )
+        nonlocal best_x, best_val
+        try:
+            check_deadline()
+            res = minimize(
+                lambda x: scale_factor * objective(x),
+                x_start,
+                jac=lambda x: scale_factor * jacobian(x),
+                method="SLSQP",
+                bounds=bounds,
+                constraints=constraints,
+                callback=check_deadline if deadline is not None else None,
+                options={"maxiter": maxiter, "ftol": ftol},
+            )
+        except _QPDeadlineReached:
+            return False
         improved = False
         if res.x is not None and is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
             cand = _project_feasible_l1(res.x, A_ub, b_ub, A_eq, b_eq, bounds)
             val = objective(cand)
-            if np.isfinite(val):
+            if np.isfinite(val) and is_feasible(cand, A_ub, b_ub, A_eq, b_eq, bounds, None, tol=1e-8):
                 if val < best_val - 1e-15 * max(1e-12, best_val):
                     improved = True
                 if best_x is None or val < best_val or not is_feasible(best_x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-8):
                     best_val = val
                     best_x = np.array(cand, dtype=float)
         if getattr(res, "success", False) or improved:
-            slsqp_progressed = True
             return True
         return False
 
     for x_init in starts[:2]:
         _run_slsqp(x_init, base_scale)
+
+    if deadline is not None and time.monotonic() >= deadline:
+        return best_x, 0.0, False
 
     # Si SLSQP no encontró punto factible, intentar encontrar un punto factible con HiGHS y re-optimizar
     if best_x is None:
@@ -532,19 +563,20 @@ def _solve_continuous_qp(
         else gap_tol
     )
 
-    def _tangent_gradient(x_pt: np.ndarray) -> Tuple[np.ndarray, float, float]:
-        d_pt = weighted_alpha @ x_pt + weighted_beta
-        d_cert = np.where((d_pt < 0.0) & (d_pt > -1e-12), 0.0, d_pt)
-        grad = 2.0 * (weighted_alpha.T @ d_cert)
-        g_scale = float(np.max(np.abs(grad), initial=0.0))
-        noise_tol = 2.0 * float(np.max(np.abs(weighted_alpha.T) @ np.abs(d_cert), initial=0.0)) * 64.0 * float(np.finfo(float).eps)
-        return grad, g_scale, noise_tol
+    def _tangent_gradient(x_pt: np.ndarray) -> Tuple[np.ndarray, float]:
+        residual = weighted_alpha @ x_pt + weighted_beta
+        # Sumar los productos por columna evita que una operación fusionada
+        # rompa la proporcionalidad exacta de columnas en un rayo nulo.
+        grad = 2.0 * np.sum(weighted_alpha * residual[:, None], axis=0)
+        return grad, float(np.max(np.abs(grad), initial=0.0))
 
     best_lb = 0.0
-    max_refine = (6 if eff_gap_tol < 1e-7 else 4) if slsqp_progressed else 0
+    max_refine = 6 if eff_gap_tol < 1e-7 else 4
     for _ in range(max_refine):
-        gradient, scale, noise_tol = _tangent_gradient(best_x)
-        if scale <= noise_tol:
+        if deadline is not None and time.monotonic() >= deadline:
+            return best_x, best_lb, False
+        gradient, scale = _tangent_gradient(best_x)
+        if scale == 0.0:
             return best_x, best_val, is_feasible(best_x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-8)
         certificate = solve_linprog_precise(
             gradient / scale, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
@@ -562,7 +594,7 @@ def _solve_continuous_qp(
         v_vec = weighted_alpha @ delta
         vv = float(v_vec @ v_vec)
         cand_x = best_x
-        if vv > 1e-24:
+        if vv > 0.0:
             gamma = float(np.clip(-(d_vec @ v_vec) / vv, 0.0, 1.0))
             step_x = _project_feasible_l1(best_x + gamma * delta, A_ub, b_ub, A_eq, b_eq, bounds)
             if is_feasible(step_x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-8):
@@ -578,8 +610,10 @@ def _solve_continuous_qp(
         if prev_val - best_val <= 1e-15 * max(1e-12, prev_val):
             break
 
-    gradient, scale, noise_tol = _tangent_gradient(best_x)
-    if scale <= noise_tol:
+    if deadline is not None and time.monotonic() >= deadline:
+        return best_x, best_lb, False
+    gradient, scale = _tangent_gradient(best_x)
+    if scale == 0.0:
         return best_x, best_val, is_feasible(best_x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-8)
     certificate = solve_linprog_precise(
         gradient / scale, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
@@ -724,7 +758,7 @@ def solve_l2(
     x0: Optional[np.ndarray] = None,
     incumbents: Optional[List[np.ndarray]] = None,
     max_nodes: int = 800,
-    max_seconds: float = 1.0,
+    max_seconds: float = 5.0,
 ) -> MetricSolution:
     """
     Resuelve la métrica L2 (Euclidiana) como Programación Cuadrática Convexa (QP):
@@ -792,6 +826,8 @@ def solve_l2(
 
     # --- CASO 2: MIP (ENTERO / BINARIO) — RAMIFICACIÓN Y PODA CON PRESUPUESTO ---
     int_indices = [j for j, flag in enumerate(integrality) if flag == 1]
+    start = time.monotonic()
+    deadline = start + max_seconds
 
     best_int_x: Optional[np.ndarray] = None
     best_int_val = float("inf")
@@ -819,7 +855,7 @@ def solve_l2(
         for j in int_indices:
             slice_bounds[j] = (float(x_int[j]), float(x_int[j]))
         pol_x, _, pol_certified = _solve_continuous_qp(
-            scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, slice_bounds, [x_int], gap_tol=1e-8
+            scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, slice_bounds, [x_int], gap_tol=1e-8, deadline=deadline
         )
         if pol_x is not None and (
             objective(pol_x) < val_int
@@ -828,12 +864,30 @@ def solve_l2(
             return pol_x, pol_certified
         return x_int, pol_certified and is_feasible(x_int, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8)
 
+    # La relajación puede reparametrizar las coordenadas enteras.
+    # Al volver al árbol, las decisiones recuperan su escala y retícula.
+    relaxation_scale = _continuous_column_scale(model, payoff, bounds_orig, None) / column_scale
+    relaxation_ub = None if A_ub is None else A_ub * relaxation_scale
+    relaxation_eq = None if A_eq is None else A_eq * relaxation_scale
+
+    def solve_relaxation(node_bounds, starts):
+        x, lower_bound, certified = _solve_continuous_qp(
+            scaled_alpha * relaxation_scale, beta, weights,
+            relaxation_ub, b_ub, relaxation_eq, b_eq, _scale_bounds(node_bounds, relaxation_scale),
+            [candidate / relaxation_scale for candidate in starts], deadline=deadline,
+        )
+        return (None if x is None else x * relaxation_scale), lower_bound, certified
+
     # Resolver relajación raíz
-    root_x, root_lb, root_certified = _solve_continuous_qp(scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, bounds, x0_candidates)
+    root_x, root_lb, root_certified = solve_relaxation(bounds, x0_candidates)
     tree_exhausted = root_x is not None or root_certified
     if root_x is not None:
-        start = time.monotonic()
-        deadline = start + max_seconds
+        rounded_root = root_x.copy()
+        rounded_root[int_indices] = np.rint(rounded_root[int_indices])
+        if is_feasible(rounded_root, A_ub, b_ub, A_eq, b_eq, bounds, integrality, tol=1e-8):
+            root_value = objective(rounded_root)
+            if root_value < best_int_val:
+                best_int_x, best_int_val = rounded_root, root_value
         if max_nodes > 0 and root_lb < best_int_val - 1e-7:
             # Las tangentes permiten saltar entre flujos enteros usando el
             # solver lineal entero, en vez de explorar todos los desgloses.
@@ -894,14 +948,11 @@ def solve_l2(
             orig_lb, orig_ub = node_bounds[branch_j]
 
             for child_lb, child_ub in [(orig_lb, fl if orig_ub is None else min(orig_ub, fl)), (ce if orig_lb is None else max(orig_lb, ce), orig_ub)]:
-                if child_lb is not None and child_ub is not None and child_lb > child_ub + 1e-12:
-                    continue
                 if child_lb is not None and child_ub is not None and child_lb > child_ub:
-                    mid = 0.5 * (child_lb + child_ub)
-                    child_lb, child_ub = mid, mid
+                    continue
                 c_bounds = list(node_bounds)
                 c_bounds[branch_j] = (child_lb, child_ub)
-                c_x, c_lb, c_certified = _solve_continuous_qp(scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, c_bounds, [node_x])
+                c_x, c_lb, c_certified = solve_relaxation(c_bounds, [node_x])
                 if c_x is None and not c_certified:
                     tree_exhausted = False
                 if c_x is not None and c_lb < best_int_val - 1e-7:
@@ -941,7 +992,7 @@ def solve_all_metrics(
     payoff: PayoffMatrixData,
     weights: Optional[List[float]] = None,
     l2_max_nodes: int = 800,
-    l2_max_seconds: float = 1.0,
+    l2_max_seconds: float = 5.0,
 ) -> Tuple[Dict[str, MetricSolution], List[float]]:
     """
     Calcula simultáneamente las tres soluciones compromiso (L1, L2, L_inf) para un vector de pesos dado.

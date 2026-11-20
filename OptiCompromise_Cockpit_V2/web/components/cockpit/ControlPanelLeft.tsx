@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect, useMemo } from "react";
 import {
   Table2,
   Code2,
@@ -97,9 +97,7 @@ function NumericInput({
     setFocused(false);
     const trimmed = draft.trim();
     if (trimmed === "" || trimmed === "-" || trimmed === "." || trimmed === "-." || /[eE][+-]?$/.test(trimmed)) {
-      const fallback = allowNull ? null : 0;
-      onCommit(fallback);
-      setDraft(formatProp(fallback));
+      setDraft(formatProp(value));
       return;
     }
     const parsed = Number(trimmed.replace(",", "."));
@@ -107,7 +105,6 @@ function NumericInput({
       let clamped = parsed;
       if (min !== undefined) clamped = Math.max(min, clamped);
       if (max !== undefined) clamped = Math.min(max, clamped);
-      onCommit(clamped);
       setDraft(formatProp(clamped));
     } else {
       setDraft(formatProp(value));
@@ -145,6 +142,7 @@ interface ControlPanelLeftProps {
   onModelChange: (updated: ModelDefinition, newWeights?: number[]) => void;
   onWeightChange: (index: number, value: number) => void;
   onNormalizeWeights: () => void;
+  onAlgebraicDraftChange: (dirty: boolean) => void;
   onManualSolve: (updated?: ModelDefinition, weights?: number[]) => void;
   isCalculating: boolean;
 }
@@ -161,6 +159,7 @@ export default function ControlPanelLeft({
   onModelChange,
   onWeightChange,
   onNormalizeWeights,
+  onAlgebraicDraftChange,
   onManualSolve,
   isCalculating,
 }: ControlPanelLeftProps) {
@@ -173,7 +172,11 @@ export default function ControlPanelLeft({
   const [algebraicText, setAlgebraicText] = useState<string>(() =>
     modelToAlgebraicText(model)
   );
-  const [algebraicDirty, setAlgebraicDirty] = useState<boolean>(false);
+  const [algebraicDirty, setDirty] = useState(false);
+  const setAlgebraicDirty = useCallback((dirty: boolean) => {
+    setDirty(dirty);
+    onAlgebraicDraftChange(dirty);
+  }, [onAlgebraicDraftChange]);
   const [algebraicErrors, setAlgebraicErrors] = useState<string[]>([]);
 
   // Al cambiar de caso/importación reiniciamos el borrador algebraico
@@ -859,7 +862,7 @@ export default function ControlPanelLeft({
                 />
                 {algebraicDirty && (
                   <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                    Tienes cambios sin aplicar en el texto. Pulsa &quot;Aplicar Ecuaciones y Resolver&quot; para actualizar el modelo.
+                    Aplica o descarta el borrador antes de consultar o exportar resultados.
                   </p>
                 )}
               </div>
@@ -1054,7 +1057,7 @@ export default function ControlPanelLeft({
             />
           </div>
           <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
-            <span className="w-2 h-2 rounded-xs bg-[#334155]" />
+            <span className="w-2 h-2 rounded-xs bg-[#334155] dark:bg-slate-300" />
             <span>L₂</span>
             <TooltipBadge
               title="Métrica L₂ (Euclidiana)"
