@@ -420,21 +420,38 @@ def _solve_continuous_qp(
                 best_val = val
                 best_x = np.array(x_init, dtype=float)
 
-    for x_init in starts[:2]:
+    # Re-escalar el objetivo para que SLSQP no se detenga prematuramente cuando los pesos o gradientes son pequeños
+    alpha_norm = float(np.max(np.abs(weighted_alpha), initial=0.0))
+    base_scale = 1.0 / max(alpha_norm * alpha_norm, 1e-12) if alpha_norm > 0.0 else 1.0
+    base_scale = float(np.clip(base_scale, 1.0, 1e6))
+    slsqp_progressed = False
+
+    def _run_slsqp(x_start: np.ndarray, scale_factor: float, maxiter: int = 400, ftol: float = 1e-11) -> bool:
+        nonlocal best_x, best_val, slsqp_progressed
         res = minimize(
-            objective,
-            x_init,
-            jac=jacobian,
+            lambda x: scale_factor * objective(x),
+            x_start,
+            jac=lambda x: scale_factor * jacobian(x),
             method="SLSQP",
             bounds=bounds,
             constraints=constraints,
-            options={"maxiter": 400, "ftol": 1e-11},
+            options={"maxiter": maxiter, "ftol": ftol},
         )
+        improved = False
         if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
             val = objective(res.x)
+            if val < best_val - 1e-15:
+                improved = True
             if val < best_val:
                 best_val = val
                 best_x = np.array(res.x, dtype=float)
+        if getattr(res, "success", False) or improved:
+            slsqp_progressed = True
+            return True
+        return False
+
+    for x_init in starts[:2]:
+        _run_slsqp(x_init, base_scale)
 
     # Si SLSQP no encontró punto factible, intentar encontrar un punto factible con HiGHS y re-optimizar
     if best_x is None:
@@ -451,23 +468,50 @@ def _solve_continuous_qp(
             return None, float("inf"), feas.status == 2
         best_x = np.array(feas.x, dtype=float)
         best_val = objective(best_x)
-        res = minimize(
-            objective,
-            best_x,
-            jac=jacobian,
-            method="SLSQP",
-            bounds=bounds,
-            constraints=constraints,
-            options={"maxiter": 400, "ftol": 1e-10},
-        )
-        if res.x is not None and _is_feasible(res.x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
-            val = objective(res.x)
-            if val < best_val:
-                best_val = val
-                best_x = np.array(res.x, dtype=float)
+        _run_slsqp(best_x, base_scale, ftol=1e-10)
 
     # Para una cuadrática convexa, la tangente es un minorante global.
     # Su mínimo sobre el poliedro certifica una cota inferior para la poda.
+    # Si SLSQP estuvo activo pero la brecha tangencial supera 1e-7, refinamos con búsqueda lineal exacta (Frank-Wolfe) hacia certificate.x y SLSQP re-escalado.
+    best_lb = 0.0
+    max_refine = 4 if slsqp_progressed else 0
+    for _ in range(max_refine):
+        gradient = jacobian(best_x)
+        scale = float(np.max(np.abs(gradient)))
+        if scale == 0.0:
+            return best_x, best_val, True
+        certificate = linprog(
+            gradient / scale, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+            bounds=bounds, method="highs",
+        )
+        if not certificate.success or certificate.x is None:
+            return best_x, best_lb, False
+        gap = max(0.0, float(gradient @ (best_x - certificate.x)))
+        best_lb = max(best_lb, best_val - gap)
+        if gap <= 1e-10:
+            return best_x, best_lb, True
+
+        delta = certificate.x - best_x
+        d_vec = weighted_alpha @ best_x + weighted_beta
+        v_vec = weighted_alpha @ delta
+        vv = float(v_vec @ v_vec)
+        cand_x = best_x
+        if vv > 1e-24:
+            gamma = float(np.clip(-(d_vec @ v_vec) / vv, 0.0, 1.0))
+            step_x = best_x + gamma * delta
+            if _is_feasible(step_x, A_ub, b_ub, A_eq, b_eq, bounds, integrality=None, tol=1e-7):
+                cand_x = step_x
+                cand_val = objective(cand_x)
+                if cand_val < best_val:
+                    best_val = cand_val
+                    best_x = cand_x
+
+        ref_scale = float(np.clip(1.0 / max(gap, 1e-9), base_scale, 1e8))
+        prev_val = best_val
+        _run_slsqp(cand_x, ref_scale, maxiter=500, ftol=1e-12)
+        if prev_val - best_val <= 1e-15:
+            break
+
     gradient = jacobian(best_x)
     scale = float(np.max(np.abs(gradient)))
     if scale == 0.0:
@@ -476,10 +520,11 @@ def _solve_continuous_qp(
         gradient / scale, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
         bounds=bounds, method="highs",
     )
-    if not certificate.success:
-        return best_x, 0.0, False
+    if not certificate.success or certificate.x is None:
+        return best_x, best_lb, False
     gap = max(0.0, float(gradient @ (best_x - certificate.x)))
-    return best_x, max(0.0, best_val - gap), gap <= 1e-7
+    best_lb = max(best_lb, best_val - gap)
+    return best_x, best_lb, gap <= 1e-7
 
 
 def _refine_integer_qp(alpha, beta, linear_rows, bounds, integrality, seeds,
@@ -643,6 +688,15 @@ def solve_l2(
                 (best_int_x, best_int_val), min(8, max_nodes), start + max_seconds / 2,
             )
             if certified:
+                if best_int_x is not None and len(int_indices) < n_vars:
+                    slice_bounds = list(bounds)
+                    for j in int_indices:
+                        slice_bounds[j] = (float(best_int_x[j]), float(best_int_x[j]))
+                    pol_x, _, _ = _solve_continuous_qp(
+                        scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, slice_bounds, [best_int_x]
+                    )
+                    if pol_x is not None and objective(pol_x) < best_int_val:
+                        best_int_x = pol_x
                 return report(best_int_x, True)
 
         # Cola de prioridad Best-First: (lower_bound, tie_breaker, node_bounds, node_x)
@@ -715,6 +769,16 @@ def solve_l2(
             aggregate_distance=0.0,
             status="error: no se encontró solución entera factible para L2",
         )
+
+    if len(int_indices) < n_vars:
+        slice_bounds = list(bounds)
+        for j in int_indices:
+            slice_bounds[j] = (float(best_int_x[j]), float(best_int_x[j]))
+        pol_x, _, _ = _solve_continuous_qp(
+            scaled_alpha, beta, weights, A_ub, b_ub, A_eq, b_eq, slice_bounds, [best_int_x]
+        )
+        if pol_x is not None and objective(pol_x) < best_int_val:
+            best_int_x = pol_x
 
     return report(best_int_x, tree_exhausted)
 

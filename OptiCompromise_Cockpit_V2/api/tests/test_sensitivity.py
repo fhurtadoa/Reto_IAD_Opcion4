@@ -13,17 +13,19 @@ from test_audit_regressions import example
 
 class TestSensitivity(unittest.TestCase):
     def test_official_models_preserve_weights_and_match_exact_solutions(self):
-        for filename in ("01_celdas_fotovoltaicas.json", "02_problema_transporte.json"):
+        for filename in ("01_celdas_fotovoltaicas.json", "02_problema_transporte.json", "06_produccion_papel.json"):
             model = example(filename)
             payoff = compute_payoff_matrix(model)
             sweep = compute_weight_sensitivity(model, payoff)
             for field, metric in (("l1", "L1"), ("l2", "L2"), ("l_inf", "L_inf")):
                 points = getattr(sweep, field)
                 np.testing.assert_allclose([p.w1 for p in points], np.linspace(0, 1, 21))
-                for i in (0, 11, 20):
+                self.assertTrue(all(p.status == "optimal" for p in points), f"{filename} {metric} tiene muestras no óptimas")
+                for i in (0, 1, 2, 11, 18, 19, 20):
                     point = points[i]
                     self.assertEqual(point.weights, [point.w1, 1 - point.w1])
                     exact, _ = solve_all_metrics(model, payoff, point.weights)
+                    self.assertEqual(exact[metric].status, "optimal")
                     np.testing.assert_allclose(point.objectives, exact[metric].objectives)
                     np.testing.assert_allclose(point.deviations_pct, 100 * np.array(exact[metric].normalized_distances))
                 self.assertAlmostEqual(points[0].deviations_pct[1], 0, places=5)
