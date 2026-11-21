@@ -10,18 +10,23 @@ import {
   SolveResponse,
   SolverStatus,
   ThemeMode,
-  DecisionProfile,
   BLANK_MODEL,
   FALLBACK_CELDAS_MODEL,
   PRESET_OPTIONS,
   PresetOption,
 } from "../components/cockpit/types";
-import {
-  exportModelJSON,
-  exportResultsCSV,
-  exportResultsExcel,
-  importModelFromFile,
-} from "../components/cockpit/mathUtils";
+import { hasFeasibleSolution, importModelFromFile, parseAlgebraicModel } from "../components/cockpit/mathUtils";
+import SectionHeading from "../components/cockpit/SectionHeading";
+import { changeWeight, createWeights, equalizeWeights, remapWeights, type WeightState } from "../components/cockpit/weights";
+
+type Workspace = "model" | "method" | "results";
+const WORKSPACE_STORAGE = "opticompromise.workspace";
+
+const workspaces = [
+  ["model", "Formular", ListChecks, "Formular el ejercicio", "Del enunciado al modelo de decisión"],
+  ["method", "Ver método", FlaskConical, "Cómo se calcula el compromiso", "De las referencias a la solución ponderada"],
+  ["results", "Explorar resultados", ChartNoAxesCombined, "Explorar resultados", "Compara soluciones y ajusta los pesos"],
+] as const;
 
 function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): string | null {
   if (m.variables.length < 1) return "Agrega al menos 1 variable de decisión.";
@@ -56,7 +61,7 @@ function validateModelClient(m: ModelDefinition, weightsToCheck?: number[]): str
     }
     const sumW = weightsToCheck.reduce((acc, w) => acc + w, 0);
     if (Math.abs(sumW - 1.0) > 0.001 + 1e-12) {
-      return `Los pesos deben sumar 1 (actual: ${sumW.toFixed(3)}). Activa el balance automático o pulsa Normalizar en Preferencias.`;
+      return `Los pesos deben sumar 1 (actual: ${sumW.toFixed(3)}).`;
     }
   }
   return null;
@@ -82,18 +87,56 @@ export default function OptiCompromiseCockpitPage() {
 
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [selectedPreset, setSelectedPreset] = useState<string>("celdas");
-  const [hasAlgebraicDraft, setHasAlgebraicDraft] = useState(false);
+  const [algebraicDraft, setAlgebraicDraft] = useState<string | null>(null);
+  const [algebraicErrors, setAlgebraicErrors] = useState<string[]>([]);
+  const hasAlgebraicDraft = algebraicDraft !== null;
+  const [loadError, setLoadError] = useState("");
+  const [reportSlot, setReportSlot] = useState<HTMLDivElement | null>(null);
+  const [isLoadingExercise, setIsLoadingExercise] = useState(false);
   const [modelKey, setModelKey] = useState<number>(0);
   const [model, setModel] = useState<ModelDefinition>(FALLBACK_CELDAS_MODEL);
-  const [weights, setWeights] = useState<number[]>(FALLBACK_CELDAS_MODEL.weights || [0.5, 0.5]);
-  const [autoBalance, setAutoBalance] = useState<boolean>(true);
-  const [decisionProfile, setDecisionProfile] = useState<DecisionProfile>("equitativo");
-  const [completed, setCompleted] = useState<{ model: ModelDefinition; result: SolveResponse } | null>(null);
-  const [workspace, setWorkspace] = useState<"model" | "results" | "method">("results");
+  const [weightState, setWeightState] = useState(() => createWeights(FALLBACK_CELDAS_MODEL.weights ?? [0.5, 0.5]));
+  const [weightError, setWeightError] = useState("");
+  const weights = weightState.values;
+  const [completed, setCompleted] = useState<{
+    model: ModelDefinition;
+    requestedWeights: number[];
+    result: SolveResponse;
+  } | null>(null);
+  const [lastValid, setLastValid] = useState<{ model: ModelDefinition; weights: WeightState } | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem(WORKSPACE_STORAGE); } catch { /* Storage may be disabled. */ }
+    setWorkspace(saved === "model" || saved === "method" ? saved : "results");
+  }, []);
+
+  const navigationRevision = useRef(0);
+  const navigate = useCallback((next: Workspace) => {
+    navigationRevision.current++;
+    setWorkspace(next);
+    try { window.localStorage.setItem(WORKSPACE_STORAGE, next); } catch { /* Navigation remains available. */ }
+  }, []);
   const solveResult = completed?.result ?? null;
   const [solverStatus, setSolverStatus] = useState<SolverStatus>("idle");
   const [solverMessage, setSolverMessage] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [modelFailed, setModelFailed] = useState(false);
+  const isCurrentResult = !hasAlgebraicDraft && completed?.model === model && completed.requestedWeights === weights
+    && (solverStatus === "optimal" || solverStatus === "partial");
+  const canRestore = modelFailed && lastValid !== null && (
+    JSON.stringify(model) !== JSON.stringify(lastValid.model) ||
+    weights.some((value, i) => value !== lastValid.weights.values[i])
+  );
+
+  // Pinning an already solved weight does not require a new solver call.
+  useEffect(() => {
+    if (completed?.model !== model || completed.requestedWeights !== weightState.values) return;
+    setLastValid(snapshot => {
+      if (!snapshot || snapshot.weights.fixed.every((fixed, i) => fixed === weightState.fixed[i])) return snapshot;
+      return { ...snapshot, weights: structuredClone(weightState) };
+    });
+  }, [completed, model, weightState]);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -120,11 +163,18 @@ export default function OptiCompromiseCockpitPage() {
   }, [theme]);
 
   // Llamada real al backend FastAPI (/api/solve)
-  const executeSolve = useCallback(async (modelToSolve: ModelDefinition, weightsToUse: number[]) => {
+  const executeSolve = useCallback(async (
+    modelToSolve: ModelDefinition,
+    preferences: WeightState,
+    onSuccess?: () => void,
+  ) => {
     cancelPending();
+    const weightsToUse = preferences.values;
+    setModelFailed(false);
     const clientErr = validateModelClient(modelToSolve, weightsToUse);
     if (clientErr) {
       setValidationError(clientErr);
+      setModelFailed(true);
       setSolverStatus("error");
       setSolverMessage(clientErr);
       return;
@@ -145,6 +195,7 @@ export default function OptiCompromiseCockpitPage() {
         constraints: modelToSolve.constraints,
         weights: weightsToUse,
         pareto_seed: modelToSolve.pareto_seed,
+        reference: modelToSolve.reference,
       };
 
       const res = await fetch("/api/solve", {
@@ -157,6 +208,7 @@ export default function OptiCompromiseCockpitPage() {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
         if (controller.signal.aborted) return;
+        setModelFailed(res.status === 400 || res.status === 422);
         const detail = Array.isArray(errData.detail)
           ? errData.detail.map((issue: { loc: string[] }) => `Revisa el campo ${issue.loc.slice(1).join(".")}.`).join(" ")
           : String(errData.detail || "Error en la resolución del modelo.");
@@ -174,14 +226,23 @@ export default function OptiCompromiseCockpitPage() {
 
       const data: SolveResponse = await res.json();
       if (controller.signal.aborted) return;
+      if (!hasFeasibleSolution(data)) {
+        setModelFailed(true);
+        setSolverStatus("error");
+        setSolverMessage(data.message || "El motor no devolvió una solución factible.");
+        return;
+      }
+      setLastValid(structuredClone({ model: modelToSolve, weights: preferences }));
       setCompleted(previous => ({
         model: modelToSolve,
+        requestedWeights: weightsToUse,
         result: previous?.model === modelToSolve && previous.result.weight_sensitivity
           ? { ...data, weight_sensitivity: previous.result.weight_sensitivity }
           : data,
       }));
       setSolverStatus(data.status === "partial" ? "partial" : "optimal");
       setSolverMessage(data.message || "Solución óptima calculada");
+      onSuccess?.();
     } catch (err: unknown) {
       if (controller.signal.aborted || (err instanceof Error && err.name === "AbortError")) return;
       setSolverStatus("error");
@@ -193,189 +254,188 @@ export default function OptiCompromiseCockpitPage() {
 
   // Debounce reactivo para sliders (50ms gracias al caché LRU en backend) o edición (250ms)
   const scheduleSolve = useCallback(
-    (nextModel: ModelDefinition, nextWeights: number[], delayMs = 150) => {
+    (nextModel: ModelDefinition, nextWeights: WeightState, delayMs: number) => {
       cancelPending();
+      setModelFailed(false);
       setSolverStatus("calculating");
       debounceRef.current = setTimeout(() => {
-        executeSolve(nextModel, nextWeights);
+        void executeSolve(nextModel, nextWeights);
       }, delayMs);
     },
     [cancelPending, executeSolve]
   );
 
+  const openExercise = useCallback((definition: ModelDefinition, preferences: WeightState) => {
+    setModel(definition);
+    setWeightState(preferences);
+    setModelKey(key => key + 1);
+    setCompleted(null);
+    setLastValid(null);
+    setWeightError("");
+    setAlgebraicDraft(null);
+    setAlgebraicErrors([]);
+    setLoadError("");
+    void executeSolve(definition, preferences);
+  }, [executeSolve]);
+
   // Cargar caso precargado directamente desde /api/examples/{id}
   const handleSelectPreset = useCallback(
-    async (presetId: string) => {
+    async (presetId: string, initial = false) => {
       const request = ++presetRequestRef.current;
-      cancelPending();
-      setSelectedPreset(presetId);
-      setValidationError(null);
-
+      const revision = ++navigationRevision.current;
+      setLoadError("");
       if (presetId === "blank") {
-        const w = BLANK_MODEL.weights || [0.5, 0.5];
-        setWorkspace("model");
-        setModel(BLANK_MODEL);
-        setModelKey((k) => k + 1);
-        setWeights(w);
-        setDecisionProfile("equitativo");
-        executeSolve(BLANK_MODEL, w);
+        setIsLoadingExercise(false);
+        setSelectedPreset(presetId);
+        openExercise(BLANK_MODEL, createWeights(BLANK_MODEL.weights ?? [0.5, 0.5]));
+        navigate("model");
         return;
       }
 
-      setSolverStatus("calculating");
+      setIsLoadingExercise(true);
       try {
         const res = await fetch(`/api/examples/${presetId}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: ModelDefinition = await res.json();
         if (request !== presetRequestRef.current) return;
-        const defaultW =
-          data.weights && data.weights.length === data.objectives.length
-            ? data.weights
-            : Array(data.objectives.length).fill(1 / data.objectives.length);
-        setWorkspace("results");
-        setModel(data);
-        setModelKey((k) => k + 1);
-        setWeights(defaultW);
-        const allEqual = defaultW.every((w) => Math.abs(w - defaultW[0]) < 0.02);
-        setDecisionProfile(allEqual ? "equitativo" : "personalizado");
-        executeSolve(data, defaultW);
-      } catch {
+        const defaultW = data.weights?.length === data.objectives.length
+          ? data.weights
+          : Array<number>(data.objectives.length).fill(1 / data.objectives.length);
+        const issue = validateModelClient(data, defaultW);
+        if (issue) throw new Error(issue);
+        setSelectedPreset(presetId);
+        openExercise(data, createWeights(defaultW));
+        if (!initial && revision === navigationRevision.current) navigate("results");
+      } catch (cause) {
         if (request !== presetRequestRef.current) return;
-        if (presetId !== "celdas") {
-          setSelectedPreset("");
-          setSolverStatus("error");
-          setSolverMessage("No se pudo cargar el ejemplo. El modelo abierto se conserva.");
-          return;
+        if (initial) {
+          openExercise(FALLBACK_CELDAS_MODEL, createWeights(FALLBACK_CELDAS_MODEL.weights ?? [0.5, 0.5]));
         }
-        setModel(FALLBACK_CELDAS_MODEL);
-        setModelKey((k) => k + 1);
-        const w = FALLBACK_CELDAS_MODEL.weights || [0.5, 0.5];
-        setWeights(w);
-        setDecisionProfile("equitativo");
-        executeSolve(FALLBACK_CELDAS_MODEL, w);
+        const detail = cause instanceof Error ? cause.message : "";
+        setLoadError(`No se pudo cargar el ejemplo. ${detail} El modelo abierto se conserva.`);
+      } finally {
+        if (request === presetRequestRef.current) setIsLoadingExercise(false);
       }
     },
-    [cancelPending, executeSolve]
+    [navigate, openExercise]
   );
 
-  // Carga inicial
   useEffect(() => {
-    handleSelectPreset("celdas");
+    void handleSelectPreset("celdas", true);
   }, [handleSelectPreset]);
 
-  // Cambios desde el Panel Izquierdo
-  const handleModelChange = (updated: ModelDefinition, newWeights?: number[]) => {
+  const updateDraft = (draft: string | null) => {
+    if (draft !== null) navigationRevision.current++;
+    setAlgebraicDraft(draft);
+    setAlgebraicErrors([]);
+    setWeightError("");
+  };
+
+  const applyModel = (updated: ModelDefinition, preferences: WeightState, destination?: Workspace) => {
     presetRequestRef.current++;
+    setIsLoadingExercise(false);
+    setLoadError("");
     setModel(updated);
-    const w = newWeights ?? weights;
-    if (newWeights) {
-      setWeights(newWeights);
-      const allEqual = newWeights.every((val) => Math.abs(val - newWeights[0]) < 0.02);
-      setDecisionProfile(allEqual ? "equitativo" : "personalizado");
-    }
-    const clientErr = validateModelClient(updated, w);
+    setWeightState(preferences);
+    setWeightError("");
+    const clientErr = validateModelClient(updated, preferences.values);
     setValidationError(clientErr);
-    if (!clientErr) {
-      scheduleSolve(updated, w, 250);
-    } else {
+    if (clientErr) {
       cancelPending();
+      setModelFailed(true);
       setSolverStatus("error");
       setSolverMessage(clientErr);
-    }
-  };
-
-  // Selección rápida de Perfil del Decisor
-  const handleSelectProfile = (profile: DecisionProfile) => {
-    presetRequestRef.current++;
-    setDecisionProfile(profile);
-    const n = model.objectives.length;
-    let newW = [...weights];
-    if (profile === "equitativo" || profile === "moderado") {
-      newW = Array(n).fill(1 / n);
-    } else if (profile === "compensatorio") {
-      newW = Array(n).fill(0.3 / (n - 1));
-      newW[0] = 0.7;
-    }
-    const sum = newW.reduce((a, b) => a + b, 0);
-    const normalized = newW.map((w) => w / sum);
-    setWeights(normalized);
-    executeSolve(model, normalized);
-  };
-
-  // Ajuste de pesos con Auto-Balance proporcional (suma estricta = 1.00) o modo libre
-  const handleWeightChange = (index: number, rawValue: number) => {
-    presetRequestRef.current++;
-    setDecisionProfile("personalizado");
-    const val = parseFloat(Math.max(0, Math.min(1, Number.isFinite(rawValue) ? rawValue : 0)).toFixed(3));
-    const n = weights.length;
-    const nextW = [...weights];
-
-    if (autoBalance && n > 1) {
-      nextW[index] = val;
-      const rem = Math.max(0, 1.0 - val);
-      const otherIndices: number[] = [];
-      let sumOther = 0;
-      for (let j = 0; j < n; j++) {
-        if (j !== index) {
-          otherIndices.push(j);
-          sumOther += weights[j] ?? 0;
-        }
-      }
-
-      if (sumOther > 1e-4) {
-        otherIndices.forEach((j) => {
-          nextW[j] = parseFloat((((weights[j] ?? 0) / sumOther) * rem).toFixed(3));
-        });
-      } else {
-        const share = parseFloat((rem / otherIndices.length).toFixed(3));
-        otherIndices.forEach((j) => {
-          nextW[j] = share;
-        });
-      }
-
-      const curSum = nextW.reduce((a, b) => a + b, 0);
-      const diff = parseFloat((1.0 - curSum).toFixed(3));
-      if (diff !== 0 && otherIndices.length > 0) {
-        let maxIdx = otherIndices[0];
-        for (const j of otherIndices) {
-          if (nextW[j] > nextW[maxIdx]) maxIdx = j;
-        }
-        nextW[maxIdx] = parseFloat(Math.max(0, nextW[maxIdx] + diff).toFixed(3));
-      }
+    } else if (destination) {
+      const revision = navigationRevision.current;
+      void executeSolve(updated, preferences, () => {
+        if (revision === navigationRevision.current) navigate(destination);
+      });
     } else {
-      nextW[index] = val;
-    }
-
-    setWeights(nextW);
-    const clientErr = validateModelClient(model, nextW);
-    setValidationError(clientErr);
-    if (!clientErr) {
-      scheduleSolve(model, nextW, 80);
-    } else {
-      cancelPending();
-      setSolverStatus("error");
-      setSolverMessage(clientErr);
+      scheduleSolve(updated, preferences, 250);
     }
   };
 
-  const handleNormalizeWeights = () => {
+  const handleModelChange = (updated: ModelDefinition, indices?: number[]): boolean => {
+    const next = indices ? remapWeights(weightState, indices) : { state: weightState };
+    if ("error" in next) {
+      setWeightError(next.error);
+      return false;
+    }
+    setAlgebraicErrors([]);
+    applyModel(updated, next.state);
+    return true;
+  };
+
+  const applyAlgebraicDraft = (destination?: Workspace): boolean => {
+    if (algebraicDraft === null) return true;
+    const parsed = parseAlgebraicModel(algebraicDraft, model);
+    if (!parsed.ok || !parsed.detectedVariables || !parsed.objectives || !parsed.constraints) {
+      setAlgebraicErrors(parsed.errors);
+      return false;
+    }
+    const updated: ModelDefinition = {
+      ...model,
+      variables: parsed.detectedVariables.map(name => model.variables.find(variable => variable.name === name)
+        ?? { name, var_type: "continuous", lower_bound: 0, upper_bound: null }),
+      objectives: parsed.objectives,
+      constraints: parsed.constraints,
+    };
+
+    const matched = new Set<number>();
+    const indices = updated.objectives.map(objective => {
+      const index = model.objectives.findIndex((original, i) => original.name === objective.name && !matched.has(i));
+      if (index >= 0) matched.add(index);
+      return index;
+    });
+    const sameOrder = indices.length === weights.length && indices.every((index, i) => index === i);
+    const next = sameOrder ? { state: weightState } : remapWeights(weightState, indices);
+    if ("error" in next) {
+      setAlgebraicErrors([next.error]);
+      return false;
+    }
+    const issue = validateModelClient(updated, next.state.values);
+    if (issue) {
+      setAlgebraicErrors([issue]);
+      return false;
+    }
+    updateDraft(null);
+    applyModel(updated, next.state, destination);
+    return true;
+  };
+
+  const handleManualSolve = () => {
+    if (hasAlgebraicDraft) applyAlgebraicDraft("results");
+    else applyModel(model, weightState, "results");
+  };
+
+  const restoreLastValid = () => {
+    if (!lastValid || !canRestore) return;
+    const snapshot = structuredClone(lastValid);
+    updateDraft(null);
+    setModelKey(key => key + 1);
+    navigate("model");
+    applyModel(snapshot.model, snapshot.weights, "model");
+  };
+
+  const applyWeights = (next: ReturnType<typeof changeWeight>) => {
+    if ("error" in next) {
+      setWeightError(next.error);
+      return;
+    }
+    setWeightError("");
+    if (next.state === weightState) return;
     presetRequestRef.current++;
-    const sum = weights.reduce((a, b) => a + b, 0);
-    const n = weights.length;
-    const normalized = sum <= 1e-6 ? Array(n).fill(1 / n) : weights.map((w) => w / sum);
-    setWeights(normalized);
-    const allEqual = normalized.every((val) => Math.abs(val - normalized[0]) < 0.02);
-    setDecisionProfile(allEqual ? "equitativo" : "personalizado");
-    setValidationError(null);
-    executeSolve(model, normalized);
+    setIsLoadingExercise(false);
+    setWeightState(next.state);
+    scheduleSolve(model, next.state, 80);
   };
 
-  // Importar JSON / Excel (.xlsx) / CSV
-  const handleImportJSON = async (file: File) => {
+  const handleImportExercise = async (file: File) => {
+    if (hasAlgebraicDraft) return;
     const request = ++presetRequestRef.current;
-    cancelPending();
-    setSolverStatus("calculating");
-    setValidationError(null);
+    const revision = ++navigationRevision.current;
+    setIsLoadingExercise(true);
+    setLoadError("");
     try {
       const { model: parsed, weights: parsedWeights } = await importModelFromFile(file);
       const nextW = parsedWeights ?? Array(parsed.objectives.length).fill(1 / parsed.objectives.length);
@@ -383,55 +443,40 @@ export default function OptiCompromiseCockpitPage() {
       if (issue) throw new Error(issue);
       if (request !== presetRequestRef.current) return;
       setSelectedPreset("");
-      setWorkspace("model");
-      setModel(parsed);
-      setModelKey((k) => k + 1);
-      setWeights(nextW);
-      setDecisionProfile("personalizado");
-      setValidationError(null);
-      executeSolve(parsed, nextW);
+      openExercise(parsed, createWeights(nextW));
+      if (revision === navigationRevision.current) navigate("model");
     } catch (err: unknown) {
       if (request !== presetRequestRef.current) return;
-      setSolverStatus("error");
-      setSolverMessage(
-        err instanceof Error
-          ? err.message
-          : "Error al importar el archivo. Verifica el formato (.json, .xlsx o .csv)."
-      );
+      const message = err instanceof Error ? err.message : "No se pudo abrir el archivo .xlsx.";
+      setLoadError(`No se pudo importar el ejercicio. ${message}`);
+    } finally {
+      if (request === presetRequestRef.current) setIsLoadingExercise(false);
     }
   };
 
+  const section = workspaces.find(([id]) => id === workspace);
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F3F4F8] dark:bg-[#111524] text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#F3F4F8] dark:bg-[#111524] text-slate-900 dark:text-slate-100">
       <TopBar
         selectedPreset={selectedPreset}
         catalog={catalog}
         catalogNotice={catalogNotice}
-        onSelectPreset={handleSelectPreset}
+        onSelectPreset={(id) => {
+          if (hasAlgebraicDraft) return;
+          void handleSelectPreset(id);
+        }}
         solverStatus={solverStatus}
         solverMessage={solverMessage}
         theme={theme}
+        hasDraft={hasAlgebraicDraft}
         onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-        onImportJSON={handleImportJSON}
-        onExportJSON={() => exportModelJSON(model, weights)}
-        canExportModel={!hasAlgebraicDraft}
-        onExportCSV={() => {
-          if (completed) exportResultsCSV(completed.model, completed.result);
-        }}
-        onExportExcel={() => {
-          if (completed) {
-            void exportResultsExcel(completed.model, completed.result).catch((err) => {
-              console.error("Error al exportar libro Excel:", err);
-            });
-          }
-        }}
-        canExportResults={Boolean(!hasAlgebraicDraft && solveResult && (solverStatus === "optimal" || solverStatus === "partial"))}
       />
 
-      <div className="workspace-shell" data-workspace={workspace}>
+      <div className="workspace-shell" data-workspace={workspace ?? undefined}>
         <section className="workspace-intro" aria-labelledby="workspace-title">
           <div>
-            <h2 id="workspace-title">{model.name || "Modelo sin título"}</h2>
+            <h1 id="workspace-title">{model.name || "Modelo sin título"}</h1>
             {model.description && <p>{model.description}</p>}
             {model.reference && <p className="academic-reference"><strong>Fuente</strong> · {model.reference}</p>}
           </div>
@@ -441,68 +486,76 @@ export default function OptiCompromiseCockpitPage() {
             <div><dt>Restricciones</dt><dd>{model.constraints.length}</dd></div>
           </dl>
         </section>
+
         <nav className="workspace-navigation" aria-label="Espacio de trabajo">
-          {([
-            ["model", "Formular", ListChecks],
-            ["method", "Ver método", FlaskConical],
-            ["results", "Explorar resultados", ChartNoAxesCombined],
-          ] as const).map(([id, label, Icon]) => (
+          {workspaces.map(([id, label, Icon]) => (
             <button key={id} type="button" aria-current={workspace === id ? "page" : undefined}
-              disabled={hasAlgebraicDraft && id !== "model"}
-              title={hasAlgebraicDraft && id !== "model" ? "Aplica o descarta el borrador algebraico primero" : undefined}
-              onClick={() => setWorkspace(id)}>
+              onClick={() => {
+                if (id !== "model" && hasAlgebraicDraft) applyAlgebraicDraft(id);
+                else navigate(id);
+              }}>
               <Icon aria-hidden="true" size={16} />
               {label}
             </button>
           ))}
         </nav>
-        {workspace === "model" && !validationError && ["error", "infeasible", "unbounded"].includes(solverStatus) && (
-          <p className="workspace-feedback mb-4 text-rose-800 dark:text-rose-300" role="alert">{solverMessage}</p>
-        )}
-        <div className="workspace-body">
-          <ControlPanelLeft
-            model={model}
-            modelKey={modelKey}
-            onAlgebraicDraftChange={setHasAlgebraicDraft}
-            weights={weights}
-            autoBalance={autoBalance}
-            onToggleAutoBalance={setAutoBalance}
-            decisionProfile={decisionProfile}
-            onSelectProfile={handleSelectProfile}
-            validationError={validationError}
-            onModelChange={handleModelChange}
-            onWeightChange={handleWeightChange}
-            onNormalizeWeights={handleNormalizeWeights}
-            onManualSolve={(updated, nextWeights) => {
-              presetRequestRef.current++;
-              const targetModel = updated ?? model;
-              const targetWeights = nextWeights ?? weights;
-              if (updated) setModel(updated);
-              if (nextWeights) {
-                setWeights(nextWeights);
-                const allEqual = nextWeights.every((val) => Math.abs(val - nextWeights[0]) < 0.02);
-                setDecisionProfile(allEqual ? "equitativo" : "personalizado");
-              }
-              if (!validateModelClient(targetModel, targetWeights)) {
-                setWorkspace("results");
-              }
-              executeSolve(targetModel, targetWeights);
-            }}
-            isCalculating={solverStatus === "calculating"}
-          />
 
-          <VisualCanvasRight
-            workspace={workspace}
-            selectedWeight={completed?.model === model && !validationError ? weights[0] : (solveResult?.weights[0] ?? null)}
-            model={completed?.model ?? model}
-            modelKey={modelKey}
-            decisionProfile={decisionProfile}
-            solveResult={solveResult}
-            solverStatus={solverStatus}
-            solverMessage={solverMessage}
-            theme={theme}
-          />
-        </div>
+        {section && workspace && <>
+          <div className="workspace-section-heading flex flex-wrap items-center justify-between gap-3">
+            <SectionHeading id="workspace-section-title" title={section[3]} cue={section[4]} />
+            {workspace === "results" && <div ref={setReportSlot} className="min-w-0" />}
+            {canRestore && <button type="button" className="workspace-button" onClick={restoreLastValid}>
+              Restaurar último modelo válido
+            </button>}
+          </div>
+          {isLoadingExercise && <p role="status" className="workspace-feedback mb-4">Cargando ejercicio…</p>}
+          {loadError && <p role="alert" className="workspace-feedback mb-4 text-rose-800 dark:text-rose-300">{loadError}</p>}
+          {workspace === "model" && !validationError && ["error", "infeasible", "unbounded"].includes(solverStatus) && (
+            <p className="workspace-feedback mb-4 text-rose-800 dark:text-rose-300" role="alert">{solverMessage}</p>
+          )}
+          <div className="workspace-body">
+            <ControlPanelLeft
+              model={model}
+              modelKey={modelKey}
+              algebraicDraft={algebraicDraft}
+              algebraicErrors={algebraicErrors}
+              onAlgebraicDraftChange={updateDraft}
+              onApplyAlgebraic={applyAlgebraicDraft}
+              isLoadingExercise={isLoadingExercise}
+              weightState={weightState}
+              weightError={weightError}
+              onToggleWeight={(index) => {
+                setWeightError("");
+                setWeightState(current => ({ ...current, fixed: current.fixed.map((fixed, i) => i === index ? !fixed : fixed) }));
+              }}
+              onEqualizeWeights={() => applyWeights(equalizeWeights(weightState))}
+              onWeightChange={(index, value) => applyWeights(changeWeight(weightState, index, value))}
+              onImportExercise={handleImportExercise}
+              validationError={validationError}
+              onModelChange={handleModelChange}
+              onManualSolve={handleManualSolve}
+              isCalculating={solverStatus === "calculating"}
+            />
+
+            <VisualCanvasRight
+              workspace={workspace}
+              reportSlot={reportSlot}
+              selectedWeight={completed?.model === model && !validationError ? weights[0] : (solveResult?.weights[0] ?? null)}
+              model={completed?.model ?? model}
+              modelKey={modelKey}
+              solveResult={solveResult}
+              isCurrentResult={isCurrentResult}
+              solverStatus={solverStatus}
+              solverMessage={solverMessage}
+              theme={theme}
+            />
+          </div>
+        </>}
+
+        <footer className="workspace-footer" aria-label="Ayuda">
+          <a className="section-cue-link" href="/MANUAL_DE_USUARIO_Y_CASOS_DE_USO_OPTICOMPROMISE.pdf" target="_blank" rel="noopener noreferrer">Manual de usuario</a>
+          <a className="section-cue-link" href="/MANUAL_DOCENTE_OPTICOMPROMISE.pdf" target="_blank" rel="noopener noreferrer">Guía docente</a>
+        </footer>
       </div>
     </div>
   );

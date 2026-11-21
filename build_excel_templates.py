@@ -2,7 +2,6 @@
 Script generador de plantillas Excel (.xlsx) para OptiCompromise Cockpit V2.
 Escribe:
   - web/public/plantilla-ejercicio-iad.xlsx
-  - web/public/plantilla-produccion-papel.xlsx
 """
 from __future__ import annotations
 
@@ -24,10 +23,6 @@ def main() -> None:
     blank_path = public_dir / "plantilla-ejercicio-iad.xlsx"
     blank_path.write_bytes(build_upload_template_workbook("blank"))
     print(f"Generada plantilla: {blank_path}")
-
-    papel_path = public_dir / "plantilla-produccion-papel.xlsx"
-    papel_path.write_bytes(build_upload_template_workbook("papel"))
-    print(f"Generada plantilla: {papel_path}")
 
 
 if __name__ == "__main__":

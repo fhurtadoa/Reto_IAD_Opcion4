@@ -204,8 +204,8 @@ def build_teacher_pdf(output_path: str):
 
     meta_rows = [
         [Paragraph("<b>Dirigido a</b>", td_bold), Paragraph("Docentes y monitores de Introducción al Análisis de Decisiones (IAD — UNAL Medellín)", td_style)],
-        [Paragraph("<b>Plantillas Oficiales</b>", td_bold), Paragraph("<font face='DejaVuMono'>plantilla-ejercicio-iad.xlsx</font> (en blanco) · <font face='DejaVuMono'>plantilla-produccion-papel.xlsx</font> (Taller 1/3) + versiones <font face='DejaVuMono'>.csv</font>", td_style)],
-        [Paragraph("<b>Acceso Rápido en UI</b>", td_bold), Paragraph("Barra superior: <b>Plantilla Excel / CSV</b>, <b>Ejemplo Excel / CSV</b>, <b>Importar</b>, <b>Excel</b> y <b>Guía Docente PDF</b>", td_style)],
+        [Paragraph("<b>Plantilla oficial</b>", td_bold), Paragraph("<font face='DejaVuMono'>plantilla-ejercicio-iad.xlsx</font>, con un ejemplo de Producción de Papel en una hoja de consulta.", td_style)],
+        [Paragraph("<b>Acceso en la interfaz</b>", td_bold), Paragraph("<b>Formular</b> incluye <b>Obtener plantilla (.xlsx)</b> y <b>Cargar ejercicio</b>. <b>Explorar resultados</b> reúne Excel y PDF.", td_style)],
         [Paragraph("<b>Soporte de Modelos</b>", td_bold), Paragraph("Lineales continuos (ℝ) y Enteros Mixtos MIP (ℤ, {0,1}), ≥2 o ≥3 objetivos (<font face='DejaVuMono'>maximize</font> / <font face='DejaVuMono'>minimize</font>)", td_style)],
     ]
     t_meta = Table(meta_rows, colWidths=[122, 394])
@@ -226,24 +226,24 @@ def build_teacher_pdf(output_path: str):
     routes_rows = [
         [Paragraph("<b>Ruta</b>", th_style), Paragraph("<b>Cuándo usarla</b>", th_style), Paragraph("<b>Artefacto / Acción clave</b>", th_style)],
         [
-            Paragraph("<b>Ruta 1 · Plantilla Excel (.xlsx / .csv)</b>", td_bold),
+            Paragraph("<b>Ruta 1 · Plantilla Excel (.xlsx)</b>", td_bold),
             Paragraph("Preparar talleres grandes (≥4 variables), variantes por estudiante o distribuir enunciados listos en Moodle.", td_style),
-            Paragraph("Editar la hoja <font face='DejaVuMono'>Modelo</font> de <font face='DejaVuMono'>plantilla-ejercicio-iad.xlsx</font> o <font face='DejaVuMono'>plantilla-produccion-papel.xlsx</font> y abrir con <b>Importar</b>.", td_style),
+            Paragraph("Diligenciar la hoja <font face='DejaVuMono'>Modelo</font> de la plantilla oficial y abrir con <b>Cargar ejercicio</b>.", td_style),
         ],
         [
             Paragraph("<b>Ruta 2 · Modo Algebraico (Texto)</b>", td_bold),
             Paragraph("Formular un ejercicio rápido en vivo frente al grupo copiando ecuaciones del tablero.", td_style),
-            Paragraph("Pegar <font face='DejaVuMono'>Max Z1 = ...</font>, <font face='DejaVuMono'>s.a.</font>, pulsar <b>Aplicar Ecuaciones y Resolver</b> y guardar en <b>JSON</b>.", td_style),
+            Paragraph("Pegar <font face='DejaVuMono'>Max Z1 = ...</font>, <font face='DejaVuMono'>s.a.</font> y pulsar <b>Aplicar Ecuaciones y Resolver</b>.", td_style),
         ],
         [
             Paragraph("<b>Ruta 3 · Catálogo Compartido / Reabrir</b>", td_bold),
             Paragraph("Dejar un ejercicio fijo en el selector <b>Ejemplos</b> para todo el semestre o calificar entregas.", td_style),
-            Paragraph("Subir <font face='DejaVuMono'>.json</font> a <font face='DejaVuMono'>examples/</font> (y Colab) o reabrir <font face='DejaVuMono'>.xlsx</font>/<font face='DejaVuMono'>.csv</font> de estudiantes con <b>Importar</b>.", td_style),
+            Paragraph("Subir <font face='DejaVuMono'>.json</font> a <font face='DejaVuMono'>examples/</font> (y Colab) o reabrir <font face='DejaVuMono'>.xlsx</font> de estudiantes con <b>Cargar ejercicio</b>.", td_style),
         ],
         [
-            Paragraph("<b>Ruta 4 · Libro Excel de Resultados</b>", td_bold),
+            Paragraph("<b>Ruta 4 · Excel y PDF de resultados</b>", td_bold),
             Paragraph("Revisar matriz de pagos, logros, variables, frontera Pareto y auditar lo que formuló el estudiante.", td_style),
-            Paragraph("Pulsar <b>Excel</b> para descargar el libro estilizado de <b>5 hojas</b> (con hoja <font face='DejaVuMono'>Modelo</font> re-importable).", td_style),
+            Paragraph("Descargar Excel o PDF con las gráficas aplicables. Excel incluye una hoja <font face='DejaVuMono'>Modelo</font> reutilizable.", td_style),
         ],
     ]
     t_routes = Table(routes_rows, colWidths=[125, 195, 196])
@@ -262,22 +262,18 @@ def build_teacher_pdf(output_path: str):
     story.append(PageBreak())
 
     # =========================================================================
-    # RUTA 1: PLANTILLA EXCEL (.XLSX) Y CSV
-    # =========================================================================
-    story.append(Paragraph("1. Ruta 1 (Más rápida para clase): Plantilla Excel (.xlsx) y CSV", h1_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E11D48"), spaceAfter=6))
+    # Plantilla oficial de carga
+    story.append(Paragraph("1. Preparar un ejercicio en Excel", h1_style))
     story.append(Paragraph(
-        "En la barra superior de OptiCompromise o en la carpeta <font face='DejaVuMono'>web/public/</font> están disponibles dos plantillas "
-        "oficiales en formato Excel (<font face='DejaVuMono'>.xlsx</font>) y texto separado por comas (<font face='DejaVuMono'>.csv</font>): "
-        "<b>(a)</b> <font face='DejaVuMono'>plantilla-ejercicio-iad.xlsx</font> (plantilla limpia de 2 variables) y "
-        "<b>(b)</b> <font face='DejaVuMono'>plantilla-produccion-papel.xlsx</font> (Taller 1/3 completo de 12 variables y 7 restricciones).",
+        "En <b>Formular</b>, pulsa <b>Obtener plantilla (.xlsx)</b>. Diligencia <b>Modelo</b>, guarda el libro y pulsa "
+        "<b>Cargar ejercicio</b>. La hoja <b>Ejemplo_Papel</b> contiene un ejemplo de consulta. "
+        "El importador lee únicamente la hoja <b>Modelo</b>.",
         body_style,
     ))
 
     story.append(Paragraph("1.1 Hojas del libro plantilla (.xlsx)", h2_style))
     story.append(Paragraph(
-        "• <b>Hoja <font face='DejaVuMono'>Modelo</font>:</b> Contiene la tabla estructurada que lee OptiCompromise al pulsar <b>Importar</b>. "
-        "El lector busca primero la hoja llamada <font face='DejaVuMono'>Modelo</font> (sin distinguir mayúsculas) y, si no existe, lee la primera hoja.<br/>"
+        "• <b>Hoja <font face='DejaVuMono'>Modelo</font>:</b> Contiene la tabla estructurada que lee OptiCompromise al pulsar <b>Cargar ejercicio</b>.<br/>"
         "• <b>Hoja <font face='DejaVuMono'>Guia_Docente</font>:</b> Hoja informativa con el diccionario de columnas y valores permitidos para consulta rápida dentro de Excel; es ignorada por el importador.",
         bullet_style,
     ))
@@ -362,13 +358,13 @@ def build_teacher_pdf(output_path: str):
     # =========================================================================
     story.append(Paragraph("1.4 Personalizar variantes por estudiante (Taller 3: Producción de Papel)", h2_style))
     story.append(Paragraph(
-        "El archivo <font face='DejaVuMono'>plantilla-produccion-papel.xlsx</font> ya incluye las 12 variables (<font face='DejaVuMono'>x1_1 (M1 Prensa)</font> … "
+        "La hoja <font face='DejaVuMono'>Ejemplo_Papel</font> incluye las 12 variables (<font face='DejaVuMono'>x1_1 (M1 Prensa)</font> … "
         "<font face='DejaVuMono'>x3_4 (M3 Reciclado)</font>), los costos unitarios, los indicadores de calidad, las horas disponibles (5 h, 3 h, 3 h) "
         "y las tasas convertidas a horas por tonelada (<font face='DejaVuMono'>1/tasa</font>). Para generar la variante del Taller 3 con dígito <b>n</b>:",
         body_style,
     ))
     story.append(Paragraph(
-        "1. Abre una copia de <font face='DejaVuMono'>plantilla-produccion-papel.xlsx</font> en la hoja <font face='DejaVuMono'>Modelo</font>.<br/>"
+        "1. Copia a <font face='DejaVuMono'>Modelo</font> los datos de <font face='DejaVuMono'>Ejemplo_Papel</font> que vayas a adaptar.<br/>"
         "2. En la fila <b>Restriccion</b> → <font face='DejaVuMono'>Demanda mínima · Prensa</font>, reemplaza <font face='DejaVuMono'>Min_o_RHS</font> = <font face='DejaVuMono'>77</font> por <b><font face='DejaVuMono'>77 + n</font></b> (por ejemplo, para <font face='DejaVuMono'>n = 6</font>, ingresa <font face='DejaVuMono'>83</font>).<br/>"
         "3. En las dos filas <b>Objetivo</b>, ajusta la columna <font face='DejaVuMono'>Max_o_Peso</font>: Costo = <b><font face='DejaVuMono'>0.5 + 0.01·n</font></b> (<font face='DejaVuMono'>0.56</font> si n=6) y Calidad = <b><font face='DejaVuMono'>0.5 − 0.01·n</font></b> (<font face='DejaVuMono'>0.44</font> si n=6).<br/>"
         "4. Actualiza el título en <b>Meta</b> usando únicamente el dígito <font face='DejaVuMono'>n</font> (sin guardar cédulas ni documentos completos) e impórtalo en OptiCompromise.",
@@ -387,7 +383,7 @@ def build_teacher_pdf(output_path: str):
         [
             Paragraph("Escribir expresiones no lineales (<font face='DejaVuMono'>x1*x2</font>, <font face='DejaVuMono'>x1^2</font>) o texto en coeficientes", td_style),
             Paragraph("El motor es lineal/MIP y las celdas de coeficientes solo aceptan números finitos.", td_style),
-            Paragraph("Ingresa el número real calculado (ej. <font face='DejaVuMono'>0.018868</font> en vez de texto <font face='DejaVuMono'>1/53</font> en CSV).", td_style),
+            Paragraph("Ingresa el número real calculado (ej. <font face='DejaVuMono'>0.018868</font> en vez de texto <font face='DejaVuMono'>1/53</font> en Excel).", td_style),
         ],
         [
             Paragraph("Mezclar pesos vacíos y numéricos o que no sumen 1.00", td_style),
@@ -395,7 +391,7 @@ def build_teacher_pdf(output_path: str):
             Paragraph("Completa todos los pesos o deja toda la columna <font face='DejaVuMono'>Max_o_Peso</font> vacía en los objetivos.", td_style),
         ],
         [
-            Paragraph("Dejar la fila <font face='DejaVuMono'>Restriccion</font> vacía de la plantilla en blanco o escribir <font face='DejaVuMono'>=</font> sin apóstrofe en Excel", td_style),
+            Paragraph("Agregar una fila <font face='DejaVuMono'>Restriccion</font> incompleta o escribir <font face='DejaVuMono'>=</font> sin apóstrofe en Excel", td_style),
             Paragraph("Excel interpreta <font face='DejaVuMono'>=</font> como fórmula rota (<font face='DejaVuMono'>#NOMBRE?</font>) o falta el valor RHS.", td_style),
             Paragraph("Elimina las filas de restricción que no uses y escribe <font face='DejaVuMono'>==</font> o <font face='DejaVuMono'>'= </font> para igualdades.", td_style),
         ],
@@ -422,9 +418,9 @@ def build_teacher_pdf(output_path: str):
         "   s.a.<br/>"
         "   x1 + x2 &lt;= 400<br/>"
         "   1000*x1 + 3000*x2 &gt;= 300000</font><br/>"
-        "3. Pulsa <b>Aplicar Ecuaciones y Resolver</b>. <i>Importante: mientras haya cambios sin aplicar aparece el estado <b>Borrador sin aplicar</b> y se bloquean la exportación (JSON/Excel/CSV) y el cambio a Ver método / Explorar resultados.</i><br/>"
+        "3. Pulsa <b>Aplicar Ecuaciones y Resolver</b>. <i>Importante: mientras haya cambios sin aplicar aparece el estado <b>Borrador sin aplicar</b> y se bloquean el cambio a Ver método / Explorar resultados.</i><br/>"
         "4. Si el ejercicio tiene variables enteras (<font face='DejaVuMono'>ℤ</font>), binarias (<font face='DejaVuMono'>{0,1}</font>) o cotas diferentes de <font face='DejaVuMono'>[0, +inf)</font>, cambia a <b>Modo Tabla</b> para ajustarlas junto con el título y la descripción.<br/>"
-        "5. Pulsa <b>JSON</b> en la barra superior para descargar el modelo listo para compartir.",
+        "5. Conserva el Excel de resultados para reabrir el modelo desde <b>Formular</b>.",
         bullet_style,
     ))
     story.append(Spacer(1, 4))
@@ -446,25 +442,25 @@ def build_teacher_pdf(output_path: str):
 
     story.append(Paragraph("3.1 Incorporar un ejercicio permanente en Ejemplos", h2_style))
     story.append(Paragraph(
-        "• <b>Catálogo dinámico web (<font face='DejaVuMono'>examples/*.json</font>):</b> Guarda el archivo exportado con el botón <b>JSON</b> usando un nombre en minúsculas sin espacios ni tildes (solo <font face='DejaVuMono'>a-z</font>, <font face='DejaVuMono'>0-9</font>, <font face='DejaVuMono'>-</font>, <font face='DejaVuMono'>_</font>; ej. <font face='DejaVuMono'>taller3_papel_base.json</font>) dentro de la carpeta <font face='DejaVuMono'>examples/</font>. El endpoint <font face='DejaVuMono'>/api/examples</font> lo detecta automáticamente y lo lista en el selector <b>Ejemplos</b> (aislando errores si algún JSON tiene fallas).<br/>"
+        "• <b>Catálogo web:</b> Comparte el libro terminado con quien mantiene el catálogo. El equipo registra la definición interna en <font face='DejaVuMono'>examples/</font> y comprueba que el ejercicio aparece en el selector de la cabecera.<br/>"
         "• <b>Respaldo estático y cuaderno Colab:</b> Para casos base del frontend sin backend revisa <font face='DejaVuMono'>PRESET_OPTIONS</font> en <font face='DejaVuMono'>web/components/cockpit/types.ts</font>. Para incluir el nuevo caso también en Google Colab, agrégalo al diccionario <font face='DejaVuMono'>MODELOS_EJEMPLO</font> dentro de <font face='DejaVuMono'>colab/OptiCompromise_Colab.ipynb</font> (y ejecuta <font face='DejaVuMono'>python3 colab/sync_engine.py</font> si actualizas <font face='DejaVuMono'>api/core/</font>).",
         bullet_style,
     ))
 
-    story.append(Paragraph("3.2 Reabrir libros Excel o CSV de resultados ya resueltos", h2_style))
+    story.append(Paragraph("3.2 Reabrir libros Excel de resultados", h2_style))
     story.append(Paragraph(
-        "Cada libro <b>Excel (.xlsx)</b> generado por la aplicación incluye la hoja <font face='DejaVuMono'>Modelo</font> y cada <b>CSV</b> incluye el bloque final <font face='DejaVuMono'>DEFINICION DEL MODELO (RE-IMPORTABLE)</font>. Para revisar la entrega de un estudiante, simplemente pulsa <b>Importar</b> y abre su archivo: OptiCompromise reconstruye sus variables, cotas, objetivos, restricciones y pesos exactamente como fueron resueltos.",
+        "Cada Excel de resultados incluye una hoja <font face='DejaVuMono'>Modelo</font> con las variables, cotas, objetivos, restricciones y pesos usados. Para revisar el ejercicio, pulsa <b>Cargar ejercicio</b> en <b>Formular</b> y selecciona el libro.",
         body_style,
     ))
     story.append(Spacer(1, 6))
 
     # =========================================================================
-    # RUTA 4: INTERPRETACIÓN DE EXPORTACIÓN EXCEL (5 HOJAS), CSV Y JSON
+    # Resultados en Excel y PDF
     # =========================================================================
-    story.append(Paragraph("4. Ruta 4: Uso e interpretación de resultados (Excel 5 hojas, CSV y JSON)", h1_style))
+    story.append(Paragraph("4. Uso e interpretación de resultados", h1_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#E11D48"), spaceAfter=6))
     story.append(Paragraph(
-        "Al pulsar <b>Excel</b> en la barra superior, OptiCompromise descarga un libro <font face='DejaVuMono'>.xlsx</font> estilizado con hasta <b>5 hojas</b> listas para auditoría docente e informes:",
+        "Al pulsar <b>Excel</b> en <b>Explorar resultados</b>, OptiCompromise descarga un libro <font face='DejaVuMono'>.xlsx</font> estilizado con hojas de datos para auditoría y una hoja por gráfica aplicable.",
         body_style,
     ))
 
@@ -502,9 +498,9 @@ def build_teacher_pdf(output_path: str):
     story.append(Spacer(1, 8))
 
     story.append(_callout_box(
-        "<b>Resumen rápido de los otros formatos de exportación:</b><br/>"
-        "• <b>JSON (.json):</b> Guarda únicamente la definición del modelo y <font face='DejaVuMono'>weights</font>. Es el formato ideal para publicar en <font face='DejaVuMono'>examples/</font> o versionar enunciados en Git.<br/>"
-        "• <b>CSV (.csv):</b> Reporte en texto UTF-8 con BOM que reúne Matriz de Pagos, Soluciones Compromiso y el bloque <font face='DejaVuMono'>DEFINICION DEL MODELO (RE-IMPORTABLE)</font>.",
+        "<b>PDF (.pdf)</b> presenta la formulación, las tablas de resultados, la interpretación y las gráficas. "
+        "Ambos documentos incluyen las vistas aplicables al modelo aunque su pestaña no se haya abierto. "
+        "Si alguna imagen queda pendiente, el documento indica cuál.",
         "#F8FAFC", "#CBD5E1", box_style,
     ))
 

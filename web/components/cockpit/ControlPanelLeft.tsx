@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useCallback, useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Table2,
   Code2,
   Plus,
   Trash2,
-  Scale,
+  Upload,
   Play,
   AlertCircle,
   Sparkles,
@@ -18,16 +18,15 @@ import {
   VarType,
   ObjectiveSense,
   ConstraintSense,
-  DecisionProfile,
 } from "./types";
 import {
   modelToAlgebraicText,
-  parseAlgebraicModel,
   modelToLatex,
 } from "./mathUtils";
 import SectionHeading from "./SectionHeading";
 import TooltipBadge from "./TooltipBadge";
 import KatexBlock from "./KatexBlock";
+import { availableWeight, WeightState } from "./weights";
 
 interface NumericInputProps {
   id?: string;
@@ -130,38 +129,77 @@ function NumericInput({
   );
 }
 
+function WeightInput({ index, label, value, disabled, onCommit }: {
+  index: number;
+  label: string;
+  value: number;
+  disabled: boolean;
+  onCommit: (index: number, value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shownValue = String(Number(value.toPrecision(15)));
+  const commit = () => {
+    if (draft === null) return;
+    const entered = draft.trim();
+    setDraft(null);
+    if (entered === shownValue) return;
+    onCommit(index, entered ? Number(entered.replace(",", ".")) : NaN);
+  };
+
+  return (
+    <input id={"weight-input-" + index} aria-label={"Valor numérico peso " + label} aria-describedby="weight-help"
+      type="text" inputMode="decimal" value={draft ?? shownValue} disabled={disabled}
+      onChange={event => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={event => {
+        if (event.key === "Escape") setDraft(null);
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        }
+      }}
+      className="min-h-9 w-24 rounded border border-slate-300 bg-slate-50 px-2 text-right text-sm font-mono dark:border-slate-700 dark:bg-slate-800" />
+  );
+}
+
 interface ControlPanelLeftProps {
   model: ModelDefinition;
   modelKey: number;
-  weights: number[];
-  autoBalance: boolean;
-  onToggleAutoBalance: (enabled: boolean) => void;
-  decisionProfile: DecisionProfile;
-  onSelectProfile: (profile: DecisionProfile) => void;
-  validationError: string | null;
-  onModelChange: (updated: ModelDefinition, newWeights?: number[]) => void;
+  weightState: WeightState;
+  weightError: string;
+  onToggleWeight: (index: number) => void;
+  onEqualizeWeights: () => void;
   onWeightChange: (index: number, value: number) => void;
-  onNormalizeWeights: () => void;
-  onAlgebraicDraftChange: (dirty: boolean) => void;
-  onManualSolve: (updated?: ModelDefinition, weights?: number[]) => void;
+  onImportExercise: (file: File) => void;
+  validationError: string | null;
+  onModelChange: (updated: ModelDefinition, objectiveIndices?: number[]) => boolean;
+  algebraicDraft: string | null;
+  algebraicErrors: string[];
+  onAlgebraicDraftChange: (draft: string | null) => void;
+  onApplyAlgebraic: () => boolean;
+  onManualSolve: () => void;
   isCalculating: boolean;
+  isLoadingExercise: boolean;
 }
 
 export default function ControlPanelLeft({
   model,
   modelKey,
-  weights,
-  autoBalance,
-  onToggleAutoBalance,
-  decisionProfile,
-  onSelectProfile,
+  weightState,
+  weightError,
+  onToggleWeight,
+  onEqualizeWeights,
+  onWeightChange,
+  onImportExercise,
   validationError,
   onModelChange,
-  onWeightChange,
-  onNormalizeWeights,
+  algebraicDraft,
+  algebraicErrors,
   onAlgebraicDraftChange,
+  onApplyAlgebraic,
   onManualSolve,
   isCalculating,
+  isLoadingExercise,
 }: ControlPanelLeftProps) {
   const [editorTab, setEditorTab] = useState<"table" | "algebraic">("table");
   const [openSections, setOpenSections] = useState<{ vars: boolean; objs: boolean; cons: boolean }>({
@@ -169,36 +207,20 @@ export default function ControlPanelLeft({
     objs: true,
     cons: true,
   });
-  const [algebraicText, setAlgebraicText] = useState<string>(() =>
-    modelToAlgebraicText(model)
-  );
-  const [algebraicDirty, setDirty] = useState(false);
-  const setAlgebraicDirty = useCallback((dirty: boolean) => {
-    setDirty(dirty);
-    onAlgebraicDraftChange(dirty);
-  }, [onAlgebraicDraftChange]);
-  const [algebraicErrors, setAlgebraicErrors] = useState<string[]>([]);
-
-  // Al cambiar de caso/importación reiniciamos el borrador algebraico
+  const algebraicText = useMemo(() => modelToAlgebraicText(model), [model]);
+  const algebraicDirty = algebraicDraft !== null;
+  const algebraicErrorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    setAlgebraicText(modelToAlgebraicText(model));
-    setAlgebraicDirty(false);
-    setAlgebraicErrors([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelKey]);
-
-  // Solo sincronizar el texto algebraico desde Tabla si no hay ediciones sin aplicar en el textarea
-  useEffect(() => {
-    if (!algebraicDirty) {
-      setAlgebraicText(modelToAlgebraicText(model));
-      setAlgebraicErrors([]);
-    }
-  }, [model, algebraicDirty]);
+    if (algebraicErrors.length > 0) algebraicErrorRef.current?.focus();
+  }, [algebraicErrors]);
 
   const latexPreview = useMemo(() => modelToLatex(model), [model]);
 
-  const weightSum = weights.reduce((acc, w) => acc + (Number.isFinite(w) ? w : 0), 0);
-  const isWeightSumValid = Math.abs(weightSum - 1.0) <= 0.001 + 1e-12;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { values: weights, fixed } = weightState;
+  const freeCount = fixed.filter(value => !value).length;
+  const remainingWeight = availableWeight(weightState);
+  const weightSum = weights.reduce((total, weight) => total + weight, 0);
 
   const handleVarChange = (
     idx: number,
@@ -286,20 +308,14 @@ export default function ControlPanelLeft({
         coefficients: Array(model.variables.length).fill(1),
       },
     ];
-    const eqW = Array(nextObjs.length).fill(1 / nextObjs.length);
-    onModelChange({ ...model, objectives: nextObjs }, eqW);
+    onModelChange({ ...model, objectives: nextObjs }, [...model.objectives.map((_, i) => i), -1]);
   };
 
   const handleRemoveObjective = (idx: number) => {
     if (model.objectives.length <= 2) return;
     const nextObjs = model.objectives.filter((_, i) => i !== idx);
-    const nextW = weights.filter((_, i) => i !== idx);
-    const s = nextW.reduce((a, b) => a + b, 0);
-    const normW =
-      s > 0
-        ? nextW.map((w) => w / s)
-        : Array(nextObjs.length).fill(1 / nextObjs.length);
-    onModelChange({ ...model, objectives: nextObjs }, normW);
+    const indices = model.objectives.map((_, i) => i).filter(i => i !== idx);
+    onModelChange({ ...model, objectives: nextObjs }, indices);
   };
 
   const handleConField = (idx: number, field: "name" | "sense" | "rhs", value: string | number) => {
@@ -344,66 +360,38 @@ export default function ControlPanelLeft({
     onModelChange({ ...model, constraints: nextCons });
   };
 
-  const parseDraftIntoModel = (): { updated: ModelDefinition; nextWeights?: number[] } | null => {
-    if (algebraicText === modelToAlgebraicText(model)) {
-      setAlgebraicDirty(false);
-      setAlgebraicErrors([]);
-      return { updated: model };
-    }
-    const parsed = parseAlgebraicModel(algebraicText, model);
-    if (!parsed.ok || !parsed.objectives || !parsed.constraints || !parsed.detectedVariables) {
-      setAlgebraicErrors(parsed.errors);
-      return null;
-    }
-
-    const updatedVars = parsed.detectedVariables.map((vName) => {
-      const existing = model.variables.find((v) => v.name === vName);
-      return (
-        existing || {
-          name: vName,
-          var_type: "continuous" as VarType,
-          lower_bound: 0,
-          upper_bound: null,
-        }
-      );
-    });
-
-    const nObjs = parsed.objectives.length;
-    const nextW = weights.length !== nObjs ? Array(nObjs).fill(1 / nObjs) : undefined;
-
-    setAlgebraicDirty(false);
-    setAlgebraicErrors([]);
-
-    return {
-      updated: {
-        ...model,
-        variables: updatedVars,
-        objectives: parsed.objectives,
-        constraints: parsed.constraints,
-      },
-      nextWeights: nextW,
-    };
-  };
-
-  const handleApplyAlgebraic = () => {
-    const applied = parseDraftIntoModel();
-    if (!applied) return;
-    onManualSolve(applied.updated, applied.nextWeights ?? weights);
-  };
-
   const handleSwitchToTable = () => {
-    if (editorTab === "algebraic" && algebraicDirty) {
-      const applied = parseDraftIntoModel();
-      if (!applied) return;
-      onModelChange(applied.updated, applied.nextWeights);
-    }
-    setEditorTab("table");
+    const invalidBounds = model.variables.some(({ lower_bound, upper_bound }) =>
+      lower_bound != null && upper_bound != null && lower_bound > upper_bound);
+    if (invalidBounds || onApplyAlgebraic()) setEditorTab("table");
   };
 
   return (
-    <aside className="workspace-controls min-w-0 space-y-4">
-      <div className="model-form space-y-4">
-      <SectionHeading title="Formular el ejercicio" cue="Del enunciado al modelo de decisión" />
+    <aside className="workspace-controls min-w-0">
+      <fieldset className="model-form min-w-0 space-y-4" disabled={isLoadingExercise}>
+      <section aria-label="Carga de ejercicios" className="workspace-actions">
+        <a href="/plantilla-ejercicio-iad.xlsx" download className="workspace-button">Obtener plantilla (.xlsx)</a>
+        <input
+          ref={fileInputRef}
+          type="file"
+          aria-label="Archivo Excel del ejercicio"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          disabled={algebraicDirty}
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) onImportExercise(file);
+            event.target.value = "";
+          }}
+        />
+        <button type="button" className="workspace-button" disabled={algebraicDirty}
+          title={algebraicDirty ? "Aplica o descarta el borrador primero" : undefined}
+          onClick={() => fileInputRef.current?.click()}>
+          <Upload size={15} aria-hidden="true" /> Cargar ejercicio
+        </button>
+        <p>Diligencia la hoja Modelo de la plantilla y guarda el archivo antes de cargarlo.</p>
+      </section>
+      {weightError && <p role="alert" className="workspace-feedback text-rose-800 dark:text-rose-300">{weightError}</p>}
       {/* Encabezado del Modelo */}
       <div className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-2 border-l-4 border-l-[#E11D48]">
         <div className="flex items-center justify-between gap-2">
@@ -412,6 +400,7 @@ export default function ControlPanelLeft({
             name="model-name"
             type="text"
             value={model.name}
+            readOnly={algebraicDirty} aria-describedby={algebraicDirty ? "metadata-lock" : undefined}
             onChange={(e) => onModelChange({ ...model, name: e.target.value })}
             aria-label="Nombre del problema"
             placeholder="Nombre del problema"
@@ -419,8 +408,8 @@ export default function ControlPanelLeft({
           />
           <button
             type="button"
-            onClick={() => editorTab === "algebraic" && algebraicDirty ? handleApplyAlgebraic() : onManualSolve()}
-            disabled={isCalculating || (Boolean(validationError) && !(editorTab === "algebraic" && algebraicDirty))}
+            onClick={onManualSolve}
+            disabled={isLoadingExercise || (!algebraicDirty && (isCalculating || Boolean(validationError)))}
             className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white disabled:opacity-50 transition-colors"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
@@ -432,6 +421,7 @@ export default function ControlPanelLeft({
           name="model-description"
           rows={2}
           value={model.description || ""}
+          readOnly={algebraicDirty} aria-describedby={algebraicDirty ? "metadata-lock" : undefined}
           onChange={(e) => onModelChange({ ...model, description: e.target.value })}
           aria-label="Descripción del problema"
           placeholder="Descripción opcional del problema de decisión..."
@@ -439,11 +429,14 @@ export default function ControlPanelLeft({
         />
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
           Fuente académica (opcional)
-          <input id="model-reference-input" name="model-reference" type="text" value={model.reference ?? ""}
+          <input id="model-reference-input" name="model-reference" type="text" value={model.reference ?? ""} readOnly={algebraicDirty} aria-describedby={algebraicDirty ? "metadata-lock" : undefined}
             onChange={e => onModelChange({ ...model, reference: e.target.value })}
             className="mt-1 block w-full rounded border border-slate-300 bg-transparent px-2 py-1.5 dark:border-slate-700"
             placeholder="Curso, taller o referencia del ejercicio" />
         </label>
+        {algebraicDirty && <p id="metadata-lock" className="text-xs text-amber-900 dark:text-amber-200">
+          Aplica o descarta el borrador algebraico para editar el nombre, la descripción y la fuente.
+        </p>}
       </div>
 
       {/* Alerta de Validación Inmediata en Cliente */}
@@ -455,16 +448,6 @@ export default function ControlPanelLeft({
               <span className="font-bold block">Error de Validación del Modelo:</span>
               <span>{validationError}</span>
             </div>
-            {!isWeightSumValid && (
-              <button
-                type="button"
-                onClick={onNormalizeWeights}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors"
-              >
-                <Scale className="w-3 h-3" />
-                <span>Normalizar pesos (1.00)</span>
-              </button>
-            )}
           </div>
         </div>
       )}
@@ -491,6 +474,7 @@ export default function ControlPanelLeft({
             <button
               type="button"
               onClick={() => setEditorTab("algebraic")}
+              disabled={isLoadingExercise}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm text-xs font-semibold transition-colors ${
                 editorTab === "algebraic"
                   ? "bg-[#E11D48] text-white"
@@ -509,6 +493,9 @@ export default function ControlPanelLeft({
         <div className="p-3.5 space-y-4">
           {editorTab === "table" ? (
             <>
+              {algebraicDirty && <p className="workspace-feedback text-amber-900 dark:text-amber-200">
+                El borrador sigue pendiente. Puedes corregir el tipo y las cotas de las variables. Edita las ecuaciones en Modo Algebraico.
+              </p>}
               {/* 1. Variables de Decisión (Acordeón sin scroll anidado) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -529,6 +516,7 @@ export default function ControlPanelLeft({
                   </div>
                   <button
                     type="button"
+                    disabled={algebraicDirty}
                     onClick={() => {
                       setOpenSections((s) => ({ ...s, vars: true }));
                       handleAddVariable();
@@ -561,6 +549,7 @@ export default function ControlPanelLeft({
                         type="text"
                         value={v.name}
                         title={v.name}
+                        disabled={algebraicDirty}
                         onChange={(e) => handleVarChange(idx, "name", e.target.value)}
                         className="text-xs font-mono px-1.5 py-1 rounded-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-[#E11D48] min-w-0"
                         placeholder="x1 (Nombre)"
@@ -604,7 +593,7 @@ export default function ControlPanelLeft({
                       <button
                         type="button"
                         onClick={() => handleRemoveVariable(idx)}
-                        disabled={model.variables.length <= 1}
+                        disabled={algebraicDirty || model.variables.length <= 1}
                         className="flex justify-center text-slate-400 hover:text-[#E11D48] disabled:opacity-30 cursor-pointer"
                         title="Eliminar variable"
                         aria-label={`Eliminar variable ${v.name || idx + 1}`}
@@ -618,7 +607,7 @@ export default function ControlPanelLeft({
               </div>
 
               {/* 2. Funciones Objetivo */}
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <fieldset disabled={algebraicDirty} className="min-w-0 space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 disabled:opacity-70">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <button
@@ -717,10 +706,10 @@ export default function ControlPanelLeft({
                   ))}
                 </div>
                 )}
-              </div>
+              </fieldset>
 
               {/* 3. Restricciones */}
-              <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <fieldset disabled={algebraicDirty} className="min-w-0 space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 disabled:opacity-70">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <button
@@ -823,7 +812,7 @@ export default function ControlPanelLeft({
                   ))}
                 </div>
                 )}
-              </div>
+              </fieldset>
             </>
           ) : (
             <div className="space-y-3">
@@ -835,43 +824,39 @@ export default function ControlPanelLeft({
                   {algebraicDirty && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setAlgebraicText(modelToAlgebraicText(model));
-                        setAlgebraicDirty(false);
-                        setAlgebraicErrors([]);
-                      }}
+                      onClick={() => onAlgebraicDraftChange(null)}
                       className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 hover:underline"
                     >
                       Descartar borrador
                     </button>
                   )}
                 </div>
-                <p className="section-cue">Escribe las ecuaciones lineales y aplícalas para actualizar el modelo.</p>
+                <p className="section-cue">Edita las ecuaciones lineales. Los tipos y las cotas se editan en Modo Tabla.</p>
                 <textarea
                   id="algebraic-model-textarea"
                   name="algebraic-model"
                   rows={8}
-                  value={algebraicText}
-                  onChange={(e) => {
-                    setAlgebraicText(e.target.value);
-                    setAlgebraicDirty(true);
-                  }}
+                  value={algebraicDraft ?? algebraicText}
+                  readOnly={isLoadingExercise}
+                  onChange={(e) => onAlgebraicDraftChange(e.target.value === algebraicText ? null : e.target.value)}
                   aria-label="Ecuaciones del modelo"
+                  aria-invalid={algebraicErrors.length > 0}
+                  aria-describedby={algebraicErrors.length > 0 ? "algebraic-feedback" : undefined}
                   spellCheck={false}
                   className="w-full font-mono text-xs p-2.5 rounded-sm border bg-slate-50 dark:bg-slate-950 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#E11D48]"
                 />
                 {algebraicDirty && (
-                  <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                    Aplica o descarta el borrador antes de consultar o exportar resultados.
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    Resolver y cambiar de vista aplican las ecuaciones. Descarta el borrador para abrir otro ejercicio.
                   </p>
                 )}
               </div>
 
               {algebraicErrors.length > 0 && (
-                <div role="alert" className="p-2.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-xs text-[#E11D48] dark:text-rose-300 space-y-1">
+                <div ref={algebraicErrorRef} id="algebraic-feedback" role="alert" tabIndex={-1} className="p-2.5 rounded-sm bg-rose-500/10 border border-rose-500/30 text-xs text-rose-800 dark:text-rose-200 space-y-1">
                   <div className="font-bold flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5" />
-                    <span>Errores de sintaxis detectados:</span>
+                    <span>Revisa el borrador algebraico</span>
                   </div>
                   <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
                     {algebraicErrors.map((err, i) => (
@@ -883,7 +868,8 @@ export default function ControlPanelLeft({
 
               <button
                 type="button"
-                onClick={handleApplyAlgebraic}
+                onClick={onManualSolve}
+                disabled={isLoadingExercise || (!algebraicDirty && (isCalculating || Boolean(validationError)))}
                 className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-sm text-xs font-bold bg-[#E11D48] hover:bg-[#BE123C] text-white transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
@@ -898,7 +884,10 @@ export default function ControlPanelLeft({
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 Vista Previa Matemática (LaTeX / KaTeX)
               </div>
-              <p className="section-cue">Comprueba las ecuaciones y dominios que recibe el motor.</p>
+              <p className="section-cue">
+                {algebraicDirty ? "Esta vista muestra el modelo aplicado. El borrador está en el editor."
+                  : "Comprueba las ecuaciones y dominios que recibe el motor."}
+              </p>
               <KatexBlock
                 latex={latexPreview}
                 className="text-xs text-slate-800 dark:text-slate-200"
@@ -908,137 +897,60 @@ export default function ControlPanelLeft({
         </div>
       </section>
 
-      </div>
+      </fieldset>
 
       <a href="#grafico-resultados" className="mobile-plot-link inline-block text-xs font-semibold text-rose-800 underline underline-offset-2 dark:text-rose-300 min-[851px]:hidden">
         Ir al gráfico
       </a>
-      {/* Ecualizador de Pesos (w_i) + Perfil del Decisor (Al final tras definir el modelo) */}
-      <section
-        id="cockpit-weights-panel"
-        className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3"
-      >
-        <SectionHeading title="Preferencias" cue="Ajusta los pesos para recalcular las soluciones." />
+      <section id="cockpit-weights-panel"
+        className="rounded-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 space-y-3">
+        <SectionHeading title="Preferencias" cue="Ajusta los pesos de los objetivos." />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <TooltipBadge title="Pesos de preferencia" content="Los pesos expresan la importancia relativa de cada objetivo y suman 1." />
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`text-[11px] font-mono font-semibold px-2 py-0.5 rounded-sm border ${
-                isWeightSumValid
-                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                  : "bg-rose-500/15 text-[#E11D48] dark:text-rose-400 border-rose-500/40 animate-pulse"
-              }`}
-            >
-              <span className="whitespace-nowrap">Σw = {weightSum.toFixed(3)}</span>
-            </span>
-            <button
-              type="button"
-              onClick={onNormalizeWeights}
-              title="Auto-normalizar pesos (w_i / Σw_i)"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-sm text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-700 dark:text-slate-200 hover:text-[#E11D48] border border-slate-200 dark:border-slate-700 hover:border-[#E11D48] transition-colors"
-            >
-              <Scale className="w-3 h-3" />
-              <span>Normalizar</span>
-            </button>
-          </div>
+          <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-mono font-semibold text-emerald-800 dark:text-emerald-300">
+            Σw = {weightSum.toFixed(3)}
+          </span>
+          <button type="button" className="workspace-button" disabled={isLoadingExercise} onClick={onEqualizeWeights}>Igualar pesos</button>
         </div>
-
-        {/* Selector Rápido de Actitud / Perfil del Decisor */}
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { id: "equitativo" as DecisionProfile, label: "Iguales", sub: "Mismo peso" },
-            { id: "compensatorio" as DecisionProfile, label: "Priorizar Z₁", sub: "70% al primero" },
-            { id: "moderado" as DecisionProfile, label: "Explorar L₂", sub: "Pesos iguales" },
-          ].map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              aria-pressed={decisionProfile === p.id}
-              onClick={() => onSelectProfile(p.id)}
-              className={`px-2 py-1.5 rounded-sm border text-left transition-colors cursor-pointer ${
-                decisionProfile === p.id
-                  ? "bg-rose-50 dark:bg-rose-950/40 border-[#E11D48] text-slate-900 dark:text-white"
-                  : "bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400"
-              }`}
-            >
-              <span className="block text-[11px] font-bold leading-tight">{p.label}</span>
-              <span className="block text-[9px] font-mono text-[#E11D48] dark:text-rose-400">
-                {p.sub}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        {/* Switch Auto-Balanceo */}
-        <div className="flex items-center justify-between pt-0.5 text-[11px] text-slate-600 dark:text-slate-400">
-          <label htmlFor="weights-auto-balance" className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              id="weights-auto-balance"
-              name="weights-auto-balance"
-              type="checkbox"
-              checked={autoBalance}
-              onChange={(e) => onToggleAutoBalance(e.target.checked)}
-              className="w-3.5 h-3.5 accent-[#E11D48] rounded-sm"
-            />
-            <span className="font-medium">Auto-balancear suma fija en 1.00</span>
-          </label>
-          {decisionProfile === "personalizado" && (
-            <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              Manual
-            </span>
-          )}
-        </div>
-
-        {!isWeightSumValid && (
-          <div className="flex items-center gap-2 p-2 rounded-sm bg-rose-50 dark:bg-rose-950/30 border border-[#E11D48] text-[11px] text-rose-800 dark:text-rose-200">
-            <AlertCircle className="w-3.5 h-3.5 text-[#E11D48] shrink-0" />
-            <span>
-              Los pesos suman <b>{weightSum.toFixed(3)}</b> (≠ 1.00). Ajusta los deslizadores o pulsa el botón <b>Normalizar</b> para normalizar antes de resolver.
-            </span>
-          </div>
-        )}
-
-        <div className="space-y-2.5">
+        <p id="weight-help" className="text-xs text-slate-600 dark:text-slate-300">
+          {freeCount === 0 ? "Todos los pesos están fijados. Desbloquea un peso con 📌."
+            : freeCount === 1 ? "El único peso libre completa la suma de 1. Desbloquea otro para ajustarlo."
+            : remainingWeight <= 0 ? "Los pesos fijados ya suman 1. Desbloquea alguno para ajustar los demás."
+            : "Fija con 📌 los valores que quieras conservar. Los demás se ajustan para sumar 1."}
+        </p>
+        {weightError && <p role="alert" className="text-xs font-medium text-rose-800 dark:text-rose-300">{weightError}</p>}
+        <div className="space-y-3" key={modelKey}>
           {model.objectives.map((obj, idx) => {
-            const wVal = weights[idx] ?? 0;
-            const pct = weightSum > 0 ? (wVal / weightSum) * 100 : 0;
+            const value = weights[idx];
+            const locked = fixed[idx];
+            const disabled = isLoadingExercise || locked || freeCount < 2 || remainingWeight <= 0;
             return (
               <div key={idx} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <label
-                    htmlFor={`weight-slider-${idx}`}
-                    className="font-medium text-slate-700 dark:text-slate-200 truncate pr-2"
+                <label htmlFor={`weight-input-${idx}`} className="block break-words text-xs font-medium text-slate-700 dark:text-slate-200">
+                  <span className="font-mono font-bold text-rose-700 dark:text-rose-300 mr-1">w{idx + 1}</span>{obj.name}
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <WeightInput index={idx} label={obj.name} value={value} disabled={disabled} onCommit={onWeightChange} />
+                  <button
+                    type="button"
+                    aria-label={`Fijar peso de ${obj.name}`}
+                    aria-pressed={locked}
+                    disabled={isLoadingExercise}
+                    className="workspace-button weight-pin"
+                    onClick={() => onToggleWeight(idx)}
                   >
-                    <span className="font-mono font-bold text-[#E11D48] mr-1">
-                      w{idx + 1}
-                    </span>
-                    {obj.name}
-                  </label>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono text-slate-400">
-                      ({pct.toFixed(0)}%)
-                    </span>
-                    <NumericInput
-                      id={`weight-input-${idx}`}
-                      name={`weight-input-${idx}`}
-                      ariaLabel={`Valor numérico peso ${obj.name}`}
-                      min={0}
-                      max={1}
-                      value={Number(wVal.toFixed(3))}
-                      onCommit={(val) => onWeightChange(idx, val ?? 0)}
-                      className="w-16 text-right font-mono text-xs px-1.5 py-0.5 rounded-sm border bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 focus:outline-[#E11D48]"
-                    />
-                  </div>
+                    <span aria-hidden="true">📌</span> {locked ? "Desbloquear" : "Fijar peso"}
+                  </button>
                 </div>
                 <input
                   id={`weight-slider-${idx}`}
-                  name={`weight-slider-${idx}`}
+                  aria-label={`Ajustar peso de ${obj.name}`}
                   type="range"
                   min={0}
                   max={1}
                   step={0.01}
-                  value={Math.min(1, Math.max(0, wVal))}
-                  onChange={(e) => onWeightChange(idx, parseFloat(e.target.value))}
+                  value={value}
+                  disabled={disabled}
+                  onChange={(event) => onWeightChange(idx, Math.min(remainingWeight, event.currentTarget.valueAsNumber))}
                   className="w-full weight-slider bg-slate-200 dark:bg-slate-700"
                 />
               </div>

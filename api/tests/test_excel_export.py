@@ -9,6 +9,8 @@ Verifica:
 """
 from __future__ import annotations
 
+from base64 import b64encode
+from copy import deepcopy
 import json
 import unittest
 from io import BytesIO
@@ -16,6 +18,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from openpyxl import load_workbook
+from PIL import Image
+from pypdf import PdfReader
 
 from core.schemas import ConstraintModel, ModelDefinition, ObjectiveModel, VariableModel
 from excel_export import build_upload_template_workbook
@@ -61,7 +65,14 @@ class TestExcelExport(unittest.TestCase):
             public_path = PUBLIC_DIR / filename
             self.assertTrue(public_path.is_file(), f"Falta plantilla generada en {public_path}")
             wb_disk = load_workbook(public_path, data_only=False)
-            self.assertEqual(wb_disk.sheetnames, ["Modelo", "Guia_Docente"])
+            expected_sheets = ["Modelo", "Guia_Docente"]
+            if variant == "blank":
+                expected_sheets.append("Ejemplo_Papel")
+                self.assertFalse(wb_disk["Modelo"]["B7"].value)
+                self.assertFalse(wb_disk["Modelo"]["F7"].value)
+                self.assertEqual(_find_model_header_row(wb_disk["Ejemplo_Papel"])[0], 3)
+                self.assertTrue(wb_disk["Ejemplo_Papel"]["B4"].value)
+            self.assertEqual(wb_disk.sheetnames, expected_sheets)
             disk_header_idx, _ = _find_model_header_row(wb_disk["Modelo"])
             self.assertEqual(disk_header_idx, 3)
 
@@ -102,6 +113,113 @@ class TestExcelExport(unittest.TestCase):
             header_idx, header = _find_model_header_row(ws_mod)
             self.assertEqual(header_idx, 2)
             self.assertEqual(header[:5], ["Seccion", "Nombre", "Tipo_o_Sentido", "Min_o_RHS", "Max_o_Peso"])
+
+    def test_reports_include_images_and_show_malformed_image_errors(self) -> None:
+        model = json.loads((EXAMPLES_DIR / "01_celdas_fotovoltaicas.json").read_text(encoding="utf-8"))
+        result = self.client.post("/api/solve", json=model).json()
+        image = BytesIO()
+        Image.new("RGB", (400, 200), "#e11d48").save(image, "PNG")
+        chart = {"title": "Gráfica de prueba", "caption": "Dos ejes", "png": b64encode(image.getvalue()).decode()}
+        payload = {
+            "model": model,
+            "result": result,
+            "charts": [chart],
+            "warnings": ["Vista 3D pendiente de generar."],
+        }
+
+        excel = self.client.post("/api/export/excel", json=payload)
+        self.assertEqual(excel.status_code, 200)
+        book = load_workbook(BytesIO(excel.content))
+        drawing = book["G1 Gráfica de prueba"]._images[0]
+        self.assertEqual(drawing._data(), image.getvalue())
+        self.assertEqual(drawing.anchor.ext.cx, 2 * drawing.anchor.ext.cy)
+        self.assertEqual(book["G1 Gráfica de prueba"]["A2"].value, "Dos ejes")
+        self.assertIn("Gráficas pendientes", [cell.value for cell in book["Resumen_Ejecutivo"]["A"]])
+
+        pdf = self.client.post("/api/export/pdf", json=payload)
+        self.assertEqual(pdf.status_code, 200)
+        self.assertEqual(pdf.headers["content-type"], "application/pdf")
+        self.assertTrue(pdf.content.startswith(b"%PDF-"))
+        self.assertIn(b"/Subtype /Image", pdf.content)
+
+        chart["png"] = "dato inválido"
+        for format in ("excel", "pdf"):
+            response = self.client.post(f"/api/export/{format}", json=payload)
+            self.assertEqual(response.status_code, 422)
+            self.assertIn("imagen PNG válida", response.json()["detail"])
+
+    def test_both_reports_reject_incomplete_or_nonfinite_snapshots(self) -> None:
+        model = json.loads((EXAMPLES_DIR / "01_celdas_fotovoltaicas.json").read_text(encoding="utf-8"))
+        result = self.client.post("/api/solve", json=model).json()
+        invalid = {
+            "payoff.headers": lambda r: r["payoff"]["headers"].pop(),
+            "payoff.ideal_point": lambda r: r["payoff"]["ideal_point"].pop(),
+            "payoff.anti_ideal_point": lambda r: r["payoff"]["anti_ideal_point"].pop(),
+            "payoff.normalization_ranges": lambda r: r["payoff"]["normalization_ranges"].pop(),
+            "payoff.matrix": lambda r: r["payoff"]["matrix"][0].pop(),
+            "solutions.L1": lambda r: r["solutions"]["L1"]["variables"].clear(),
+            "solutions.L2": lambda r: r["solutions"]["L2"]["normalized_distances"].pop(),
+            "pareto_points[0]": lambda r: r["pareto_points"][0]["objectives"].pop(),
+            "Desbordamiento numérico": lambda r: r["solutions"]["L1"].update(aggregate_distance=float("nan")),
+            "result.payoff.matrix.0": lambda r: r["payoff"]["matrix"].__setitem__(0, float("inf")),
+        }
+        for format in ("excel", "pdf"):
+            for expected, mutate in invalid.items():
+                with self.subTest(format=format, field=expected):
+                    malformed = deepcopy(result)
+                    mutate(malformed)
+                    response = self.client.post(
+                        f"/api/export/{format}",
+                        content=json.dumps({"model": model, "result": malformed}),
+                        headers={"Content-Type": "application/json"},
+                    )
+                    self.assertIn(response.status_code, (400, 422), response.text)
+                    self.assertIn(expected, response.json()["detail"])
+
+    def test_both_reports_accept_genuine_partial_results(self) -> None:
+        model = json.loads((EXAMPLES_DIR / "01_celdas_fotovoltaicas.json").read_text(encoding="utf-8"))
+        result = self.client.post("/api/solve", json=model).json()
+        result.update(status="partial")
+        result["solutions"]["L2"].update(
+            variables={}, objectives=[], normalized_distances=[], achievement_pct=[],
+            aggregate_distance=0, status="error: falta un certificado factible",
+        )
+        for format in ("excel", "pdf"):
+            response = self.client.post(f"/api/export/{format}", json={"model": model, "result": result})
+            self.assertEqual(response.status_code, 200, response.text[:250])
+
+    def test_excel_chart_names_are_safe_and_bounded(self) -> None:
+        model = json.loads((EXAMPLES_DIR / "01_celdas_fotovoltaicas.json").read_text(encoding="utf-8"))
+        result = self.client.post("/api/solve", json=model).json()
+        image = BytesIO()
+        Image.new("RGB", (40, 20)).save(image, "PNG")
+        png = b64encode(image.getvalue()).decode()
+        charts = [{"title": title, "png": png} for title in (
+            "'\n\r[]:*?/\\", "'  A\r\n[ B ] " + 70 * "Z", "'", "A B",
+        )]
+        response = self.client.post("/api/export/excel", json={"model": model, "result": result, "charts": charts})
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook.sheetnames[-4:], ["G1 Gráfica", "G2 A B " + 24 * "Z", "G3 Gráfica", "G4 A B"])
+        self.assertTrue(all(len(workbook[name]._images) == 1 for name in workbook.sheetnames[-4:]))
+
+    def test_pdf_embeds_unicode_and_both_filenames_preserve_accents_as_ascii(self) -> None:
+        model = json.loads((EXAMPLES_DIR / "01_celdas_fotovoltaicas.json").read_text(encoding="utf-8"))
+        model["name"] = "Producción de prueba"
+        model["description"] = "Criterios Z₃ y Z₄ sobre ℝ y ℤ. A < B & C > D."
+        model["objectives"][0]["name"] = "Z₃ & Z₄"
+        result = self.client.post("/api/solve", json=model).json()
+        payload = {"model": model, "result": result}
+        for format, ext in (("excel", "xlsx"), ("pdf", "pdf")):
+            response = self.client.post(f"/api/export/{format}", json=payload)
+            self.assertEqual(response.status_code, 200, response.text[:250])
+            self.assertIn(f"OptiCompromise_produccion_de_prueba.{ext}", response.headers["content-disposition"])
+        pdf = PdfReader(BytesIO(response.content))
+        extracted = "\n".join(page.extract_text() for page in pdf.pages)
+        self.assertIn(model["description"], extracted)
+        self.assertIn(model["objectives"][0]["name"], extracted)
+        self.assertNotIn("■", extracted)
+        self.assertNotIn("Interpretación", extracted)
 
     def test_export_excel_endpoint_adversarial_reserved_names_and_bounds(self) -> None:
         adversarial = ModelDefinition(

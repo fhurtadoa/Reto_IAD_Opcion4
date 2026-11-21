@@ -9,7 +9,8 @@
   "framework": "nextjs",
   "functions": {
     "api/index.py": {
-      "includeFiles": "examples/**"
+      "includeFiles": "{examples/**,api/fonts/**}",
+      "maxDuration": 60
     }
   },
   "rewrites": [

@@ -94,14 +94,14 @@ def generate_figures():
 
     # Marco exterior
     ax.add_patch(patches.FancyBboxPatch((0.5, 0.5), 99, 53, boxstyle="round,pad=0.3", facecolor="#F3F4F8", edgecolor="#CBD5E1", lw=1.2))
-    # TopBar (fila principal + sub-barra docente/plantillas)
+    # Cabecera y accesos por sección
     ax.add_patch(patches.Rectangle((1.2, 44.8), 97.6, 8.0, facecolor="#FFFFFF", edgecolor="#CBD5E1", lw=1))
     ax.add_patch(patches.Rectangle((2.0, 49.2), 2.8, 2.8, facecolor="#E11D48", edgecolor="none"))
     ax.text(5.5, 50.6, "OptiCompromise  [COCKPIT V2]", fontsize=8.8, fontweight="bold", color="#0F172A", va="center")
     ax.text(30.5, 50.6, "Ejemplos (6 casos + En blanco)  |  ● Óptimo / Borrador sin aplicar", fontsize=7.0, color="#059669", fontweight="bold", va="center")
-    ax.text(65.5, 50.6, "[Importar] [JSON] [Excel] [CSV] [Manual PDF] [Tema]", fontsize=6.7, color="#334155", va="center")
+    ax.text(65.5, 50.6, "[Tema claro/oscuro]", fontsize=6.7, color="#334155", va="center")
     ax.plot([1.8, 98.2], [48.1, 48.1], color="#E2E8F0", lw=0.7)
-    ax.text(2.4, 46.4, "Recursos rápidos:  [Plantilla Excel (.xlsx) / CSV]   [Ejemplo Excel (Papel) / CSV]   [Guía Docente PDF]", fontsize=6.8, color="#475569", fontweight="bold", va="center")
+    ax.text(2.4, 46.4, "Formular: [Obtener plantilla .xlsx] [Cargar ejercicio]   ·   Pie de página: [Manual] [Guía docente]", fontsize=6.8, color="#475569", fontweight="bold", va="center")
 
     # Barra de navegación de espacio de trabajo
     ax.add_patch(patches.Rectangle((1.2, 41.2), 97.6, 3.0, facecolor="#F8FAFC", edgecolor="#CBD5E1", lw=0.8))
@@ -119,7 +119,7 @@ def generate_figures():
         (24.0, 5.6, "2. Objetivos (Max/Min + Coeficientes)"),
         (17.9, 5.5, "3. Restricciones (≤, ≥, = + Lado Derecho)"),
         (12.0, 5.3, "4. Vista Previa Matemática (LaTeX / KaTeX)"),
-        (2.4, 8.8, "5. Preferencias & Pesos (Σw = 1.00)\n    Perfiles + Deslizadores + [Normalizar pesos (1.00)]"),
+        (2.4, 8.8, "5. Preferencias & Pesos (Σw = 1.00)\n    Fijar peso · Edición numérica · Igualar pesos"),
     ]
     for y, h, lbl in blocks_left:
         ax.add_patch(patches.Rectangle((2.2, y), 32.0, h, facecolor="#F8FAFC", edgecolor="#E2E8F0", lw=0.8))
@@ -128,16 +128,16 @@ def generate_figures():
     # Canvas Derecho (65%)
     ax.add_patch(patches.Rectangle((36.2, 1.5), 62.6, 39.0, facecolor="#FFFFFF", edgecolor="#CBD5E1", lw=1))
     ax.add_patch(patches.Rectangle((37.2, 36.6), 60.6, 3.0, facecolor="#F8FAFC", edgecolor="#E2E8F0", lw=0.8))
-    ax.text(38.0, 38.1, "[Objetivos 2D] [Sensibilidad 21 pts] [Espacio 3D] [Radar] [Región Factible] | [PNG]", fontsize=6.5, fontweight="bold", color="#0F172A", va="center")
+    ax.text(38.0, 38.1, "[Objetivos 2D] [Sensibilidad 21 pts] [Espacio 3D] [Radar] [Región Factible]", fontsize=6.5, fontweight="bold", color="#0F172A", va="center")
 
     ax.add_patch(patches.Rectangle((37.2, 20.5), 60.6, 15.4, facecolor="#F8FAFC", edgecolor="#CBD5E1", lw=0.9))
     ax.text(67.5, 28.2, "Lienzo Interactivo Plotly (Pareto + Isodistancia + Zona Factible + Sensibilidad 3 paneles)\nIdeal ★ / Nadir ✕ / L₁ / L₂ / L∞ + Explorador de Puntos Pareto (Pesos × Métricas)", fontsize=7.0, color="#334155", ha="center", va="center")
 
     blocks_right = [
-        (15.6, 4.2, "Recomendación Analítica + Comparativa de Soluciones (Zᵢ, % Logro, Distancia Dₚ)"),
+        (15.6, 4.2, "Comparativa de soluciones (Zᵢ, % Logro, Distancia Dₚ)"),
         (11.0, 4.0, "Decisiones Óptimas por Variable (Vector x* en L₁, L₂, L∞)"),
         (6.4, 4.0, "Ver método: Matriz de Pagos (q×q), Ideal (Z*), Nadir y Normalización por rango"),
-        (2.2, 3.6, "Modo Rayos X (L∞ · λ*) + Exportación Excel (5 hojas) / CSV / JSON"),
+        (2.2, 3.6, "Modo Rayos X (L∞ · λ*) + Exportación Excel y PDF, con gráficas"),
     ]
     for y, h, lbl in blocks_right:
         ax.add_patch(patches.Rectangle((37.2, y), 60.6, h, facecolor="#F8FAFC", edgecolor="#E2E8F0", lw=0.8))
@@ -370,7 +370,7 @@ def build_pdf(output_path: str):
     story.append(Spacer(1, 10))
 
     story.append(_scaled_image(os.path.join(FIG_DIR, "v2_arquitectura_cockpit.png"), max_width=516, max_height=232))
-    story.append(Paragraph("Figura 1: Arquitectura visual de OptiCompromise Cockpit V2 (barra superior con plantillas y guías, pestañas Formular/Ver método/Explorar resultados, panel 35% y lienzo 65%).", cap_style))
+    story.append(Paragraph("Figura 1: Arquitectura visual de OptiCompromise Cockpit V2 (cabecera, secciones de trabajo, preferencias y visualizaciones).", cap_style))
     story.append(Spacer(1, 8))
     story.append(Table(
         [[Paragraph(
@@ -459,11 +459,11 @@ def build_pdf(output_path: str):
 
     steps_rows = [
         [Paragraph("<b>Paso</b>", th_style), Paragraph("<b>Zona de la Interfaz</b>", th_style), Paragraph("<b>Acción del Usuario</b>", th_style)],
-        [Paragraph("<b>1. Cargar o Crear</b>", td_bold), Paragraph("Barra Superior (<b>Ejemplos</b> y <b>Plantillas</b>)", td_style), Paragraph("Elige entre los 6 casos precargados (Celdas, Transporte, Sostenibilidad 3D, MIP, Flota y Papel) o <b>+ Nuevo Modelo en Blanco</b>. Descarga <b>Plantilla Excel / CSV</b> o <b>Ejemplo Excel / CSV</b>, abre un archivo con <b>Importar</b> (.json, .xlsx, .csv) o consulta <b>Guía Docente PDF</b> y <b>Manual PDF</b>.", td_style)],
+        [Paragraph("<b>1. Cargar o Crear</b>", td_bold), Paragraph("<b>Ejercicio</b> y <b>Formular</b>", td_style), Paragraph("Elige entre los 6 casos precargados (Celdas, Transporte, Sostenibilidad 3D, MIP, Flota y Papel) o <b>+ Nuevo Modelo en Blanco</b>. En <b>Formular</b>, pulsa <b>Obtener plantilla (.xlsx)</b>, diligencia la hoja <b>Modelo</b> y pulsa <b>Cargar ejercicio</b>. El ejemplo de papel está en una hoja del mismo libro.", td_style)],
         [Paragraph("<b>2. Formular Modelo</b>", td_bold), Paragraph("Pestaña <b>Formular</b> (<b>Modo Tabla</b> / <b>Modo Algebraico</b>)", td_style), Paragraph("Define variables (ℝ, ℤ, {0,1} y cotas), objetivos (Max/Min) y restricciones (≤, ≥, =). En <b>Modo Algebraico</b> escribe ecuaciones como <font face='DejaVuMono'>Max Z1 = 50*x1 + 120*x2</font>; mientras existan cambios sin aplicar, el estado marca <b>Borrador sin aplicar</b> y bloquea vistas/exportación hasta pulsar <b>Aplicar Ecuaciones y Resolver</b>. La <b>Vista Previa LaTeX</b> se actualiza en vivo.", td_style)],
-        [Paragraph("<b>3. Ajustar Pesos</b>", td_bold), Paragraph("Panel <b>Preferencias</b>", td_style), Paragraph("Selecciona un perfil rápido (<b>Iguales</b>, <b>Priorizar Z₁</b>, <b>Explorar L₂</b>) o ajusta los deslizadores w_i. Con <i>Auto-balancear suma fija en 1.00</i> activo Σw permanece en 1.00; si lo desactivas y Σw ≠ 1.00, pulsa el botón rápido <b>Normalizar pesos (1.00)</b> (o <b>Normalizar</b>).", td_style)],
-        [Paragraph("<b>4. Ver Método y Explorar</b>", td_bold), Paragraph("Pestañas <b>Ver método</b> y <b>Explorar resultados</b>", td_style), Paragraph("En <b>Explorar resultados</b> analiza <b>Objetivos 2D</b> (Pareto + Isodistancia + Zona Factible), <b>Sensibilidad de pesos</b> (21 puntos en [0,1] + descarga <b>PNG</b> conjunta de los 3 paneles), <b>Espacio 3D</b>, <b>Radar (% Logro)</b> y <b>Región Factible</b> (2 variables, con malla discreta ℤ). En <b>Ver método</b> inspecciona la Matriz de Pagos, normalización y el acordeón <b>Modo Rayos X (L∞)</b>.", td_style)],
-        [Paragraph("<b>5. Exportar</b>", td_bold), Paragraph("Barra Superior y Gráfico", td_style), Paragraph("Guarda la definición en <b>JSON</b>, exporta el libro <b>Excel (.xlsx)</b> multi-hoja estilizado de <b>5 hojas</b> (<font face='DejaVuMono'>Resumen_Ejecutivo</font>, <font face='DejaVuMono'>Matriz_de_Pagos</font>, <font face='DejaVuMono'>Soluciones_Compromiso</font>, <font face='DejaVuMono'>Frontera_Pareto</font> si aplica, y <font face='DejaVuMono'>Modelo</font> re-importable), descarga <b>CSV</b> re-importable o captura <b>PNG</b>.", td_style)],
+        [Paragraph("<b>3. Ajustar Pesos</b>", td_bold), Paragraph("Panel <b>Preferencias</b>", td_style), Paragraph("Escribe un peso o ajusta su deslizador. Pulsa <b>Fijar peso</b> para mantenerlo al ajustar los demás. Los pesos libres se redistribuyen y conservan la suma de 1. Para <b>Igualar pesos</b>, desbloquea los pines que tengan un valor distinto al reparto equitativo.", td_style)],
+        [Paragraph("<b>4. Ver Método y Explorar</b>", td_bold), Paragraph("Pestañas <b>Ver método</b> y <b>Explorar resultados</b>", td_style), Paragraph("En <b>Explorar resultados</b> analiza <b>Objetivos 2D</b> (Pareto + Isodistancia + Zona Factible), <b>Sensibilidad de pesos</b> (21 puntos entre 0 y 1, en tres paneles), <b>Espacio 3D</b>, <b>Radar (% Logro)</b> y <b>Región Factible</b> (2 variables, con malla discreta ℤ). En <b>Ver método</b> inspecciona la Matriz de Pagos, normalización y el acordeón <b>Modo Rayos X (L∞)</b>.", td_style)],
+        [Paragraph("<b>5. Exportar</b>", td_bold), Paragraph("<b>Explorar resultados</b>", td_style), Paragraph("Descarga <b>Excel (.xlsx)</b> o <b>PDF (.pdf)</b> con el modelo, resultados e imágenes de todas las gráficas aplicables. La hoja <b>Modelo</b> del Excel se puede reabrir desde <b>Formular</b>.", td_style)],
     ]
     t_steps = Table(steps_rows, colWidths=[85, 130, 301])
     t_steps.setStyle(TableStyle([
@@ -498,7 +498,7 @@ def build_pdf(output_path: str):
             ]),
         )
         story.append(t_caps_light)
-        story.append(Paragraph("Figura 2: Capturas reales de Cockpit V2 — Explorar resultados con Objetivos 2D y Preferencias (izq.) y vista Ver método con Matriz de pagos en Flota 4Z (der.).", cap_style))
+        story.append(Paragraph("Figura 2: Capturas reales de Cockpit V2 — Explorar resultados con Objetivos 2D y Preferencias (izq.) y vista Ver método con Matriz de pagos del mismo ejercicio (der.).", cap_style))
     story.append(PageBreak())
 
     # =========================================================================
@@ -527,13 +527,13 @@ def build_pdf(output_path: str):
     story.append(_scaled_image(os.path.join(FIG_DIR, "v2_mip_discreto.png"), max_width=495, max_height=198))
     story.append(Paragraph("Figura 5: Muestra de Pareto del caso Producción Mixta MIP. En L₂, la ramificación y poda puede devolver una solución factible sin certificado si se agota el presupuesto.", cap_style))
 
-    ev_fibras = os.path.join(ROOT_DIR, "qa", "estabilizacion", "evidencia", "fibras-enteras.png")
-    ev_3d = os.path.join(ROOT_DIR, "qa", "estabilizacion", "evidencia", "ejes-3d-oscuro.png")
-    if os.path.exists(ev_fibras) and os.path.exists(ev_3d):
-        t_caps_dark = Table(
+    cap_mobile = os.path.join(ROOT_DIR, "docs", "capturas", "opticompromise-movil.jpg")
+    cap_3d = os.path.join(ROOT_DIR, "docs", "capturas", "opticompromise-3d.jpg")
+    if os.path.exists(cap_mobile) and os.path.exists(cap_3d):
+        t_caps_more = Table(
             [[
-                _scaled_image(ev_fibras, max_width=252, max_height=182),
-                _scaled_image(ev_3d, max_width=252, max_height=182),
+                _scaled_image(cap_mobile, max_width=252, max_height=182),
+                _scaled_image(cap_3d, max_width=252, max_height=182),
             ]],
             colWidths=[258, 258],
             style=TableStyle([
@@ -546,8 +546,8 @@ def build_pdf(output_path: str):
             ]),
         )
         story.append(Spacer(1, 6))
-        story.append(t_caps_dark)
-        story.append(Paragraph("Figura 6: Evidencia en tema oscuro — Región Factible discreta y pestaña Sensibilidad de pesos (izq.) y Espacio 3D con selectores de ejes en Flota 4Z (der.).", cap_style))
+        story.append(t_caps_more)
+        story.append(Paragraph("Figura 6: Exploración de objetivos en móvil (izq.) y Espacio 3D del modelo Sostenibilidad en tema oscuro (der.).", cap_style))
 
     story.append(PageBreak())
     story.append(Paragraph("4. Resultados de los casos de demostración", h1_style))

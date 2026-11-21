@@ -2,24 +2,28 @@
 
 ## Formular un modelo
 
-1. Elige uno de los seis ejercicios precargados o **+ Nuevo Modelo en Blanco** en la barra superior. Desde la misma barra puedes descargar **Plantilla Excel (.xlsx)** / **CSV**, **Ejemplo Excel (Papel)** / **CSV**, abrir **Guía Docente PDF** o **Manual PDF**, e **Importar** archivos `.json`, `.xlsx` o `.csv`.
+1. Elige un caso del catálogo en la cabecera o selecciona **+ Nuevo Modelo en Blanco**. Para abrir un archivo, entra en **Formular**, pulsa **Obtener plantilla (.xlsx)**, diligencia **Modelo** y usa **Cargar ejercicio**. Consulta la [guía docente](../GUIA_DOCENTE_CARGA_EJERCICIOS.md) para ver los campos admitidos.
 2. En **Formular**, define las variables (tipo continua ℝ, entera ℤ o binaria {0,1} y cotas), agrega dos o más objetivos (Max/Min) y registra las restricciones con `≤`, `≥` o `=`.
-3. Puedes editar coeficientes en **Modo Tabla** o escribir ecuaciones directamente en **Modo Algebraico**. Si editas en texto, recuerda pulsar **Aplicar Ecuaciones y Resolver**; mientras exista un **Borrador sin aplicar**, las vistas de resultados y la exportación permanecen bloqueadas para evitar inconsistencias. La **Vista Previa Matemática (LaTeX / KaTeX)** muestra en vivo el modelo que recibe el motor.
-4. Si el modelo es infactible, revisa qué restricciones y cotas son incompatibles. Si está no acotado, revisa qué objetivo puede mejorar indefinidamente.
+3. Puedes editar coeficientes en **Modo Tabla** o escribir ecuaciones directamente en **Modo Algebraico**. **Resolver**, **Aplicar Ecuaciones y Resolver** y el cambio a otra vista aplican el borrador si las ecuaciones son válidas. Si hay errores, el texto se conserva y se indica qué corregir. Si las cotas son incompatibles, vuelve a **Modo Tabla** para corregirlas con el borrador pendiente y luego aplica las ecuaciones. El nombre, la descripción y la fuente se desbloquean al aplicar o descartar el borrador. Puedes usar **Descartar borrador** para recuperar el texto del modelo aplicado. Cada ecuación determina las variables presentes. **Modo Tabla** permite editar tipos y cotas.
+4. Si el modelo es infactible, revisa qué restricciones y cotas son incompatibles. Si está no acotado, revisa qué objetivo puede mejorar indefinidamente. Cuando una edición invalida un ejercicio que ya resolviste, usa **Restaurar último modelo válido** para recuperar su formulación y pesos.
 
 ## Explorar e interpretar
 
-1. En **Preferencias**, elige un perfil rápido o mueve los deslizadores para expresar la importancia de cada objetivo. Con *Auto-balancear suma fija en 1.00* la suma se conserva automáticamente; si lo desactivas y $\Sigma w \neq 1.00$, utiliza el botón **Normalizar pesos (1.00)** (o **Normalizar**).
-2. En **Explorar resultados**, identifica en **Objetivos 2D** el punto ideal, el nadir aproximado, las curvas de isodistancia, la zona factible y las tres soluciones. Elige **Región Factible** cuando haya dos variables (incluyendo malla discreta MIP) o **Espacio 3D** y **Radar (% Logro)** cuando existan tres o más objetivos.
-3. En modelos de dos objetivos, abre **Sensibilidad de pesos** para comparar la desviación al ideal de $L_1$, $L_2$ y $L_\infty$ en 21 pesos entre 0 y 1. La línea punteada sigue el peso seleccionado y los marcadores grandes muestran el último cálculo del motor. Pulsa **PNG** para exportar juntos los tres paneles.
-4. En **Comparación de soluciones** y **Decisiones Óptimas**, revisa qué gana y qué cede cada métrica y traduce los valores óptimos de las variables a decisiones concretas.
-5. En **Ver método**, usa el índice para saltar a *Referencias*, *Normalización* o *Métricas*. La matriz de pagos incluye el ideal y el nadir aproximado como referencias, junto con consultas avanzadas y el acordeón **Modo Rayos X ($L_\infty$)**.
-6. Guarda la definición en **JSON**, descarga resultados planos en **CSV**, captura cualquier gráfico en **PNG**, o exporta el libro estilizado **Excel (.xlsx)** de **5 hojas**:
-   - `Resumen_Ejecutivo`: ficha del modelo, pesos, estado del solver e Ideal/Nadir.
-   - `Matriz_de_Pagos`: matriz $q \times q$, ideal, nadir aproximado y rangos de normalización.
-   - `Soluciones_Compromiso`: distancia $D_p$, variables óptimas, valores de objetivos y % de logro para $L_1$, $L_2$ y $L_\infty$.
-   - `Frontera_Pareto`: muestra de puntos no dominados (incluida cuando aplica).
-   - `Modelo`: tabla `Meta` / `Variable` / `Objetivo` / `Restriccion` 100% re-importable mediante **Importar**.
+1. En **Preferencias**, escribe un peso (admite coma o punto decimal) o usa su deslizador. Pulsa **📌 Fijar peso** para conservar su valor al ajustar los demás. Si solo queda un peso libre, toma el valor necesario para que la suma sea 1. **Igualar pesos** asigna el mismo valor a todos. Si hay un peso fijado incompatible, desbloquéalo antes de igualar.
+2. En **Explorar resultados**, identifica en **Objetivos 2D** el punto ideal, el nadir aproximado, las curvas de isodistancia, la zona factible y las tres soluciones. Abre **Guía de curvas de isodistancia** para leer qué representa cada forma. Elige **Región Factible** cuando haya dos variables (incluyendo malla discreta MIP) o **Espacio 3D** y **Radar (% Logro)** cuando existan tres o más objetivos.
+3. En modelos de dos objetivos, abre **Sensibilidad de pesos** para comparar la desviación al ideal de $L_1$, $L_2$ y $L_\infty$ en 21 pesos entre 0 y 1. La línea punteada sigue el peso seleccionado y los marcadores grandes muestran el último cálculo del motor.
+4. En **Comparación de soluciones** y **Valores de las variables**, revisa qué gana y qué cede cada métrica y traduce los valores óptimos de las variables a decisiones concretas.
+5. En **Ver método**, usa el índice para saltar a *Referencias*, *Normalización* o *Métricas*. La matriz de pagos incluye el ideal y el nadir aproximado como referencias, junto con consultas avanzadas y **Ver restricciones minimax con los datos del modelo**.
+
+## Copiar y descargar resultados
+
+**Copiar para informe**, al inicio de **Explorar resultados** junto a **Excel (.xlsx)** y **PDF**, lleva al portapapeles los pesos, la matriz de pagos, el ideal y el nadir, las distancias y los valores por objetivo y variable. Al pegar, un editor puede usar las tablas en HTML o el texto en Markdown.
+
+- **Excel (.xlsx)** reúne la ficha del modelo, la matriz de pagos, L₁, L₂ y L∞, los valores y brechas por objetivo y las muestras Pareto cuando existen. Cada gráfica se incrusta en su propia hoja. La hoja **Modelo** se puede volver a abrir con **Cargar ejercicio**. La aplicación asigna el dominio [0, 1] a las binarias al cargar el archivo.
+- **PDF (.pdf)** presenta la identificación, la formulación matemática, las tablas de resultados y las gráficas con sus leyendas.
+- Ambos incluyen la proyección 2D con Pareto e isodistancias cuando aplican, la región de decisiones si hay dos variables, la sensibilidad si hay dos objetivos, y las vistas 3D y radar a partir de tres objetivos. Las gráficas se incluyen aunque no hayas abierto sus pestañas. La aplicación y el informe identifican las imágenes que no se pudieron generar.
+
+Al recargar, el navegador conserva la última sección activa. Los manuales están en el pie de página. Si un archivo o ejemplo falla al cargar, la alerta conserva el modelo y la sección abiertos.
 
 | Concepto | Lectura |
 |---|---|
@@ -38,7 +42,7 @@
 
 **Ver método.** La matriz de pagos muestra qué se consigue al optimizar cada criterio por separado. Debajo se usa el rango de referencia para comparar unidades distintas.
 
-![Vista de método y matriz de pagos del ejercicio de Flota](capturas/opticompromise-metodo.jpg)
+![Vista de método y matriz de pagos del ejercicio de Celdas](capturas/opticompromise-metodo.jpg)
 
 **Modelo triobjetivo.** Selecciona **Espacio 3D** para girar el gráfico y ver la relación entre los tres criterios.
 

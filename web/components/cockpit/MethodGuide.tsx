@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import KatexBlock from "./KatexBlock";
 import SectionHeading from "./SectionHeading";
-import { buildLinfXRayLatex, fmtNum } from "./mathUtils";
+import { buildLinfXRayLatex, cleanDeviation, fmtAchievement, fmtNum } from "./mathUtils";
 import type { ModelDefinition, SolveResponse } from "./types";
 
 function MethodTable({ label, children }: { label: string; children: ReactNode }) {
@@ -43,16 +43,14 @@ export default function MethodGuide({ model, result }: { model: ModelDefinition;
     return Math.max(0, gap / ranges[i]);
   };
   const minimax = solutions.L_inf;
-  const hasMinimax = minimax.objectives.length > 0;
-  const firstMinimaxDeviation = minimax.normalized_distances[0];
-  const firstMinimaxAchievement = minimax.achievement_pct[0];
+  const hasMinimax = Boolean(minimax?.objectives?.length);
+  const firstMinimaxDeviation = cleanDeviation(minimax?.normalized_distances?.[0]);
+  const firstMinimaxAchievement = minimax?.achievement_pct?.[0];
   const xray = buildLinfXRayLatex(model, payoff, weights, hasMinimax ? minimax : undefined);
 
   return (
-    <article className="method-guide" aria-labelledby="method-title">
+    <article className="method-guide" aria-labelledby="workspace-section-title">
       <header className="method-header">
-        <SectionHeading id="method-title" title="Cómo se calcula el compromiso"
-          cue="De los óptimos individuales a las soluciones ponderadas" />
         <p>Primero se construyen las referencias de cada objetivo. Después se expresa cada brecha en una escala común y se aplica la preferencia del decisor.</p>
         <nav className="method-index" aria-label="En esta explicación">
           {steps.map(([id, title], i) => <a href={`#metodo-${id}`} key={id}><span>{i + 1}</span>{title}</a>)}
@@ -99,15 +97,15 @@ export default function MethodGuide({ model, result }: { model: ModelDefinition;
           <thead><tr><th scope="col">Objetivo</th><th scope="col">Sentido</th><th scope="col">Rango Rᵢ</th><th scope="col">Base de la escala</th><th scope="col">Peso wᵢ</th></tr></thead>
           <tbody>{headers.map((name, i) => <tr key={i}>
             <th scope="row">Z{i + 1} · {name}</th><td>{model.objectives[i].sense === "minimize" ? "Minimizar" : "Maximizar"}</td>
-            <td>{payoff.normalization_sources?.[i] === "constant" ? "—" : (ranges[i] < 1e-6 ? ranges[i].toExponential(3) : fmtNum(ranges[i], 6))}</td>
+            <td>{payoff.normalization_sources?.[i] === "constant" ? "—" : fmtNum(ranges[i], 6)}</td>
             <td>{rangeLabels[payoff.normalization_sources?.[i] ?? "payoff"]}</td><td>{fmtNum(weights[i] * 100, 2)} %</td>
           </tr>)}</tbody>
         </MethodTable>
         {hasMinimax && (
           <p className="method-example">
             <strong>Ejemplo con L∞ · {headers[0]}.</strong>{" "}
-            El valor {fmtNum(minimax.objectives[0], 4)} da una desviación de {fmtNum(100 * firstMinimaxDeviation, 2)} %
-            y un logro de {fmtNum(firstMinimaxAchievement, 2)} %.
+            El valor {fmtNum(minimax.objectives[0], 4)} da una desviación de {firstMinimaxDeviation === undefined ? "—" : `${fmtNum(100 * firstMinimaxDeviation, 2)} %`}
+            {" "}y un logro de {fmtAchievement(firstMinimaxAchievement, 2)}.
           </p>
         )}
         <details className="method-disclosure">
@@ -116,7 +114,7 @@ export default function MethodGuide({ model, result }: { model: ModelDefinition;
           <MethodTable label="Matriz de pagos normalizada">
             <thead><tr><th scope="col">Objetivo optimizado</th>{headers.map((name, i) => <th scope="col" key={i}>D{i + 1} · {name}</th>)}</tr></thead>
             <tbody>{matrix.map((row, i) => <tr key={i}><th scope="row">Z{i + 1} · {headers[i]}</th>
-              {row.map((value, j) => <td key={j}>{fmtNum(deviation(value, j), 3)}</td>)}</tr>)}</tbody>
+              {row.map((value, j) => <td key={j}>{fmtNum(cleanDeviation(deviation(value, j)), 3)}</td>)}</tr>)}</tbody>
           </MethodTable>
         </details>
       </section>
@@ -127,8 +125,8 @@ export default function MethodGuide({ model, result }: { model: ModelDefinition;
         <p>Cada métrica se minimiza con las restricciones y dominios del modelo. Compara los valores y logros por objetivo, porque cada distancia se calcula con una fórmula distinta.</p>
         <div className="method-metrics">{metrics.map(({ key, name, formula, note }) => (
           <div key={key}><h4>{name}</h4><KatexBlock latex={formula} /><p>{note}</p>
-            <p className="method-distance">Distancia calculada <strong>{solutions[key].objectives.length ? fmtNum(solutions[key].aggregate_distance, 4) : "—"}</strong>
-              {solutions[key].status === "feasible_suboptimal" && <span> · Factible sin certificado</span>}</p></div>
+            <p className="method-distance">Distancia calculada <strong>{solutions[key]?.objectives?.length ? fmtNum(solutions[key].aggregate_distance, 4) : "—"}</strong>
+              {solutions[key]?.status === "feasible_suboptimal" && <span> · Factible sin certificado</span>}</p></div>
         ))}</div>
         <div className="method-equation method-minimax">
           <div><h4>Cómo se linealiza el minimax</h4>

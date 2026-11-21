@@ -101,7 +101,6 @@ export interface SolveResponse {
 export type SolverStatus = "idle" | "calculating" | "partial" | "optimal" | "infeasible" | "unbounded" | "error";
 
 export type ThemeMode = "dark" | "light";
-export type DecisionProfile = "equitativo" | "compensatorio" | "moderado" | "personalizado";
 
 export interface PresetOption {
   id: string;

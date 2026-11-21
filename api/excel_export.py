@@ -1,16 +1,18 @@
 """
 Generación de libros Excel (.xlsx) con estética editorial UNAL / OptiCompromise:
-- Plantillas de carga (en blanco editable y ejemplo Producción de Papel).
+- Plantilla de carga con ejemplo de consulta dentro del libro.
 - Reportes completos de resultados multiobjetivo con hoja Modelo 100% re-importable.
 """
 from __future__ import annotations
 
-import json
 from io import BytesIO
+from math import ceil
+import re
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 from openpyxl import Workbook
+from openpyxl.drawing.image import Image
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -18,8 +20,10 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 try:
     from .core.schemas import ModelDefinition, SolveResponse
+    from .report_images import ChartImage, report_text
 except (ImportError, ValueError):
     from core.schemas import ModelDefinition, SolveResponse
+    from report_images import ChartImage, report_text
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 
@@ -203,6 +207,7 @@ def _write_model_sheet(
     banner_title: str,
     subtitle: str | None = None,
     extra_editable_rows: int = 0,
+    blank: bool = False,
 ) -> None:
     """Escribe la hoja 'Modelo' 100% compatible con importModelFromFile."""
     var_cols = [coefficient_column(v.name) for v in model.variables]
@@ -291,6 +296,12 @@ def _write_model_sheet(
                 ],
             )
         )
+
+    if blank:
+        rows_payload = [
+            (section, values if section == "Variable" else [section, *[""] * (len(headers) - 1)])
+            for section, values in rows_payload
+        ]
 
     first_data_row = header_row_idx + 1
     current_row = first_data_row
@@ -483,7 +494,7 @@ def _write_guide_sheet(ws: Worksheet) -> None:
     tips = [
         ("Pesos vacíos = pesos iguales", "Si dejas vacía la columna Max_o_Peso en todos los objetivos, OptiCompromise asignará pesos iguales (1/q). Si ingresas un peso, completa todos para que sumen 1."),
         ("Nombres reservados de variables", "Si una variable se llama exactamente Seccion, Nombre, Tipo_o_Sentido, Min_o_RHS, Max_o_Peso, min, max, peso, etc., nombra su columna de coeficientes como «Coef: <nombre>»."),
-        ("Cómo importar en la web", "En la barra superior pulsa «Importar» y selecciona este archivo .xlsx (también admite .csv o .json). El sistema lee automáticamente la hoja «Modelo»."),
+        ("Cómo importar en la web", "En «Formular», pulsa «Cargar ejercicio». Solo se lee la hoja «Modelo». Usa «Ejemplo_Papel» como referencia."),
         ("Re-importación de resultados", "Todo libro de resultados descargado desde OptiCompromise incluye una hoja «Modelo» fiel que puedes ajustar y volver a importar sin pérdida de datos."),
     ]
     for offset, (title_tip, desc_tip) in enumerate(tips):
@@ -512,22 +523,15 @@ def _write_guide_sheet(ws: Worksheet) -> None:
 
 def _build_blank_template_model() -> ModelDefinition:
     return ModelDefinition(
-        name="Ejercicio Multiobjetivo IAD",
-        description="Plantilla editable: ajusta nombres, cotas, sentidos, pesos y coeficientes.",
-        reference="Universidad Nacional de Colombia · Introducción al Análisis de Decisiones (IAD)",
+        name="",
         variables=[
             {"name": "x1", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": None},
             {"name": "x2", "var_type": "continuous", "lower_bound": 0.0, "upper_bound": None},
         ],
         objectives=[
-            {"name": "Objetivo 1 (Beneficio)", "sense": "maximize", "coefficients": [3.0, 2.0]},
-            {"name": "Objetivo 2 (Impacto)", "sense": "minimize", "coefficients": [1.0, 2.0]},
+            {"name": "", "sense": "maximize"},
+            {"name": "", "sense": "minimize"},
         ],
-        constraints=[
-            {"name": "Restricción 1 (Capacidad)", "sense": "<=", "rhs": 100.0, "coefficients": [1.0, 1.0]},
-        ],
-        weights=[0.5, 0.5],
-        pareto_seed=42,
     )
 
 
@@ -554,8 +558,8 @@ def build_upload_template_workbook(variant: str = "blank") -> bytes:
     if variant == "blank":
         model = _build_blank_template_model()
         subtitle = (
-            "Edita nombres, tipos, cotas, pesos o agrega filas/columnas de variables. "
-            "Consulta la pestaña Guia_Docente para ver todos los valores válidos."
+            "Diligencia esta hoja antes de cargar el archivo. "
+            "Consulta Guia_Docente y Ejemplo_Papel para ver cómo completar los datos."
         )
         extra_rows = 8
     else:
@@ -573,11 +577,19 @@ def build_upload_template_workbook(variant: str = "blank") -> bytes:
         banner_title="OptiCompromise Cockpit V2 — Plantilla de Carga de Modelo Multiobjetivo (IAD · UNAL)",
         subtitle=subtitle,
         extra_editable_rows=extra_rows,
+        blank=variant == "blank",
     )
 
-    ws_guide = wb.create_sheet("Guia_Docente")
-    _write_guide_sheet(ws_guide)
-
+    _write_guide_sheet(wb.create_sheet("Guia_Docente"))
+    if variant == "blank":
+        paper = _load_papel_model()
+        _write_model_sheet(
+            wb.create_sheet("Ejemplo_Papel"),
+            paper,
+            paper.weights,
+            "Ejemplo de consulta | Producción de papel",
+            "Esta hoja contiene datos de referencia. OptiCompromise carga únicamente la hoja Modelo.",
+        )
     return _workbook_to_bytes(wb)
 
 
@@ -681,7 +693,7 @@ def _write_summary_sheet(ws: Worksheet, model: ModelDefinition, result: SolveRes
             row_vals = [key, METRIC_LABELS.get(key, key), "No disponible", None, None, "Métrica no incluida en respuesta"]
         else:
             avg_ach = (
-                sum(sol.achievement_pct) / len(sol.achievement_pct) / 100.0
+                sum(value / 100.0 / len(sol.achievement_pct) for value in sol.achievement_pct)
                 if sol.achievement_pct
                 else None
             )
@@ -812,6 +824,8 @@ def _write_solutions_sheet(ws: Worksheet, model: ModelDefinition, result: SolveR
         *var_names,
         *[f"Z: {h}" for h in headers],
         *[f"% Logro: {h}" for h in headers],
+        *[f"Desviación: {h}" for h in headers],
+        *[f"Brecha ponderada: {h}" for h in headers],
     ]
 
     _style_banner(
@@ -846,6 +860,9 @@ def _write_solutions_sheet(ws: Worksheet, model: ModelDefinition, result: SolveR
                 (sol.achievement_pct[i] / 100.0) if i < len(sol.achievement_pct) else None
                 for i in range(n_objs)
             ],
+            *[sol.normalized_distances[i] if i < len(sol.normalized_distances) else None for i in range(n_objs)],
+            *[result.weights[i] * sol.normalized_distances[i]
+              if i < len(sol.normalized_distances) else None for i in range(n_objs)],
         ]
         fill = ALT_ROW_FILL if idx % 2 else PatternFill(fill_type=None)
         pct_start_col = 4 + n_vars + n_objs
@@ -861,7 +878,7 @@ def _write_solutions_sheet(ws: Worksheet, model: ModelDefinition, result: SolveR
             else:
                 cell.alignment = ALIGN_RIGHT
                 if isinstance(val, (int, float)):
-                    if c_idx >= pct_start_col:
+                    if pct_start_col <= c_idx < pct_start_col + n_objs:
                         cell.number_format = "0.00%"
                     elif c_idx >= z_start_col:
                         cell.number_format = "#,##0.00##"
@@ -924,7 +941,18 @@ def _write_pareto_sheet(ws: Worksheet, model: ModelDefinition, result: SolveResp
     _autofit_columns(ws, min_width=10, max_width=32, skip_merged_rows=(1, 2))
 
 
-def build_results_workbook(model: ModelDefinition, result: SolveResponse) -> bytes:
+def _chart_sheet_name(index: int, title: str) -> str:
+    sanitized = re.sub(r"[\[\]:*?/\\'\x00-\x1f\x7f-\x9f]", " ", title)
+    sanitized = " ".join(sanitized.split()) or "Gráfica"
+    return f"G{index} {sanitized}"[:31].rstrip()
+
+
+def build_results_workbook(
+    model: ModelDefinition,
+    result: SolveResponse,
+    charts: Sequence[ChartImage] = (),
+    warnings: Sequence[str] = (),
+) -> bytes:
     """Genera el libro Excel multi-hoja estilizado con todos los resultados y la hoja Modelo re-importable."""
     wb = Workbook()
 
@@ -951,5 +979,35 @@ def build_results_workbook(model: ModelDefinition, result: SolveResponse) -> byt
         subtitle=None,
         extra_editable_rows=0,
     )
+
+    if warnings:
+        row = ws_summary.max_row + 2
+        ws_summary.cell(row=row, column=1, value="Gráficas pendientes").font = FONT_SECTION_TITLE
+        for warning in warnings:
+            row += 1
+            ws_summary.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+            cell = ws_summary.cell(row, 1, report_text(warning))
+            cell.alignment = ALIGN_LEFT
+            cell.fill = NADIR_FILL
+            ws_summary.row_dimensions[row].height = 30
+
+    for index, chart in enumerate(charts, 1):
+        ws = wb.create_sheet(_chart_sheet_name(index, chart.title))
+        _style_banner(ws, report_text(chart.title), report_text(chart.caption), 12)
+        ws.sheet_view.showGridLines = False
+        for col in range(1, 13):
+            ws.column_dimensions[get_column_letter(col)].width = 12
+        ws.row_dimensions[2].height = max(30, ceil(len(chart.caption) / 100) * 15)
+        image = Image(BytesIO(chart.png))
+        image.width = 940
+        image.height = round(940 * chart.height / chart.width)
+        ws.add_image(image, "A4")
+
+    # User labels and descriptions remain text even when Excel recognizes a formula prefix.
+    for sheet in wb.worksheets:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if cell.data_type in {"f", "e"}:
+                    cell.data_type = "s"
 
     return _workbook_to_bytes(wb)
